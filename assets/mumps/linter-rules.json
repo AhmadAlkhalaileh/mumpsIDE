@@ -1,0 +1,127 @@
+{
+  "rules": {
+    "M001-UNNEWED-VARIABLE": {
+      "severity": "info",
+      "message": "Variable '{var}' used without NEW",
+      "description": "Local variables should be NEWed before use to avoid unintended side effects",
+      "autofix": false
+    },
+    "M002-UNCLOSED-STRING": {
+      "severity": "error",
+      "message": "Unclosed string literal",
+      "description": "String must be properly closed with matching quotes",
+      "autofix": false
+    },
+    "M003-LOWERCASE-COMMAND": {
+      "severity": "warning",
+      "message": "Command '{cmd}' should be uppercase",
+      "description": "MUMPS commands should be uppercase for consistency",
+      "autofix": true
+    },
+    "M004-UNUSED-LABEL": {
+      "severity": "info",
+      "message": "Label '{label}' is defined but never called",
+      "description": "Unused labels may indicate dead code",
+      "autofix": false
+    },
+    "M005-UNREACHABLE-CODE": {
+      "severity": "warning",
+      "message": "Code after QUIT/HALT is unreachable",
+      "description": "Commands after QUIT or HALT will never execute",
+      "autofix": false
+    },
+    "M006-MISSING-QUIT": {
+      "severity": "warning",
+      "message": "Label '{label}' missing QUIT statement",
+      "description": "Labels should end with QUIT to prevent fall-through",
+      "autofix": false
+    },
+    "M007-MISMATCHED-PARENS": {
+      "severity": "error",
+      "message": "Mismatched parentheses",
+      "description": "Opening and closing parentheses must match",
+      "autofix": false
+    },
+    "M008-INVALID-VARIABLE": {
+      "severity": "error",
+      "message": "Invalid variable name '{var}'",
+      "description": "Variable names must start with letter or %",
+      "autofix": false
+    },
+    "M009-GOTO-CONSIDERED-HARMFUL": {
+      "severity": "info",
+      "message": "Consider using DO instead of GOTO",
+      "description": "GOTO can make code harder to follow; DO is preferred",
+      "autofix": false
+    },
+    "M010-MISSING-POSTCOND": {
+      "severity": "info",
+      "message": "Consider using postconditional instead of IF",
+      "description": "Postconditionals (cmd:condition) are more concise",
+      "autofix": false
+    },
+    "M011-NESTED-FOR": {
+      "severity": "info",
+      "message": "Deeply nested FOR loops ({depth} levels)",
+      "description": "Consider refactoring to reduce complexity",
+      "autofix": false
+    },
+    "M012-MAGIC-NUMBER": {
+      "severity": "info",
+      "message": "Magic number '{number}' - consider using named constant",
+      "description": "Named constants improve code readability",
+      "autofix": false
+    },
+    "M013-LONG-LINE": {
+      "severity": "info",
+      "message": "Line exceeds 80 characters ({length} chars)",
+      "description": "Long lines can be hard to read",
+      "autofix": false
+    },
+    "M014-DUPLICATE-CODE": {
+      "severity": "info",
+      "message": "Duplicate code block detected",
+      "description": "Consider extracting to a subroutine",
+      "autofix": false
+    },
+    "M015-NAKED-REFERENCE": {
+      "severity": "warning",
+      "message": "Naked reference may be ambiguous",
+      "description": "Naked references can lead to bugs; use explicit references",
+      "autofix": false
+    },
+    "M016-LOCK-WITHOUT-TIMEOUT": {
+      "severity": "warning",
+      "message": "LOCK without timeout may cause deadlock",
+      "description": "Always specify timeout for LOCK commands",
+      "autofix": false
+    },
+    "M017-MISSING-ERROR-HANDLER": {
+      "severity": "warning",
+      "message": "No $ETRAP or $ZTRAP error handler",
+      "description": "Routines should have error handling",
+      "autofix": false
+    },
+    "M018-HARDCODED-PATH": {
+      "severity": "warning",
+      "message": "Hardcoded file path detected",
+      "description": "Use configuration or variables for file paths",
+      "autofix": false
+    },
+    "M019-SQL-INJECTION": {
+      "severity": "error",
+      "message": "Potential SQL injection vulnerability",
+      "description": "Use parameterized queries",
+      "autofix": false
+    }
+
+  },
+  "config": {
+    "maxLineLength": 80,
+    "maxNestingDepth": 3,
+    "checkUnusedVariables": false,
+    "checkUnusedLabels": true,
+    "enforceUppercase": true,
+    "checkMagicNumbers": false
+  }
+}

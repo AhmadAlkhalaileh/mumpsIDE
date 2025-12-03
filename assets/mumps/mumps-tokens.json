@@ -1,0 +1,209 @@
+{
+  "version": "1.0.0",
+  "description": "MUMPS language tokens and intrinsic functions",
+  "commands": {
+    "BREAK": { "abbrev": "B", "description": "Break execution and enter direct mode" },
+    "CLOSE": { "abbrev": "C", "description": "Close a device or file" },
+    "DO": { "abbrev": "D", "description": "Execute a subroutine or external routine" },
+    "ELSE": { "abbrev": "E", "description": "Execute if previous IF was false" },
+    "FOR": { "abbrev": "F", "description": "Loop construct" },
+    "GOTO": { "abbrev": "G", "description": "Jump to a label" },
+    "HALT": { "abbrev": "H", "description": "Terminate process" },
+    "HANG": { "abbrev": "H", "description": "Suspend execution for specified time" },
+    "IF": { "abbrev": "I", "description": "Conditional execution" },
+    "JOB": { "abbrev": "J", "description": "Start a new process" },
+    "KILL": { "abbrev": "K", "description": "Delete variables" },
+    "LOCK": { "abbrev": "L", "description": "Lock/unlock resources" },
+    "MERGE": { "abbrev": "M", "description": "Merge variable trees" },
+    "NEW": { "abbrev": "N", "description": "Create new variable scope" },
+    "OPEN": { "abbrev": "O", "description": "Open a device" },
+    "QUIT": { "abbrev": "Q", "description": "Exit current scope or return value" },
+    "READ": { "abbrev": "R", "description": "Read from device" },
+    "SET": { "abbrev": "S", "description": "Assign value to variable" },
+    "TCOMMIT": { "abbrev": "TC", "description": "Commit transaction" },
+    "TRESTART": { "abbrev": "TRE", "description": "Restart transaction" },
+    "TROLLBACK": { "abbrev": "TRO", "description": "Rollback transaction" },
+    "TSTART": { "abbrev": "TS", "description": "Start transaction" },
+    "USE": { "abbrev": "U", "description": "Set current device" },
+    "VIEW": { "abbrev": "V", "description": "Access system information" },
+    "WRITE": { "abbrev": "W", "description": "Write to current device" },
+    "XECUTE": { "abbrev": "X", "description": "Execute string as code" },
+    "ZBREAK": { "abbrev": "ZB", "description": "Set debugger breakpoint" },
+    "ZPRINT": { "abbrev": "ZP", "description": "Print routine lines" },
+    "ZSHOW": { "abbrev": "ZSH", "description": "Show system information" },
+    "ZSTEP": { "abbrev": "ZST", "description": "Single-step in debugger" },
+    "ZWRITE": { "abbrev": "ZW", "description": "Write variable tree" },
+    "ZTRAP": { "abbrev": "ZTRAP", "description": "Set error trap" }
+  },
+  "intrinsics": {
+    "$ASCII": {
+      "abbrev": "$A",
+      "signature": "$ASCII(expr[,intexpr])",
+      "returns": "integer",
+      "description": "Returns ASCII code of character at position"
+    },
+    "$CHAR": {
+      "abbrev": "$C",
+      "signature": "$CHAR(intexpr[,...])",
+      "returns": "string",
+      "description": "Returns character(s) from ASCII code(s)"
+    },
+    "$DATA": {
+      "abbrev": "$D",
+      "signature": "$DATA(glvn)",
+      "returns": "integer",
+      "description": "Returns 0=undefined, 1=data only, 10=descendants only, 11=data+descendants"
+    },
+    "$EXTRACT": {
+      "abbrev": "$E",
+      "signature": "$EXTRACT(expr[,from[,to]])",
+      "returns": "string",
+      "description": "Extract substring"
+    },
+    "$FIND": {
+      "abbrev": "$F",
+      "signature": "$FIND(expr,substr[,start])",
+      "returns": "integer",
+      "description": "Find substring position"
+    },
+    "$GET": {
+      "abbrev": "$G",
+      "signature": "$GET(glvn[,default])",
+      "returns": "string",
+      "description": "Get value or default if undefined"
+    },
+    "$HOROLOG": {
+      "abbrev": "$H",
+      "signature": "$HOROLOG",
+      "returns": "string",
+      "description": "Returns current date,time as days,seconds"
+    },
+    "$JUSTIFY": {
+      "abbrev": "$J",
+      "signature": "$JUSTIFY(expr,width[,decimals])",
+      "returns": "string",
+      "description": "Right-justify with optional decimal formatting"
+    },
+    "$LENGTH": {
+      "abbrev": "$L",
+      "signature": "$LENGTH(expr[,delimiter])",
+      "returns": "integer",
+      "description": "Returns length or piece count"
+    },
+    "$NAME": {
+      "abbrev": "$NA",
+      "signature": "$NAME(glvn[,subscripts])",
+      "returns": "string",
+      "description": "Returns string representation of global/local name"
+    },
+    "$ORDER": {
+      "abbrev": "$O",
+      "signature": "$ORDER(glvn[,direction])",
+      "returns": "string",
+      "description": "Returns next subscript in collating sequence"
+    },
+    "$PIECE": {
+      "abbrev": "$P",
+      "signature": "$PIECE(expr,delimiter[,from[,to]])",
+      "returns": "string",
+      "description": "Extract delimited piece(s)"
+    },
+    "$QLENGTH": {
+      "abbrev": "$QL",
+      "signature": "$QLENGTH(namevalue)",
+      "returns": "integer",
+      "description": "Returns number of subscripts in name"
+    },
+    "$QSUBSCRIPT": {
+      "abbrev": "$QS",
+      "signature": "$QSUBSCRIPT(namevalue,intexpr)",
+      "returns": "string",
+      "description": "Returns specified subscript from name"
+    },
+    "$QUERY": {
+      "abbrev": "$Q",
+      "signature": "$QUERY(glvn[,direction])",
+      "returns": "string",
+      "description": "Returns next node in tree traversal"
+    },
+    "$RANDOM": {
+      "abbrev": "$R",
+      "signature": "$RANDOM(intexpr)",
+      "returns": "integer",
+      "description": "Returns random integer 0 to intexpr-1"
+    },
+    "$REVERSE": {
+      "abbrev": "$RE",
+      "signature": "$REVERSE(expr)",
+      "returns": "string",
+      "description": "Returns reversed string"
+    },
+    "$SELECT": {
+      "abbrev": "$S",
+      "signature": "$SELECT(condition:value[,...])",
+      "returns": "any",
+      "description": "Returns value of first true condition"
+    },
+    "$TEXT": {
+      "abbrev": "$T",
+      "signature": "$TEXT(entryref[+offset])",
+      "returns": "string",
+      "description": "Returns source line text"
+    },
+    "$TRANSLATE": {
+      "abbrev": "$TR",
+      "signature": "$TRANSLATE(expr,from[,to])",
+      "returns": "string",
+      "description": "Translate characters"
+    },
+    "$VIEW": {
+      "abbrev": "$V",
+      "signature": "$VIEW(keyword[,...])",
+      "returns": "string",
+      "description": "Access system information"
+    },
+    "$ZCMDLINE": {
+      "abbrev": "$ZCMDLINE",
+      "signature": "$ZCMDLINE",
+      "returns": "string",
+      "description": "Returns command line"
+    },
+    "$ZJOBEXAM": {
+      "abbrev": "$ZJ",
+      "signature": "$ZJOBEXAM()",
+      "returns": "integer",
+      "description": "Create process dump"
+    },
+    "$ZSTATUS": {
+      "abbrev": "$ZS",
+      "signature": "$ZSTATUS",
+      "returns": "string",
+      "description": "Returns last error message"
+    }
+  },
+  "operators": {
+    "arithmetic": ["+", "-", "*", "/", "\\", "#", "**"],
+    "comparison": ["=", "'=", "<", "'>", ">", "'<", "[", "']", "]", "'["],
+    "logical": ["&", "!", "'", "?"],
+    "string": ["_"]
+  },
+  "specialVariables": {
+    "$DEVICE": "Current I/O device",
+    "$ECODE": "Error code stack",
+    "$ESTACK": "Error stack level",
+    "$ETRAP": "Error trap",
+    "$HOROLOG": "Current date/time",
+    "$IO": "Current I/O device",
+    "$JOB": "Process ID",
+    "$KEY": "Last key read",
+    "$PRINCIPAL": "Principal device",
+    "$QUIT": "Quit context flag",
+    "$REFERENCE": "Last global reference",
+    "$STORAGE": "Storage remaining",
+    "$SYSTEM": "System ID",
+    "$TEST": "Truth value from last IF/FOR",
+    "$X": "Current horizontal position",
+    "$Y": "Current vertical position",
+    "$ZSTATUS": "Last error message"
+  }
+}

@@ -1,0 +1,398 @@
+{
+  "commands": [
+    {
+      "label": "BREAK",
+      "abbr": "B",
+      "detail": "BREAK - Interrupt execution",
+      "documentation": "Sets a breakpoint or interrupts program execution",
+      "insertText": "BREAK",
+      "kind": "Command"
+    },
+    {
+      "label": "CLOSE",
+      "abbr": "C",
+      "detail": "CLOSE device",
+      "documentation": "Closes a device or file",
+      "insertText": "CLOSE device",
+      "kind": "Command"
+    },
+    {
+      "label": "DO",
+      "abbr": "D",
+      "detail": "DO label^routine",
+      "documentation": "Execute a subroutine or label",
+      "insertText": "DO label",
+      "kind": "Command"
+    },
+    {
+      "label": "ELSE",
+      "abbr": "E",
+      "detail": "ELSE - Execute if IF condition is false",
+      "documentation": "Executes when the preceding IF condition is false",
+      "insertText": "ELSE",
+      "kind": "Command"
+    },
+    {
+      "label": "FOR",
+      "abbr": "F",
+      "detail": "FOR var=start:increment:end",
+      "documentation": "Loop control structure",
+      "insertText": "FOR var=start:increment:end",
+      "kind": "Command"
+    },
+    {
+      "label": "GOTO",
+      "abbr": "G",
+      "detail": "GOTO label",
+      "documentation": "Transfer control to a label",
+      "insertText": "GOTO label",
+      "kind": "Command"
+    },
+    {
+      "label": "HALT",
+      "abbr": "H",
+      "detail": "HALT - Terminate program",
+      "documentation": "Stops program execution and returns to system",
+      "insertText": "HALT",
+      "kind": "Command"
+    },
+    {
+      "label": "HANG",
+      "abbr": "H",
+      "detail": "HANG seconds",
+      "documentation": "Pause execution for specified seconds",
+      "insertText": "HANG SECONDS",
+      "kind": "Command"
+    },
+    {
+      "label": "IF",
+      "abbr": "I",
+      "detail": "IF condition command",
+      "documentation": "Conditional execution",
+      "insertText": "IF condition DO",
+      "kind": "Command"
+    },
+    {
+      "label": "JOB",
+      "abbr": "J",
+      "detail": "JOB label^routine",
+      "documentation": "Start a new process",
+      "insertText": "JOB label^routine",
+      "kind": "Command"
+    },
+    {
+      "label": "KILL",
+      "abbr": "K",
+      "detail": "KILL variable",
+      "documentation": "Delete a variable or global",
+      "insertText": "KILL variable",
+      "kind": "Command"
+    },
+    {
+      "label": "LOCK",
+      "abbr": "L",
+      "detail": "LOCK +resource",
+      "documentation": "Lock a resource for exclusive access",
+      "insertText": "LOCK +resource",
+      "kind": "Command"
+    },
+    {
+      "label": "MERGE",
+      "abbr": "M",
+      "detail": "MERGE dest=source",
+      "documentation": "Copy entire array or tree",
+      "insertText": "MERGE dest=source",
+      "kind": "Command"
+    },
+    {
+      "label": "NEW",
+      "abbr": "N",
+      "detail": "NEW variable",
+      "documentation": "Create new local variable scope",
+      "insertText": "NEW variable",
+      "kind": "Command"
+    },
+    {
+      "label": "OPEN",
+      "abbr": "O",
+      "detail": "OPEN device:parameters",
+      "documentation": "Open a device or file",
+      "insertText": "OPEN device:parameters",
+      "kind": "Command"
+    },
+    {
+      "label": "QUIT",
+      "abbr": "Q",
+      "detail": "QUIT value",
+      "documentation": "Return from subroutine or function",
+      "insertText": "QUIT value",
+      "kind": "Command"
+    },
+    {
+      "label": "READ",
+      "abbr": "R",
+      "detail": "READ variable",
+      "documentation": "Read input from device",
+      "insertText": "READ variable",
+      "kind": "Command"
+    },
+    {
+      "label": "SET",
+      "abbr": "S",
+      "detail": "SET variable=value",
+      "documentation": "Assign value to variable",
+      "insertText": "SET variable=value",
+      "kind": "Command"
+    },
+    {
+      "label": "USE",
+      "abbr": "U",
+      "detail": "USE device",
+      "documentation": "Switch current I/O device",
+      "insertText": "USE device",
+      "kind": "Command"
+    },
+    {
+      "label": "WRITE",
+      "abbr": "W",
+      "detail": "WRITE expression",
+      "documentation": "Output data to current device",
+      "insertText": "WRITE expression",
+      "kind": "Command"
+    },
+    {
+      "label": "XECUTE",
+      "abbr": "X",
+      "detail": "XECUTE string",
+      "documentation": "Execute MUMPS code from string",
+      "insertText": "XECUTE string",
+      "kind": "Command"
+    }
+  ],
+  "intrinsicFunctions": [
+    {
+      "label": "$ASCII",
+      "abbr": "$A",
+      "detail": "$ASCII(string, position)",
+      "documentation": "Returns ASCII code of character at position in string",
+      "insertText": "$ASCII(string, position)",
+      "kind": "Function"
+    },
+    {
+      "label": "$CHAR",
+      "abbr": "$C",
+      "detail": "$CHAR(code1, code2, ...)",
+      "documentation": "Converts ASCII codes to characters",
+      "insertText": "$CHAR(code)",
+      "kind": "Function"
+    },
+    {
+      "label": "$DATA",
+      "abbr": "$D",
+      "detail": "$DATA(glvn)",
+      "documentation": "Returns 0=undefined, 1=data, 10=descendants, 11=both",
+      "insertText": "$DATA(variable)",
+      "kind": "Function"
+    },
+    {
+      "label": "$EXTRACT",
+      "abbr": "$E",
+      "detail": "$EXTRACT(string, start, end)",
+      "documentation": "Extracts substring from string",
+      "insertText": "$EXTRACT(string, start, end)",
+      "kind": "Function"
+    },
+    {
+      "label": "$FIND",
+      "abbr": "$F",
+      "detail": "$FIND(string, substring, start)",
+      "documentation": "Finds position of substring in string",
+      "insertText": "$FIND(string, substring, start)",
+      "kind": "Function"
+    },
+    {
+      "label": "$FNUMBER",
+      "abbr": "$FN",
+      "detail": "$FNUMBER(number, format)",
+      "documentation": "Formats a number according to format code",
+      "insertText": "$FNUMBER(number, format)",
+      "kind": "Function"
+    },
+    {
+      "label": "$GET",
+      "abbr": "$G",
+      "detail": "$GET(glvn, default)",
+      "documentation": "Returns value or default if undefined",
+      "insertText": "$GET(variable, default)",
+      "kind": "Function"
+    },
+    {
+      "label": "$JUSTIFY",
+      "abbr": "$J",
+      "detail": "$JUSTIFY(string, width, decimals)",
+      "documentation": "Right-justifies and formats string/number",
+      "insertText": "$JUSTIFY(expression, width, decimals)",
+      "kind": "Function"
+    },
+    {
+      "label": "$LENGTH",
+      "abbr": "$L",
+      "detail": "$LENGTH(string, delimiter)",
+      "documentation": "Returns length of string or number of pieces",
+      "insertText": "$LENGTH(string, delimiter)",
+      "kind": "Function"
+    },
+    {
+      "label": "$NAME",
+      "abbr": "$NA",
+      "detail": "$NAME(glvn, subscript)",
+      "documentation": "Returns formatted name of variable",
+      "insertText": "$NAME(variable, subscript)",
+      "kind": "Function"
+    },
+    {
+      "label": "$ORDER",
+      "abbr": "$O",
+      "detail": "$ORDER(glvn, direction)",
+      "documentation": "Returns next subscript in collating sequence",
+      "insertText": "$ORDER(variable or File Global, direction)",
+      "kind": "Function"
+    },
+    {
+      "label": "$PIECE",
+      "abbr": "$P",
+      "detail": "$PIECE(string, delimiter, start, end)",
+      "documentation": "Extracts piece(s) from delimited string",
+      "insertText": "$PIECE(string, delimiter, start, end)",
+      "kind": "Function"
+    },
+    {
+      "label": "$QUERY",
+      "abbr": "$Q",
+      "detail": "$QUERY(glvn, direction)",
+      "documentation": "Returns next node in array tree",
+      "insertText": "$QUERY(variable, direction)",
+      "kind": "Function"
+    },
+    {
+      "label": "$RANDOM",
+      "abbr": "$R",
+      "detail": "$RANDOM(range)",
+      "documentation": "Returns random integer from 0 to range-1",
+      "insertText": "$RANDOM(range)",
+      "kind": "Function"
+    },
+    {
+      "label": "$REVERSE",
+      "abbr": "$RE",
+      "detail": "$REVERSE(string)",
+      "documentation": "Reverses character order in string",
+      "insertText": "$REVERSE(string)",
+      "kind": "Function"
+    },
+    {
+      "label": "$SELECT",
+      "abbr": "$S",
+      "detail": "$SELECT(cond1:val1, cond2:val2, ...)",
+      "documentation": "Returns value of first true condition",
+      "insertText": "$SELECT(condition:value, 1:default)",
+      "kind": "Function"
+    },
+    {
+      "label": "$TEXT",
+      "abbr": "$T",
+      "detail": "$TEXT(label+offset^routine)",
+      "documentation": "Returns source code line as string",
+      "insertText": "$TEXT(label)",
+      "kind": "Function"
+    },
+    {
+      "label": "$TRANSLATE",
+      "abbr": "$TR",
+      "detail": "$TRANSLATE(string, from, to)",
+      "documentation": "Translates characters in string",
+      "insertText": "$TRANSLATE(string, from, to)",
+      "kind": "Function"
+    }
+  ],
+  "intrinsicVariables": [
+    {
+      "label": "$HOROLOG",
+      "abbr": "$H",
+      "detail": "$HOROLOG - Current date and time",
+      "documentation": "Days since Dec 31, 1840 and seconds since midnight",
+      "insertText": "$HOROLOG",
+      "kind": "Variable"
+    },
+    {
+      "label": "$IO",
+      "abbr": "$I",
+      "detail": "$IO - Current I/O device",
+      "documentation": "Name of current input/output device",
+      "insertText": "$IO",
+      "kind": "Variable"
+    },
+    {
+      "label": "$JOB",
+      "abbr": "$J",
+      "detail": "$JOB - Current job/process ID",
+      "documentation": "Unique identifier for current process",
+      "insertText": "$JOB",
+      "kind": "Variable"
+    },
+    {
+      "label": "$TEST",
+      "abbr": "$T",
+      "detail": "$TEST - Result of last IF or timeout",
+      "documentation": "Boolean result of most recent IF command",
+      "insertText": "$TEST",
+      "kind": "Variable"
+    },
+    {
+      "label": "$X",
+      "abbr": "$X",
+      "detail": "$X - Horizontal cursor position",
+      "documentation": "Current column position on output device",
+      "insertText": "$X",
+      "kind": "Variable"
+    },
+    {
+      "label": "$Y",
+      "abbr": "$Y",
+      "detail": "$Y - Vertical cursor position",
+      "documentation": "Current line position on output device",
+      "insertText": "$Y",
+      "kind": "Variable"
+    }
+  ],
+  "snippets": [
+    {
+      "label": "for-loop",
+      "detail": "FOR loop with variable",
+      "documentation": "Standard FOR loop pattern",
+      "insertText": "FOR i=1:1:10 DO\n. command\n",
+      "kind": "Snippet"
+    },
+    {
+      "label": "if-else",
+      "detail": "IF-ELSE conditional",
+      "documentation": "IF-ELSE pattern",
+      "insertText": "IF condition DO\n. true-block\nELSE  DO\n. false-block\n",
+      "kind": "Snippet"
+    },
+    {
+      "label": "new-label",
+      "detail": "Label with parameters",
+      "documentation": "Create new label entry point",
+      "insertText": "LABEL(params) ;\n command\n QUIT value\n",
+      "kind": "Snippet"
+    },
+    {
+      "label": "error-handler",
+      "detail": "Error handling pattern",
+      "documentation": "Standard error trap pattern",
+      "insertText": "NEW $ETRAP\nSET $ETRAP=\"DO ERROR^ROUTINE\"\ncode\nQUIT\nERROR ;\n WRITE !,\"Error: \",$ZSTATUS,!\n QUIT\n",
+      "kind": "Snippet"
+    }
+  ]
+}

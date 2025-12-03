@@ -1,0 +1,21 @@
+{
+  "name": "ahmad-ide",
+  "version": "1.0.0",
+  "description": "",
+  "main": "main.js",
+  "scripts": {
+    "start": "AHMAD_IDE_USE_SG=1 electron .",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^27.1.0"
+  },
+  "dependencies": {
+    "monaco-editor": "^0.55.1",
+    "ssh2": "^1.17.0",
+    "node-pty": "^0.11.1"
+  }
+}

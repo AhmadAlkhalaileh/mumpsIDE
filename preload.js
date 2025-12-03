@@ -1,0 +1,33 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('ahmadIDE', {
+    getEnv: () => ipcRenderer.invoke('env:get'),
+    lint: (code) => ipcRenderer.invoke('lint:run', { code }),
+    execute: (code) => ipcRenderer.invoke('exec:run', { code }),
+    setConnection: (type, config) => ipcRenderer.invoke('connection:set', { type, config }),
+    debugStart: (code, breakpoints) => ipcRenderer.invoke('debug:start', { code, breakpoints }),
+    debugStep: (sessionId, stepType) => ipcRenderer.invoke('debug:step', { sessionId, stepType }),
+    debugContinue: (sessionId) => ipcRenderer.invoke('debug:continue', { sessionId }),
+    debugStop: (sessionId) => ipcRenderer.invoke('debug:stop', { sessionId }),
+    listDocker: () => ipcRenderer.invoke('docker:list'),
+    sshConnect: (config) => ipcRenderer.invoke('ssh:connect', config),
+    sshExec: (sessionId, command) => ipcRenderer.invoke('ssh:exec', { sessionId, command }),
+    sshDisconnect: (sessionId) => ipcRenderer.invoke('ssh:disconnect', { sessionId }),
+    listRoutines: (search) => ipcRenderer.invoke('routines:list', { search }),
+    readRoutine: (name) => ipcRenderer.invoke('routines:read', { name }),
+    saveRoutine: (name, code) => ipcRenderer.invoke('routines:save', { name, code }),
+    zlinkRoutine: (name) => ipcRenderer.invoke('routines:zlink', { name }),
+    hostExec: (command) => ipcRenderer.invoke('terminal:exec', { command }),
+    git: (command) => ipcRenderer.invoke('git:run', { command }),
+    getGitConfig: (projectPath) => ipcRenderer.invoke('git:getConfig', { projectPath }),
+    createProject: (config) => ipcRenderer.invoke('project:create', config),
+    openProject: (projectPath) => ipcRenderer.invoke('project:open', { projectPath }),
+    openFolderDialog: () => ipcRenderer.invoke('dialog:openFolder'),
+    toggleDevTools: () => ipcRenderer.invoke('devtools:toggle'),
+    terminalCreate: () => ipcRenderer.invoke('terminal:create'),
+    terminalWrite: (id, data) => ipcRenderer.invoke('terminal:write', { id, data }),
+    terminalResize: (id, cols, rows) => ipcRenderer.invoke('terminal:resize', { id, cols, rows }),
+    terminalClose: (id) => ipcRenderer.invoke('terminal:close', { id }),
+    onTerminalData: (cb) => ipcRenderer.on('terminal:data', (_event, payload) => cb(payload)),
+    onTerminalExit: (cb) => ipcRenderer.on('terminal:exit', (_event, payload) => cb(payload))
+});
