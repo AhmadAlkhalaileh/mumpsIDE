@@ -4,11 +4,18 @@ const { exec, spawn } = require('child_process');
 const fs = require('fs');
 const bridge = require('./bridge');
 let nodePty = null;
-try {
-    // Optional: node-pty for true PTY behavior
-    nodePty = require('node-pty');
-} catch (e) {
-    nodePty = null;
+const enableNodePty = process.env.AHMAD_IDE_ENABLE_NODE_PTY === '1';
+let nodePtyLoadError = null;
+if (enableNodePty) {
+    try {
+        nodePty = require('node-pty');
+    } catch (e) {
+        nodePtyLoadError = e;
+        nodePty = null;
+        console.warn('node-pty unavailable, falling back to spawn():', e?.message || e);
+    }
+} else {
+    console.warn('node-pty disabled by default (set AHMAD_IDE_ENABLE_NODE_PTY=1 to attempt loading). Using spawn() fallback.');
 }
 
 // Terminal sessions (simple persistent shell per tab)
@@ -139,6 +146,10 @@ ipcMain.handle('routines:list', async (_event, payload) => {
   return bridge.listRoutines(payload?.search || '');
 });
 
+ipcMain.handle('routines:search', async (_event, payload) => {
+  return bridge.searchRoutines(payload?.term || '', payload?.options || {});
+});
+
 ipcMain.handle('routines:read', async (_event, payload) => {
   return bridge.readRoutine(payload?.name || '');
 });
@@ -206,16 +217,46 @@ ipcMain.handle('shell:reveal', async (event, { path }) => {
     }
 });
 
-function createTerminalSession(sender) {
-    const shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : '/bin/bash');
+function resolveShell(shellOverride) {
+    if (shellOverride && typeof shellOverride === 'string' && shellOverride.trim().length) {
+        return shellOverride.trim();
+    }
+    if (process.platform === 'win32') {
+        return process.env.COMSPEC || 'powershell.exe';
+    }
+    return process.env.SHELL || '/bin/bash';
+}
+
+function resolveCwd(dirOverride) {
+    const candidate = dirOverride && typeof dirOverride === 'string' ? dirOverride : process.cwd();
+    try {
+        if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+            return candidate;
+        }
+    } catch (_) {
+        // fall through to default cwd
+    }
+    return process.cwd();
+}
+
+function createTerminalSession(sender, options = {}) {
+    const shell = resolveShell(options.shell);
+    if (options.shell && (options.shell.includes(path.sep)) && !fs.existsSync(shell)) {
+        throw new Error(`Shell not found at ${shell}`);
+    }
+    const cwd = resolveCwd(options.cwd);
+    const parsedCols = parseInt(options.cols, 10);
+    const parsedRows = parseInt(options.rows, 10);
+    const cols = Number.isFinite(parsedCols) && parsedCols > 0 ? parsedCols : 80;
+    const rows = Number.isFinite(parsedRows) && parsedRows > 0 ? parsedRows : 24;
     const id = `term_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
     if (nodePty) {
         const ptyProc = nodePty.spawn(shell, [], {
             name: 'xterm-color',
-            cols: 80,
-            rows: 24,
-            cwd: process.cwd(),
+            cols,
+            rows,
+            cwd,
             env: process.env
         });
         ptyProc.onData((data) => sender.send('terminal:data', { id, data }));
@@ -227,7 +268,7 @@ function createTerminalSession(sender) {
     } else {
         const child = spawn(shell, [], {
             env: process.env,
-            cwd: process.cwd(),
+            cwd,
             stdio: 'pipe'
         });
         child.stdout.on('data', (data) => sender.send('terminal:data', { id, data: data.toString() }));
@@ -241,11 +282,12 @@ function createTerminalSession(sender) {
     return id;
 }
 
-ipcMain.handle('terminal:create', async (event) => {
+ipcMain.handle('terminal:create', async (event, payload) => {
     try {
-        const id = createTerminalSession(event.sender);
+        const id = createTerminalSession(event.sender, payload || {});
         return { ok: true, id };
     } catch (e) {
+        console.error('terminal:create failed', e);
         return { ok: false, error: e.message };
     }
 });

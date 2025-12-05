@@ -125,6 +125,22 @@
                         <button class="btn primary icon-btn toolbar-btn" id="runBtn" title="Run (Ctrl+Enter)">
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2v12l10-6L4 2z"/></svg>
                         </button>
+                        <div class="toolbar-separator"></div>
+                        <button class="btn ghost toolbar-btn with-label" id="toolbarGitBtn" title="Git (opens Version Control tool window)">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                <circle cx="4" cy="4" r="2"/>
+                                <circle cx="12" cy="12" r="2"/>
+                                <path d="M5.5 5.5l5 5" stroke="currentColor" stroke-width="1.8" fill="none"/>
+                            </svg>
+                            <span class="toolbar-label">Git</span>
+                        </button>
+                        <button class="btn ghost toolbar-btn with-label" id="toolbarCommitBtn" title="Commit (opens Commit tool window)">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4">
+                                <rect x="2.8" y="2.8" width="10.4" height="10.4" rx="2"/>
+                                <path d="M5.5 8.5l2 2.1 3.2-4.1" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span class="toolbar-label">Commit</span>
+                        </button>
                     </div>
                 </div>
                 <div class="editor-frame">
@@ -139,21 +155,20 @@
                     <div class="pane-header terminal-header">
                         <div class="pane-title">Terminal</div>
                         <div class="pane-actions">
-                            <div class="pill subtle">Shell</div>
+                            <div class="pill subtle" id="terminalStatusPill" title="Toggle with Alt+F12">Alt+F12</div>
+                            <button class="btn ghost icon-btn" id="terminalNewTabBtn" title="New Terminal Tab (Ctrl+Shift+T)">+</button>
                             <button class="btn ghost icon-btn" id="terminalHideBtn" title="Hide Terminal">✕</button>
                         </div>
                     </div>
                     <div class="terminal-tabbar">
                         <div id="terminalTabs" class="terminal-tabs"></div>
                         <div class="terminal-tab-actions">
-                            <button class="btn ghost icon-btn" id="terminalNewTabBtn" title="New Terminal Tab">+</button>
                             <button class="btn ghost icon-btn" id="terminalClearBtn" title="Clear Active Terminal">Clear</button>
                         </div>
                     </div>
-                    <div class="output" id="output" aria-label="Terminal">Ready.</div>
-                    <div class="terminal-input-row">
-                        <span class="prompt">$</span>
-                        <input id="terminalInput" class="terminal-input" placeholder="Enter command and press Enter">
+                    <div class="terminal-surface">
+                        <div class="terminal-viewport" id="terminalViewport" aria-label="Terminal"></div>
+                        <div class="terminal-error hidden" id="terminalError" role="alert"></div>
                     </div>
                 </section>
                 <section class="panel debug-panel" id="debugPanel">
@@ -342,55 +357,6 @@
             </div>
         </div>
 
-        <!-- RIGHT TOOL WINDOW BAR (PhpStorm: Git, Commit, Database) -->
-        <div class="tool-window-bar tool-window-bar-right">
-            <button class="tool-window-stripe-btn" data-panel="gitToolPanel" data-position="right" title="Git (Alt+9)">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <circle cx="4" cy="4" r="2"/>
-                    <circle cx="12" cy="12" r="2"/>
-                    <path d="M5.5 5.5l5 5" stroke="currentColor" stroke-width="1.8" fill="none"/>
-                </svg>
-                <span class="stripe-text">Git</span>
-            </button>
-            <button class="tool-window-stripe-btn" data-panel="commitPanel" data-position="right" title="Commit (Alt+0)">
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                    <circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/>
-                    <path d="M8 1v4M8 11v4" stroke="currentColor" stroke-width="1.5"/>
-                </svg>
-                <span class="stripe-text">Commit</span>
-            </button>
-            <div class="stripe-spacer"></div>
-        </div>
-
-        <!-- RIGHT TOOL WINDOW CONTENT -->
-        <aside class="tool-window-content tool-window-right hidden" id="rightToolWindow">
-            <div class="tool-window-panel" id="gitToolPanelRight">
-                <div class="tool-window-header">
-                    <span class="tool-window-title">Git</span>
-                    <div class="tool-window-actions">
-                        <button class="tool-window-action-btn hide-panel-btn" title="Hide">
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-                        </button>
-                    </div>
-                </div>
-                <div class="tool-window-body">
-                    <div class="placeholder-content">TODO: Git tool window content (moved from bottom)</div>
-                </div>
-            </div>
-            <div class="tool-window-panel hidden" id="commitPanel">
-                <div class="tool-window-header">
-                    <span class="tool-window-title">Commit</span>
-                    <div class="tool-window-actions">
-                        <button class="tool-window-action-btn hide-panel-btn" title="Hide">
-                            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-                        </button>
-                    </div>
-                </div>
-                <div class="tool-window-body">
-                    <div class="placeholder-content">TODO: Commit tool window content</div>
-                </div>
-            </div>
-        </aside>
     </div>
 
     <footer class="statusbar">
@@ -489,30 +455,45 @@
     </div>
 </div>
 
-<!-- Project Search modal -->
-<div id="projectSearchOverlay" class="overlay hidden"></div>
-<div id="projectSearchModal" class="search-modal hidden">
-    <div class="search-header">
+<!-- Find / Replace in Files (PhpStorm-style) -->
+<div id="findOverlay" class="overlay hidden"></div>
+<div id="findDialog" class="search-dialog hidden" data-mode="find">
+    <div class="search-dialog-header">
         <div>
-            <div class="pane-title" id="searchModalTitle">Find in Project</div>
-            <div class="pane-subtitle">Ctrl+Shift+F (Find) · Ctrl+Shift+R (Replace) · Double Shift (Search Everywhere)</div>
+            <div class="pane-title" id="findDialogTitle">Find in Files</div>
+            <div class="pane-subtitle" id="findScopeLabel">Scope: Unknown</div>
         </div>
-        <button class="btn ghost icon-btn" id="closeProjectSearchBtn" title="Close">✕</button>
+        <div class="dialog-actions">
+            <span class="pill subtle" id="findModePill">Find</span>
+            <button class="btn ghost icon-btn" id="closeFindDialog" title="Close">✕</button>
+        </div>
     </div>
-    <div class="search-body">
-        <div class="search-inputs">
-            <div class="search-row">
-                <input class="search-input" id="projectSearchQuery" placeholder="Search term (case-insensitive)">
-                <button class="btn ghost icon-btn search-icon-btn" id="projectSearchRunBtn" title="Run search">🔍</button>
-                <button class="btn ghost icon-btn search-icon-btn" id="projectSearchCaseBtn" title="Match Case">Aa</button>
-            </div>
-            <input class="search-input" id="projectReplaceInput" placeholder="Replace with" style="display:none;">
+    <div class="search-dialog-body">
+        <label class="field-label" for="findQueryInput">Text to find</label>
+        <input class="search-text-input" id="findQueryInput" placeholder="Search term">
+        <div class="replace-row" id="replaceRow">
+            <label class="field-label" for="replaceQueryInput">Replace with</label>
+            <input class="search-text-input" id="replaceQueryInput" placeholder="Replacement text">
         </div>
+        <div class="search-options">
+            <label><input type="checkbox" id="findCaseOption"> Case sensitive</label>
+            <label><input type="checkbox" id="findWholeOption"> Whole words</label>
+            <label><input type="checkbox" id="findRegexOption"> Regex</label>
+            <span class="search-scope-pill" id="findScopePath">Scope: Unknown</span>
+        </div>
+        <div class="search-results-list" id="findResults">Type to search…</div>
         <div class="search-actions">
-            <button class="btn ghost" id="projectReplaceRunBtn" style="display:none;">Replace All</button>
+            <button class="btn ghost" id="findReplaceToggleBtn">Switch to Replace</button>
+            <button class="btn primary" id="replaceAllBtn">Replace All</button>
         </div>
-        <div class="search-results" id="projectSearchResults">Type a term to search routines…</div>
     </div>
+</div>
+
+<!-- Search Everywhere (double Shift) -->
+<div id="searchEverywhereOverlay" class="overlay hidden"></div>
+<div id="searchEverywhereDialog" class="search-everywhere hidden">
+    <input class="search-everywhere-input" id="searchEverywhereInput" placeholder="Search Everywhere (files)">
+    <div class="search-everywhere-results" id="searchEverywhereResults">Press Shift twice to search…</div>
 </div>
 
 <!-- Git panel -->
@@ -716,6 +697,7 @@
 <script src="./assets/mumps/mumps-lexer.js"></script>
 <script src="./assets/mumps/mumps-ast.js"></script>
 <script src="./assets/mumps/mumps-parser.js"></script>
+<script src="./node_modules/xterm/lib/xterm.js"></script>
 <script src="./renderer.js"></script>
 </body>
 </html>

@@ -14,6 +14,7 @@ contextBridge.exposeInMainWorld('ahmadIDE', {
     sshExec: (sessionId, command) => ipcRenderer.invoke('ssh:exec', { sessionId, command }),
     sshDisconnect: (sessionId) => ipcRenderer.invoke('ssh:disconnect', { sessionId }),
     listRoutines: (search) => ipcRenderer.invoke('routines:list', { search }),
+    searchRoutines: (term, options) => ipcRenderer.invoke('routines:search', { term, options }),
     readRoutine: (name) => ipcRenderer.invoke('routines:read', { name }),
     saveRoutine: (name, code) => ipcRenderer.invoke('routines:save', { name, code }),
     zlinkRoutine: (name) => ipcRenderer.invoke('routines:zlink', { name }),
@@ -25,10 +26,18 @@ contextBridge.exposeInMainWorld('ahmadIDE', {
     openFolderDialog: () => ipcRenderer.invoke('dialog:openFolder'),
     toggleDevTools: () => ipcRenderer.invoke('devtools:toggle'),
     revealInExplorer: (path) => ipcRenderer.invoke('shell:reveal', { path }),
-    terminalCreate: () => ipcRenderer.invoke('terminal:create'),
+    terminalCreate: (options) => ipcRenderer.invoke('terminal:create', options || {}),
     terminalWrite: (id, data) => ipcRenderer.invoke('terminal:write', { id, data }),
     terminalResize: (id, cols, rows) => ipcRenderer.invoke('terminal:resize', { id, cols, rows }),
     terminalClose: (id) => ipcRenderer.invoke('terminal:close', { id }),
     onTerminalData: (cb) => ipcRenderer.on('terminal:data', (_event, payload) => cb(payload)),
     onTerminalExit: (cb) => ipcRenderer.on('terminal:exit', (_event, payload) => cb(payload))
 });
+
+// Expose xterm to the isolated renderer so the terminal can use the full renderer without CDN.
+try {
+    const { Terminal } = require('xterm');
+    contextBridge.exposeInMainWorld('Terminal', Terminal);
+} catch (err) {
+    console.warn('xterm preload failed; falling back to basic renderer', err);
+}

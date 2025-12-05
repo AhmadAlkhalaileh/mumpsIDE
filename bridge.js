@@ -2,7 +2,18 @@
 const { spawn, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { Client: SSHClient } = require('ssh2');
+let SSHClient = undefined;
+let sshLoadError = null;
+function ensureSshClient() {
+  if (SSHClient !== undefined) return SSHClient;
+  try {
+    SSHClient = require('ssh2').Client;
+  } catch (e) {
+    SSHClient = null;
+    sshLoadError = e;
+  }
+  return SSHClient;
+}
 
 const DEFAULT_ENV_KEY = 'cc';
 const DOCKER_DEFAULT_ENV_KEY = 'hakeem';
@@ -1373,6 +1384,52 @@ module.exports = {
     return { ok: true, routine, folder };
   },
 
+  async searchRoutines(term, opts = {}) {
+    const routineDirs = getRoutineDirs();
+    if (!routineDirs.length) return { ok: false, error: 'No routines path configured' };
+    const scoped = routineDirs.filter(d => {
+      if (!opts.folder) return true;
+      return d.endsWith(`/${opts.folder}`) || d.includes(`/${opts.folder}/`);
+    });
+    if (!scoped.length) {
+      return { ok: false, error: `No routines found in scope "${opts.folder || ''}"` };
+    }
+
+    // Build grep flags
+    const flags = ['-R', '-n', '-I', '--with-filename', '--color=never', "--include='*.m'"];
+    if (!opts.matchCase) flags.push('-i');
+    if (opts.wholeWords) flags.push('-w');
+    flags.push(opts.regex ? '-E' : '-F');
+
+    const pattern = shellQuote(term || '');
+    const dirs = scoped.map(d => shellQuote(d)).join(' ');
+    // Use `|| true` so grep exit code 1 (no matches) doesn't bubble as an error
+    const cmd = `grep ${flags.join(' ')} ${pattern} ${dirs} 2>/dev/null || true`;
+    const res = await runHostCommand(cmd);
+    if (!res.ok) {
+      return { ok: false, error: res.error || res.stderr || 'Search failed' };
+    }
+
+    const hits = (res.stdout || '')
+      .split('\n')
+      .filter(Boolean)
+      .map(line => {
+        const first = line.indexOf(':');
+        const second = first === -1 ? -1 : line.indexOf(':', first + 1);
+        if (first === -1 || second === -1) return null;
+        const filePath = line.slice(0, first);
+        const lineNum = parseInt(line.slice(first + 1, second), 10);
+        const snippet = line.slice(second + 1);
+        const folder = filePath.includes('/localr/') ? 'localr' : 'routines';
+        const base = path.basename(filePath, '.m').toUpperCase();
+        const routine = `${folder}/${base}`;
+        return { file: routine, line: isNaN(lineNum) ? null : lineNum, snippet };
+      })
+      .filter(Boolean);
+
+    return { ok: true, hits };
+  },
+
   async zlinkRoutine(name) {
     // Handle both "ROUTINE" and "localr/ROUTINE" formats
     let routine;
@@ -1744,8 +1801,12 @@ module.exports = {
   },
 
   async sshConnect(config) {
+    const sshCtor = ensureSshClient();
+    if (!sshCtor) {
+      return { ok: false, error: `SSH not available (missing native module ssh2${sshLoadError ? `: ${sshLoadError.message}` : ''})` };
+    }
     return new Promise((resolve) => {
-      const conn = new SSHClient();
+      const conn = new sshCtor();
       const id = `ssh_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
       conn.on('ready', () => {

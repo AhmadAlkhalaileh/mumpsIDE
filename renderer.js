@@ -137,7 +137,8 @@
     const terminalConfig = {
         shellPath: null, // Default: system shell
         startDir: null, // Default: project root
-        overrideIdeShortcuts: false // If true, terminal keeps shortcuts when focused
+        overrideIdeShortcuts: false, // If true, terminal keeps IDE shortcuts from firing while focused
+        escapeToEditor: true // If true and shortcuts are not overridden, Esc returns focus to editor
     };
     let envInfoCache = null;
     const mumpsValidator = typeof MUMPSValidator !== 'undefined' ? new MUMPSValidator() : null;
@@ -147,6 +148,7 @@
     const registeredShortcuts = [];
     const expandedArrayKeys = new Set(); // track expanded arrays in Locals panel
     let activeRoutineName = null; // for breakpoint grouping and labels
+    let routineState = null; // shared routine state for search/navigation helpers
     let routineStateRef = null; // shared ref for project search
     let dbgStateRef = null; // shared debug state reference for helpers outside init scope
     const menuConfig = [
@@ -267,7 +269,8 @@
         'ctrl+n': { label: 'Go to File', action: 'goto-file' },
         'ctrl+shift+n': { label: 'Go to File (Alt)', action: 'goto-file' },
         'ctrl+f': { label: 'Find in File', action: 'find' },
-        'ctrl+shift+f': { label: 'Find in Path', action: 'find-in-files' },
+        'ctrl+shift+f': { label: 'Find in Path (Current Folder)', action: 'find-in-folder' },
+        'ctrl+shift+r': { label: 'Replace in Path (Current Folder)', action: 'replace-in-folder' },
         'ctrl+s': { label: 'Save', action: 'save' },
         'ctrl+shift+s': { label: 'Save All', action: 'save-all' },
         'ctrl+w': { label: 'Expand Selection', action: 'expand-selection' },
@@ -275,10 +278,17 @@
         'ctrl+tab': { label: 'Next Tab', action: 'tab-next' },
         'alt+f12': { label: 'Toggle Terminal', action: 'toggle-terminal' }
     };
-    let projectSearchMode = 'find';
-    let projectSearchScope = 'all';
-    let projectSearchMatchCase = false;
-    const projectSearchCtx = { routineState: null, editor: null };
+    const findReplaceState = {
+        mode: 'find',
+        options: { matchCase: false, wholeWords: false, regex: false },
+        token: 0,
+        scopeFolder: null
+    };
+    const searchEverywhereState = {
+        index: [],
+        selectedIndex: 0,
+        open: false
+    };
     let routinesCache = [];
     let lastShiftTap = 0;
     let shortcutDefaults = {};
@@ -1025,7 +1035,7 @@
         };
 
         const ensureGitPanel = () => {
-            openGitPanel();
+            openGitToolWindow();
         };
 
         const gitActions = {
@@ -1861,6 +1871,28 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
+    // Promise helper to avoid hanging UI operations forever
+    const withTimeout = (promise, ms, label = 'Operation') => {
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            const timer = setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                reject(new Error(`${label} timed out after ${ms}ms`));
+            }, ms);
+            promise.then((res) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(res);
+            }).catch((err) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                reject(err);
+            });
+        });
+    };
 
     const getSelectedText = () => {
         if (!activeEditor) return '';
@@ -1873,242 +1905,403 @@
         return '';
     };
 
-    async function ensureRoutineList(state) {
-        if (routinesCache.length) return routinesCache;
-        const rs = state || projectSearchCtx.routineState;
+    const searchDebounce = (() => {
+        let t = null;
+        return (fn, ms = 220) => {
+            clearTimeout(t);
+            t = setTimeout(fn, ms);
+        };
+    })();
+
+    const getScopeInfo = () => {
+        const active = getActiveRoutine();
+        const normalized = normalizeRoutineTarget(active);
+        const folder = normalized.folder || (normalized.path?.includes('/') ? normalized.path.split('/')[0] : null) || 'localr';
+        const root = (currentProject?.routinesPath || '').replace(/\\/g, '/');
+        const scopePath = root && folder ? `${root}/${folder}` : (folder || 'UNKNOWN – NEED DESIGN DECISION: localR / routines paths');
+        return { folder, scopePath };
+    };
+
+    async function listScopedRoutines(folder) {
         try {
-            const res = await window.ahmadIDE.listRoutines('');
-            const routines = res?.ok ? res.routines || [] : [];
-            routinesCache = routines;
-            if (rs) rs._cacheFull = routines;
-            return routines;
+            const query = folder ? `${folder}/` : '';
+            const res = await withTimeout(window.ahmadIDE.listRoutines(query), 8000, 'List routines');
+            if (res?.ok && Array.isArray(res.routines)) {
+                routinesCache = res.routines || routinesCache;
+            }
         } catch (e) {
-            return [];
+            // fall through to cache
         }
+        const prefix = folder ? `${folder.toLowerCase()}/` : '';
+        return (routinesCache || []).filter(r => !prefix || r.toLowerCase().startsWith(prefix));
     }
 
-    async function openProjectSearch(mode = 'find', scope = 'all', prefill = '') {
-        projectSearchMode = mode;
-        projectSearchScope = scope;
-        // Keep context fresh for global triggers (double shift)
-        if (!projectSearchCtx.routineState && typeof routineState !== 'undefined') {
-            projectSearchCtx.routineState = routineState;
-        }
-        if (!projectSearchCtx.editor && typeof editor !== 'undefined') {
-            projectSearchCtx.editor = editor;
-        }
-        const overlay = document.getElementById('projectSearchOverlay');
-        const modal = document.getElementById('projectSearchModal');
-        const title = document.getElementById('searchModalTitle');
-        const replaceInput = document.getElementById('projectReplaceInput');
-        const replaceBtn = document.getElementById('projectReplaceRunBtn');
-        const caseBtn = document.getElementById('projectSearchCaseBtn');
-        if (!overlay || !modal) return;
-        overlay.classList.remove('hidden');
-        modal.classList.remove('hidden');
-        modal.dataset.mode = mode;
-        modal.dataset.scope = scope;
-        const scopeLabel = scope === 'names' ? ' (Names only)' : ' (Names + Body)';
-        if (title) title.textContent = mode === 'replace' ? 'Replace in Project' : 'Find in Project';
-        if (replaceInput) replaceInput.style.display = mode === 'replace' ? 'block' : 'none';
-        if (replaceBtn) replaceBtn.style.display = mode === 'replace' ? 'inline-flex' : 'none';
-        const query = document.getElementById('projectSearchQuery');
-        if (query) {
-            if (typeof prefill === 'string') query.value = prefill;
-            query.focus();
-            if (prefill) query.select();
-        }
-        if (caseBtn) {
-            caseBtn.classList.toggle('active', projectSearchMatchCase);
-            caseBtn.title = projectSearchMatchCase ? 'Match Case (on)' : 'Match Case (off)';
-        }
-        const results = document.getElementById('projectSearchResults');
-        if (results) results.textContent = `Type to search routines${scopeLabel}…`;
-        if (prefill && prefill.trim()) projectSearchExecute(projectSearchCtx.routineState, projectSearchCtx.editor, false);
-    }
-
-    const launchProjectSearch = (mode = 'find', scope = 'all', opts = {}) => {
-        const options = (opts && typeof opts === 'object') ? opts : {};
-        const useSelection = options.useSelection !== false;
-        const rawSeed = typeof options.prefill === 'string' ? options.prefill : (useSelection ? getSelectedText() : '');
-        const prefill = (rawSeed || '').trim();
-        const runImmediately = options.runImmediately || (!!prefill && options.runImmediately !== false);
-        openProjectSearch(mode, scope, prefill);
-        if ($) {
-            const input = $('#projectSearchQuery');
-            if (input.length) {
-                input.focus();
-                if (prefill) input.select();
+    const buildSearchRegex = (term, opts = {}) => {
+        if (opts.regex) {
+            try {
+                return new RegExp(term, opts.matchCase ? 'g' : 'gi');
+            } catch (err) {
+                return null;
             }
         }
-        if (runImmediately && prefill) {
-            setTimeout(() => projectSearchExecute(projectSearchCtx.routineState, projectSearchCtx.editor, false), 30);
+        const safe = escapeRegex(term);
+        const pattern = opts.wholeWords ? `\\b${safe}\\b` : safe;
+        return new RegExp(pattern, opts.matchCase ? 'g' : 'gi');
+    };
+
+    const renderFindResults = (hits = [], term = '', mode = 'find') => {
+        const host = document.getElementById('findResults');
+        if (!host) return;
+        if (!hits.length) {
+            host.textContent = 'No matches found.';
+            return;
+        }
+        host.innerHTML = '';
+        const limit = hits.slice(0, 400);
+        const markRegex = term ? buildSearchRegex(term, findReplaceState.options) : null;
+        limit.forEach(hit => {
+            const row = document.createElement('div');
+            row.className = 'search-hit';
+            const header = document.createElement('div');
+            header.className = 'search-hit-header';
+            const title = document.createElement('span');
+            title.textContent = `${hit.file}:${hit.line}`;
+            title.className = 'search-hit-file';
+            const chip = document.createElement('span');
+            chip.className = 'pill subtle';
+            chip.textContent = hit.kind || (mode === 'replace' ? 'Replace' : 'Match');
+            header.appendChild(chip);
+            header.appendChild(title);
+
+            const snippet = document.createElement('div');
+            snippet.className = 'search-hit-snippet';
+            if (hit.snippet && markRegex) {
+                snippet.innerHTML = escapeHtml(hit.snippet).replace(markRegex, (m) => `<span class="search-hit-mark">${m}</span>`);
+            } else {
+                snippet.textContent = hit.snippet || '';
+            }
+
+            row.appendChild(header);
+            row.appendChild(snippet);
+            row.onclick = async () => {
+                await loadRoutineByName(hit.file, routineState, activeEditor, routinesCache, globalTerminalState);
+                revealLine(hit.line);
+                closeFindReplaceDialog();
+            };
+            host.appendChild(row);
+        });
+
+        if (hits.length > limit.length) {
+            const more = document.createElement('div');
+            more.className = 'search-hit-file';
+            more.textContent = `Showing first ${limit.length} of ${hits.length} matches. Refine your query to narrow results.`;
+            host.appendChild(more);
         }
     };
 
-    function closeProjectSearch() {
-        document.getElementById('projectSearchOverlay')?.classList.add('hidden');
-        document.getElementById('projectSearchModal')?.classList.add('hidden');
+    const updateFindScopeLabels = () => {
+        const { scopePath, folder } = getScopeInfo();
+        const scopeLabel = document.getElementById('findScopeLabel');
+        const scopePathEl = document.getElementById('findScopePath');
+        findReplaceState.scopeFolder = folder;
+        if (scopeLabel) scopeLabel.textContent = `Scope: ${scopePath}`;
+        if (scopePathEl) scopePathEl.textContent = `Scope: ${scopePath}`;
+    };
+
+    const toggleFindMode = (mode) => {
+        findReplaceState.mode = mode;
+        const dialog = document.getElementById('findDialog');
+        const replaceRow = document.getElementById('replaceRow');
+        const replaceAllBtn = document.getElementById('replaceAllBtn');
+        const toggleBtn = document.getElementById('findReplaceToggleBtn');
+        const pill = document.getElementById('findModePill');
+        const title = document.getElementById('findDialogTitle');
+        if (dialog) dialog.dataset.mode = mode;
+        if (replaceRow) replaceRow.style.display = mode === 'replace' ? 'flex' : 'none';
+        if (replaceAllBtn) replaceAllBtn.style.display = mode === 'replace' ? 'inline-flex' : 'none';
+        if (toggleBtn) toggleBtn.textContent = mode === 'replace' ? 'Switch to Find' : 'Switch to Replace';
+        if (pill) pill.textContent = mode === 'replace' ? 'Replace' : 'Find';
+        if (title) title.textContent = mode === 'replace' ? 'Replace in Files' : 'Find in Files';
+    };
+
+    function openFindReplaceDialog(mode = 'find', prefill = '') {
+        toggleFindMode(mode);
+        updateFindScopeLabels();
+        document.getElementById('findOverlay')?.classList.remove('hidden');
+        document.getElementById('findDialog')?.classList.remove('hidden');
+        const findInput = document.getElementById('findQueryInput');
+        if (findInput) {
+            findInput.value = prefill || findInput.value;
+            findInput.focus();
+            if (prefill) findInput.select();
+        }
+        const replaceInput = document.getElementById('replaceQueryInput');
+        if (mode === 'replace' && replaceInput && !replaceInput.value) {
+            replaceInput.value = '';
+        }
+        executeFindReplacePreview();
     }
 
-    async function projectSearchExecute(routineState, editor, applyReplace = false) {
-        // Fallback to shared context if not provided, and keep context fresh
-        projectSearchCtx.routineState = routineState || projectSearchCtx.routineState || routineStateRef;
-        projectSearchCtx.editor = editor || projectSearchCtx.editor || activeEditor;
-        const rs = projectSearchCtx.routineState;
-        const ed = projectSearchCtx.editor;
-        const queryEl = document.getElementById('projectSearchQuery');
-        const replaceEl = document.getElementById('projectReplaceInput');
-        const resultsEl = document.getElementById('projectSearchResults');
-        if (!queryEl || !resultsEl) return;
+    function closeFindReplaceDialog() {
+        document.getElementById('findOverlay')?.classList.add('hidden');
+        document.getElementById('findDialog')?.classList.add('hidden');
+        findReplaceState.token += 1; // cancel inflight searches
+    }
 
-        const term = (queryEl.value || '').trim();
-        if (!term) {
-            resultsEl.textContent = 'Enter a search term.';
-            return;
-        }
-        const replaceTerm = (replaceEl?.value || '').trim();
-        const mode = projectSearchMode;
-        if (mode === 'replace' && !replaceTerm && applyReplace) {
-            resultsEl.textContent = 'Enter a replace value.';
-            return;
-        }
-        const scopeLabel = projectSearchScope === 'names' ? 'Routine names' : 'Names + Body';
-        resultsEl.textContent = mode === 'replace'
-            ? (applyReplace ? `Applying replacements for "${term}"...` : `Previewing replacements for "${term}"...`)
-            : `Searching (${scopeLabel}) for "${term}"...`;
+    const executeFindReplacePreview = async (applyReplace = false) => {
+        const term = (document.getElementById('findQueryInput')?.value || '').trim();
+        const replaceTerm = (document.getElementById('replaceQueryInput')?.value || '').trim();
+        const host = document.getElementById('findResults');
+        if (!host) return;
 
-        // Always ensure routines are loaded (cached after first fetch)
-        let routines = await ensureRoutineList(rs);
-        if (!routines || !routines.length) {
-            resultsEl.textContent = 'No routines available to search.';
-            return;
-        }
-
-        const hits = [];
-        const regex = new RegExp(escapeRegex(term), projectSearchMatchCase ? 'g' : 'gi');
-        const nameMatch = (routine) => {
-            const base = routine.includes('/') ? routine.split('/').pop() : routine;
-            return projectSearchMatchCase
-                ? base.includes(term)
-                : base.toLowerCase().includes(term.toLowerCase());
+        const fail = (msg) => {
+            host.textContent = msg;
+            showToast('error', 'Find', msg);
         };
-        // Use a simple for..of with awaits to avoid overwhelming IO
-        for (const name of routines) {
-            const matchedName = nameMatch(name);
-            if (projectSearchScope === 'names') {
-                if (matchedName) hits.push({ file: name, line: 1, snippet: '(routine name match)' });
-                continue;
+
+        try {
+            if (!term) {
+                host.textContent = 'Enter text to search.';
+                return;
             }
 
-            if (matchedName) {
-                hits.push({ file: name, line: 1, snippet: '(routine name match)' });
+        const options = {
+            matchCase: !!document.getElementById('findCaseOption')?.checked,
+            wholeWords: !!document.getElementById('findWholeOption')?.checked,
+            regex: !!document.getElementById('findRegexOption')?.checked
+        };
+            findReplaceState.options = options;
+            const regex = buildSearchRegex(term, options);
+            if (!regex) {
+                host.textContent = 'Invalid regular expression.';
+                return;
             }
 
+        const token = ++findReplaceState.token;
+        const { folder } = getScopeInfo();
+        host.textContent = applyReplace ? 'Replacing across files…' : 'Searching…';
+
+        // Fast path: ask backend to grep all routines in scope
+        if (!applyReplace && window.ahmadIDE.searchRoutines) {
             try {
-                const read = await window.ahmadIDE.readRoutine(name);
-                if (!read?.ok) continue;
+                const fast = await withTimeout(
+                    window.ahmadIDE.searchRoutines(term, { folder, ...options }),
+                    10000,
+                    'Search routines (fast)'
+                );
+                if (fast?.ok) {
+                    renderFindResults(fast.hits || [], term, findReplaceState.mode);
+                    return;
+                }
+                console.warn('Fast search failed, falling back to slow scan:', fast?.error);
+            } catch (err) {
+                console.warn('Fast search errored, falling back:', err);
+            }
+        }
+
+        const routines = await listScopedRoutines(folder);
+        if (!routines.length) {
+            host.textContent = `No routines found in scope "${folder || 'UNKNOWN – NEED DESIGN DECISION: localR / routines paths'}".`;
+            return;
+        }
+
+            const total = routines.length;
+            let processed = 0;
+            host.textContent = applyReplace
+                ? `Replacing across files… (0/${total})`
+                : `Searching… (0/${total})`;
+            let hits = [];
+            let replaceCount = 0;
+            let failed = false;
+
+            const searchOne = async (routine) => {
+                if (token !== findReplaceState.token || failed) return;
+                let read = null;
+                try {
+                    read = await withTimeout(window.ahmadIDE.readRoutine(routine), 8000, `Read ${routine}`);
+                } catch (err) {
+                    console.error('Find/Replace read failed:', err);
+                    failed = true;
+                    fail(`Search failed on ${routine}: ${err?.message || err}`);
+                    return;
+                }
+                if (!read?.ok) return;
+
                 const code = read.code || '';
                 const lines = code.split(/\r?\n/);
                 let mutated = code;
-                if (mode === 'replace' && replaceTerm) {
-                    mutated = code.replace(regex, replaceTerm);
-                }
-                for (let idx = 0; idx < lines.length; idx += 1) {
-                    const line = lines[idx];
+                lines.forEach((line, idx) => {
                     regex.lastIndex = 0;
                     if (regex.test(line)) {
-                        hits.push({
-                            file: name,
-                            line: idx + 1,
-                            snippet: line.trim()
-                        });
+                        hits.push({ file: routine, line: idx + 1, snippet: line });
                     }
-                }
+                });
 
-                if (mode === 'replace' && replaceTerm && applyReplace && mutated !== code) {
-                    await window.ahmadIDE.saveRoutine(name, mutated);
-                    // Sync open tab content if loaded
-                    const openTab = findOpenTab(name, { exact: true });
-                    if (openTab) {
-                        openTab.content = mutated;
-                        const model = tabModels.get(openTab.id);
-                        if (model) {
-                            model.setValue(mutated);
-                            openTab.isDirty = false;
-                            renderTabs();
-                        } else if (activeTabId === openTab.id && editor) {
-                            editor.setValue(mutated);
+                if (applyReplace && findReplaceState.mode === 'replace' && replaceTerm) {
+                    mutated = code.replace(regex, replaceTerm);
+                    if (mutated !== code) {
+                        replaceCount += 1;
+                        try {
+                            await window.ahmadIDE.saveRoutine(routine, mutated);
+                        } catch (err) {
+                            console.error('Replace failed to save', err);
+                        }
+                        const openTab = findOpenTab(routine, { exact: true });
+                        if (openTab) {
+                            openTab.content = mutated;
+                            const model = tabModels.get(openTab.id);
+                            if (model) {
+                                model.setValue(mutated);
+                                openTab.isDirty = false;
+                                renderTabs();
+                            } else if (activeTabId === openTab.id && activeEditor) {
+                                activeEditor.setValue(mutated);
+                            }
                         }
                     }
                 }
-            } catch (e) {
-                // skip routine on error
-            }
-        }
+            };
 
-        if (!hits.length) {
-            resultsEl.textContent = 'No matches found.';
+            // Concurrency-limited search to speed up large projects
+            const limit = Math.min(12, Math.max(2, navigator.hardwareConcurrency || 4));
+            let cursor = 0;
+            const worker = async () => {
+                while (cursor < total && token === findReplaceState.token && !failed) {
+                    const idx = cursor++;
+                    const routine = routines[idx];
+                    await searchOne(routine);
+                    processed += 1;
+                    if (!failed && token === findReplaceState.token) {
+                        if (!applyReplace && processed % 20 === 0) {
+                            host.textContent = `Searching… (${processed}/${total})`;
+                        } else if (applyReplace && processed % 20 === 0) {
+                            host.textContent = `Replacing across files… (${processed}/${total})`;
+                        }
+                        if (!applyReplace && hits.length && hits.length % 50 === 0) {
+                            renderFindResults(hits, term, findReplaceState.mode);
+                        }
+                    }
+                }
+            };
+            const workers = Array.from({ length: limit }, () => worker());
+            await Promise.all(workers);
+
+            if (token !== findReplaceState.token || failed) return;
+            renderFindResults(hits, term, findReplaceState.mode);
+            if (applyReplace && host) {
+                const summary = document.createElement('div');
+                summary.className = 'search-hit-file';
+                summary.textContent = replaceCount
+                    ? `Applied replacements in ${replaceCount} file(s).`
+                    : 'No replacements applied.';
+                host.appendChild(summary);
+            }
+        } catch (err) {
+            console.error('Find/Replace failed:', err);
+            fail(`Search failed: ${err?.message || err}`);
+        }
+    };
+
+    const confirmAndReplaceAll = () => {
+        const term = (document.getElementById('findQueryInput')?.value || '').trim();
+        if (!term) return;
+        const replaceTerm = (document.getElementById('replaceQueryInput')?.value || '').trim();
+        if (!replaceTerm) {
+            showToast('error', 'Replace', 'Enter replacement text before replacing.');
             return;
         }
+        const ok = window.confirm(`Replace all occurrences of "${term}" in the current folder?`);
+        if (!ok) return;
+        executeFindReplacePreview(true);
+    };
 
-        resultsEl.innerHTML = '';
-        const limited = hits.slice(0, 300);
-        limited.forEach(hit => {
-            const item = document.createElement('div');
-            item.className = 'search-hit';
-            const header = document.createElement('div');
-            header.className = 'hit-header';
-            const chip = document.createElement('span');
-            chip.className = 'hit-chip';
-            chip.textContent = projectSearchScope === 'names' || hit.snippet === '(routine name match)' ? 'Name' : 'Body';
-            const path = document.createElement('div');
-            path.className = 'hit-path';
-            path.textContent = `${hit.file}:${hit.line}`;
-            const snippet = document.createElement('div');
-            snippet.className = 'hit-snippet';
-            if (hit.snippet) {
-                const markRegex = new RegExp(escapeRegex(term), projectSearchMatchCase ? 'g' : 'gi');
-                const safeSnippet = escapeHtml(hit.snippet || '');
-                snippet.innerHTML = safeSnippet.replace(markRegex, (m) => `<span class="hit-mark">${m}</span>`);
-            } else {
-                snippet.textContent = '(routine name match)';
-                snippet.style.color = 'var(--muted)';
+    const openSearchEverywhereResult = async (path) => {
+        if (!path) return;
+        try {
+            const ok = await loadRoutineByName(path, routineState, activeEditor, routinesCache, globalTerminalState);
+            if (ok !== false) closeSearchEverywhere();
+        } catch (err) {
+            showToast('error', 'Search Everywhere', err?.message || 'Could not open selection.');
+        }
+    };
+
+    const openSearchEverywhere = async (prefill = '') => {
+        document.getElementById('searchEverywhereOverlay')?.classList.remove('hidden');
+        document.getElementById('searchEverywhereDialog')?.classList.remove('hidden');
+        const input = document.getElementById('searchEverywhereInput');
+        const resultsHost = document.getElementById('searchEverywhereResults');
+        searchEverywhereState.open = true;
+        searchEverywhereState.selectedIndex = 0;
+        if (input) {
+            input.value = prefill || '';
+            input.focus();
+            if (prefill) input.select();
+        }
+        if (resultsHost) resultsHost.textContent = 'Indexing project files…';
+        if (!searchEverywhereState.index.length) {
+            const res = await window.ahmadIDE.listRoutines('');
+            if (res?.ok) {
+                routinesCache = res.routines || routinesCache;
+                // UNKNOWN – NEED DESIGN DECISION: non-project items in Search Everywhere (only routines are indexed here)
+                searchEverywhereState.index = (res.routines || []).map(r => ({
+                    path: r,
+                    name: r.split('/').pop(),
+                    folder: r.split('/')[0] || ''
+                }));
+            } else if (resultsHost) {
+                resultsHost.textContent = res?.error || 'Unable to index project files.';
+                return;
             }
-            header.appendChild(chip);
-            header.appendChild(path);
-            item.appendChild(header);
-            item.appendChild(snippet);
-            item.onclick = async () => {
-                await loadRoutineByName(hit.file, routineState, editor, routines, globalTerminalState);
-                revealLine(hit.line);
-                closeProjectSearch();
-            };
-            resultsEl.appendChild(item);
-        });
+        }
+        renderSearchEverywhereResults(input?.value || '');
+    };
 
-        if (mode === 'replace' && replaceTerm && applyReplace) {
-            const summary = document.createElement('div');
-            summary.className = 'hit-path';
-            summary.style.marginTop = '8px';
-            summary.textContent = `Applied replace across routines (showing first ${Math.min(hits.length, 300)} hits).`;
-            resultsEl.appendChild(summary);
+    const closeSearchEverywhere = () => {
+        document.getElementById('searchEverywhereOverlay')?.classList.add('hidden');
+        document.getElementById('searchEverywhereDialog')?.classList.add('hidden');
+        searchEverywhereState.open = false;
+    };
+
+    const renderSearchEverywhereResults = (query = '') => {
+        const host = document.getElementById('searchEverywhereResults');
+        if (!host) return;
+        const q = (query || '').toLowerCase();
+        const scored = searchEverywhereState.index
+            .map(item => {
+                const name = (item.name || '').toLowerCase();
+                const path = (item.path || '').toLowerCase();
+                const idx = name.indexOf(q);
+                const pathIdx = path.indexOf(q);
+                const hit = q ? Math.min(idx === -1 ? 9999 : idx, pathIdx === -1 ? 9999 : pathIdx) : 0;
+                return { item, score: hit };
+            })
+            .filter(entry => q ? entry.score < 9999 : true)
+            .sort((a, b) => a.score - b.score || a.item.name.localeCompare(b.item.name));
+
+        const results = scored.slice(0, 60).map(s => s.item);
+        host.innerHTML = '';
+        if (!results.length) {
+            searchEverywhereState.selectedIndex = 0;
+            host.textContent = q ? 'No matches.' : 'No files indexed yet.';
+            return;
         }
-        if (hits.length > 300) {
-            const note = document.createElement('div');
-            note.className = 'hit-path';
-            note.style.marginTop = '6px';
-            note.textContent = `Showing first 300 of ${hits.length} matches. Refine your search for more precise results.`;
-            resultsEl.appendChild(note);
-        }
-        if (!applyReplace) {
-            const summary = document.createElement('div');
-            summary.className = 'hit-path';
-            summary.style.marginTop = '6px';
-            summary.textContent = `Found ${hits.length} matches (${projectSearchScope === 'names' ? 'names only' : 'names + body'}).`;
-            resultsEl.appendChild(summary);
-        }
-    }
+        searchEverywhereState.selectedIndex = Math.max(0, Math.min(searchEverywhereState.selectedIndex, results.length - 1));
+
+        results.forEach((res, idx) => {
+            const row = document.createElement('div');
+            row.className = 'search-everywhere-item' + (idx === searchEverywhereState.selectedIndex ? ' active' : '');
+            row.dataset.path = res.path;
+            const title = document.createElement('span');
+            title.textContent = res.name;
+            const path = document.createElement('span');
+            path.className = 'search-everywhere-path';
+            path.textContent = res.path;
+            row.appendChild(title);
+            row.appendChild(path);
+            row.onclick = () => openSearchEverywhereResult(res.path);
+            host.appendChild(row);
+        });
+    };
     function describeBinding(binding) {
         if (!binding && binding !== 0) return 'Unbound';
         const parts = [];
@@ -2289,9 +2482,26 @@
         }, 100);
     }
 
-    function openGitPanel() {
+    const normalizeGitError = (text, fallback = 'Git command failed') => {
+        if (/not a git repository/i.test(text || '')) {
+            return 'Git is not configured for this project';
+        }
+        return text || fallback;
+    };
+
+    let openGitToolWindow = (opts = {}) => {
         // Use new tool window system - Git is on the bottom bar
         toggleToolWindowPanel('gitToolPanel', 'bottom');
+    };
+
+    let openCommitToolWindow = () => {
+        openGitToolWindow();
+        const msg = document.getElementById('gitCommitMessage');
+        msg?.focus();
+    };
+
+    function openGitPanel() {
+        openGitToolWindow();
     }
 
     function closeGitPanel() {
@@ -2316,7 +2526,9 @@
                 if (res.stderr) gitOutputGlobal(res.stderr);
             }
         } else {
-            showToast('error', toastLabel, res.error || res.stderr || 'Git command failed');
+            const message = normalizeGitError(res.error || res.stderr);
+            if (!silent) gitOutputGlobal(`✗ ${message}`);
+            showToast('error', toastLabel, message);
         }
         return res;
     }
@@ -2336,12 +2548,12 @@
 
         switch (action) {
             case 'add':
-                openGitPanel();
+                openGitToolWindow();
                 await runGitQuickCmd(`git add -- "${safe}"`, { toastLabel: 'Git Add' });
                 refresh();
                 return;
             case 'commit':
-                openGitPanel();
+                openCommitToolWindow();
                 setPath(target);
                 await runGitQuickCmd(`git add -- "${safe}"`, { toastLabel: 'Commit File' });
                 showToast('info', 'Commit File', 'File staged. Enter a commit message in Git tool window.');
@@ -2349,18 +2561,18 @@
                 refresh();
                 return;
             case 'history':
-                openGitPanel();
+                openGitToolWindow();
                 setPath(target);
                 await runGitQuickCmd(`git log --oneline -- "${safe}"`, { toastLabel: 'Git History' });
                 document.getElementById('gitLogBtn')?.click();
                 return;
             case 'compare':
-                openGitPanel();
+                openGitToolWindow();
                 setPath(target);
                 document.getElementById('gitDiffFileBtn')?.click();
                 return;
             case 'rollback':
-                openGitPanel();
+                openGitToolWindow();
                 await runGitQuickCmd(`git checkout -- "${safe}"`, { toastLabel: 'Rollback' });
                 refresh();
                 return;
@@ -2375,9 +2587,15 @@
     }
 
     function toggleTerminal() {
+        if (globalTerminalState && !globalTerminalState.tabs.length) {
+            addTerminalTab(globalTerminalState, true);
+        }
         // Toggle the bottom tool window (Terminal panel) using new PhpStorm-style layout
         toggleToolWindowPanel('terminalPanel', 'bottom');
-        setTimeout(() => focusTerminal(), 80);
+        setTimeout(() => {
+            if (globalTerminalState) refreshTerminalLayout(globalTerminalState);
+            focusTerminal();
+        }, 80);
     }
 
     function revealLine(lineNumber) {
@@ -2472,8 +2690,14 @@
                 case 'replace':
                     editor?.trigger('keyboard', 'editor.action.startFindReplaceAction', null);
                     return;
-                case 'find-in-files':
-                    launchProjectSearch('find', 'all', { runImmediately: true });
+                case 'find-in-folder':
+                    openFindReplaceDialog('find', getSelectedText());
+                    return;
+                case 'replace-in-folder':
+                    openFindReplaceDialog('replace', getSelectedText());
+                    return;
+                case 'search-everywhere':
+                    openSearchEverywhere('');
                     return;
                 case 'comment':
                     editor?.trigger('keyboard', 'editor.action.commentLine', null);
@@ -2485,7 +2709,7 @@
                     editor?.trigger('keyboard', 'editor.action.gotoLine', null);
                     return;
                 case 'goto-file':
-                    launchProjectSearch('find', 'names');
+                    openSearchEverywhere('');
                     return;
                 case 'expand-selection':
                     editor?.trigger('keyboard', 'editor.action.smartSelect.expand', null);
@@ -2516,7 +2740,10 @@
                         await addTerminalTab(terminalState, true);
                     }
                     toggleToolWindowPanel('terminalPanel', 'bottom');
-                    setTimeout(() => focusTerminal(), 50);
+                    setTimeout(() => {
+                        refreshTerminalLayout(terminalState);
+                        focusTerminal();
+                    }, 50);
                     return;
                 case 'extensions':
                     toggleToolWindowPanel('extensionsPanel', 'bottom');
@@ -2549,18 +2776,18 @@
                     await createNewFile();
                     return;
                 case 'git':
-                    openGitPanel();
+                    openGitToolWindow();
                     return;
                 case 'git-status':
-                    openGitPanel();
+                    openGitToolWindow();
                     $('#gitStatusBtn').trigger('click');
                     return;
                 case 'git-diff':
-                    openGitPanel();
+                    openGitToolWindow();
                     $('#gitDiffBtn').trigger('click');
                     return;
                 case 'git-history':
-                    openGitPanel();
+                    openGitToolWindow();
                     $('#gitLogBtn').trigger('click');
                     return;
                 case 'appearance':
@@ -2653,9 +2880,10 @@
 
         const isEditableTarget = (el) => {
             if (!el) return false;
+            const inTerminal = !!el.closest?.('#terminalViewport') || !!el.closest?.('.xterm');
+            if (inTerminal) return terminalConfig.overrideIdeShortcuts;
             const tag = (el.tagName || '').toLowerCase();
             const editable = el.isContentEditable;
-            if (terminalConfig.overrideIdeShortcuts && isTerminalFocused()) return true;
             return editable || tag === 'input' || tag === 'textarea' || tag === 'select';
         };
 
@@ -2741,19 +2969,33 @@
         const contentArea = document.getElementById(`${position}ToolWindow`);
         const buttons = document.querySelectorAll(`.tool-window-stripe-btn[data-position="${position}"]`);
 
-        // If clicking the same panel, toggle visibility
+        // If clicking the same panel, toggle visibility (bottom keeps stripe visible)
         if (state.activePanel === panelId && state.visible) {
             state.visible = false;
-            if (contentArea) contentArea.classList.add('hidden');
-            buttons.forEach(b => b.classList.remove('active'));
             state.activePanel = null;
+            if (position === 'bottom') {
+                if (contentArea) contentArea.classList.add('collapsed');
+                const bottomPanels = ['terminalPanel', 'debugPanel', 'problemsPanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel'];
+                bottomPanels.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.classList.add('hidden');
+                });
+            } else {
+                if (contentArea) contentArea.classList.add('hidden');
+            }
+            buttons.forEach(b => b.classList.remove('active'));
             return;
         }
 
         // Show the content area and switch panels
         state.visible = true;
         state.activePanel = panelId;
-        if (contentArea) contentArea.classList.remove('hidden');
+        if (contentArea) {
+            contentArea.classList.remove('hidden');
+            if (position === 'bottom') {
+                contentArea.classList.remove('collapsed');
+            }
+        }
 
         // Update button states
         buttons.forEach(b => {
@@ -2780,6 +3022,11 @@
             const src = document.getElementById('problemsList');
             const dst = document.getElementById('problemsListStandalone');
             if (src && dst) dst.innerHTML = src.innerHTML;
+        }
+
+        if (panelId === 'terminalPanel' && state.visible && globalTerminalState) {
+            refreshTerminalLayout(globalTerminalState);
+            setTimeout(() => focusTerminal(), 10);
         }
     }
 
@@ -3054,11 +3301,11 @@
                 }
             });
 
-            const routineState = { current: null };
+            routineState = { current: null };
             routineStateRef = routineState;
-            projectSearchCtx.routineState = routineState;
             const terminalState = createTerminalState();
             globalTerminalState = terminalState; // Save for context menus
+            updateTerminalStatusPill();
             const dbgState = {
                 sessionId: null,
                 breakpoints: new Set(),
@@ -3073,8 +3320,6 @@
                 debugModeEnabled: false // Track if debug button was clicked
             };
             const debugBar = document.getElementById('debugBar');
-            projectSearchCtx.routineState = routineState;
-            projectSearchCtx.editor = editor;
             dbgStateRef = dbgState;
 
             // Register hover provider for variable inspection during debug
@@ -3197,7 +3442,6 @@
                 'toggle-sidebar': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB,
                 'toggle-terminal': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyJ,
                 'new-terminal': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyT,
-                'project-search': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
 
                 // PhpStorm Navigation shortcuts
                 'goto-file': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyN,
@@ -3212,8 +3456,8 @@
                 // PhpStorm Search shortcuts
                 'find': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF,
                 'replace': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR,
-                'find-in-files': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF,
-                'replace-in-files': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyR,
+                'find-in-folder': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF,
+                'replace-in-folder': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyR,
 
                 // PhpStorm Code shortcuts
                 'format-code': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyL,
@@ -3243,10 +3487,9 @@
             registerKeybinding(editor, 'Toggle Sidebar', 'toggle-sidebar', () => toggleSidebar(), shortcutDefaults['toggle-sidebar']);
             registerKeybinding(editor, 'Toggle Terminal', 'toggle-terminal', () => toggleTerminal(), shortcutDefaults['toggle-terminal']);
             registerKeybinding(editor, 'New Terminal', 'new-terminal', () => document.getElementById('terminalNewTabBtn')?.click(), shortcutDefaults['new-terminal']);
-            registerKeybinding(editor, 'Search in Project', 'project-search', () => launchProjectSearch('find', 'all', { runImmediately: true }), shortcutDefaults['project-search']);
 
             // PhpStorm Navigation shortcuts
-            registerKeybinding(editor, 'Go to File', 'goto-file', () => launchProjectSearch('find', 'names'), shortcutDefaults['goto-file']);
+            registerKeybinding(editor, 'Go to File', 'goto-file', () => openSearchEverywhere(''), shortcutDefaults['goto-file']);
             registerKeybinding(editor, 'Go to Line', 'goto-line', () => editor.trigger('keyboard', 'editor.action.gotoLine', null), shortcutDefaults['goto-line']);
             registerKeybinding(editor, 'Recent Files', 'recent-files', () => showToast('info', 'Recent Files', 'Feature coming soon'), shortcutDefaults['recent-files']);
 
@@ -3258,8 +3501,8 @@
             // PhpStorm Search shortcuts
             registerKeybinding(editor, 'Find', 'find', () => editor.trigger('keyboard', 'actions.find', null), shortcutDefaults['find']);
             registerKeybinding(editor, 'Replace', 'replace', () => editor.trigger('keyboard', 'editor.action.startFindReplaceAction', null), shortcutDefaults['replace']);
-            registerKeybinding(editor, 'Find in Files', 'find-in-files', () => launchProjectSearch('find', 'all', { runImmediately: true }), shortcutDefaults['find-in-files']);
-            registerKeybinding(editor, 'Replace in Files', 'replace-in-files', () => launchProjectSearch('replace', 'all'), shortcutDefaults['replace-in-files']);
+            registerKeybinding(editor, 'Find in Files', 'find-in-folder', () => openFindReplaceDialog('find', getSelectedText()), shortcutDefaults['find-in-folder']);
+            registerKeybinding(editor, 'Replace in Files', 'replace-in-folder', () => openFindReplaceDialog('replace', getSelectedText()), shortcutDefaults['replace-in-folder']);
 
             // PhpStorm Code shortcuts
             registerKeybinding(editor, 'Format Code', 'format-code', () => editor.trigger('keyboard', 'editor.action.formatDocument', null), shortcutDefaults['format-code']);
@@ -3270,7 +3513,7 @@
 
             // PhpStorm Tool Windows (Alt+Number to toggle panels)
             registerKeybinding(editor, 'Tool: Project', 'tool-project', () => toggleToolWindowPanel('projectPanel', 'left'), shortcutDefaults['tool-project']);
-            registerKeybinding(editor, 'Tool: Find', 'tool-find', () => launchProjectSearch('find', 'all'), shortcutDefaults['tool-find']);
+            registerKeybinding(editor, 'Tool: Find', 'tool-find', () => openFindReplaceDialog('find', ''), shortcutDefaults['tool-find']);
             registerKeybinding(editor, 'Tool: Run', 'tool-run', () => toggleToolWindowPanel('terminalPanel', 'bottom'), shortcutDefaults['tool-run']);
             registerKeybinding(editor, 'Tool: Debug', 'tool-debug', () => toggleToolWindowPanel('debugPanel', 'bottom'), shortcutDefaults['tool-debug']);
             registerKeybinding(editor, 'Tool: Problems', 'tool-todo', () => toggleToolWindowPanel('problemsPanel', 'bottom'), shortcutDefaults['tool-todo']);
@@ -3285,54 +3528,81 @@
             bindTabKeyboardShortcuts();
             // PhpStorm-like editor context menu
             bindEditorContextMenu(editor);
-            projectSearchCtx.editor = editor;
             bindSettingsPanelThemes();
             bindGitSettingsPanel();
             bindDebugTabs();
             bindToolWindows();
             bindGlobalShortcuts();
+            window.addEventListener('resize', () => {
+                if (globalTerminalState) {
+                    refreshTerminalLayout(globalTerminalState, { resizeSession: true });
+                }
+            });
             initExtensionsView();
 
-            // Project search modal controls
-            const searchDebounce = (() => {
-                let t = null;
-                return (fn, ms = 250) => {
-                    clearTimeout(t);
-                    t = setTimeout(fn, ms);
-                };
-            })();
-
-            document.getElementById('projectSearchRunBtn')?.addEventListener('click', () => projectSearchExecute(projectSearchCtx.routineState, projectSearchCtx.editor, false));
-            document.getElementById('projectReplaceRunBtn')?.addEventListener('click', () => {
-                projectSearchMode = 'replace';
-                projectSearchExecute(projectSearchCtx.routineState, projectSearchCtx.editor, true);
+            // PhpStorm-style search bindings
+            updateFindScopeLabels();
+            document.getElementById('findReplaceToggleBtn')?.addEventListener('click', () => {
+                const nextMode = findReplaceState.mode === 'replace' ? 'find' : 'replace';
+                toggleFindMode(nextMode);
+                executeFindReplacePreview(false);
             });
-            document.getElementById('closeProjectSearchBtn')?.addEventListener('click', closeProjectSearch);
-            document.getElementById('projectSearchOverlay')?.addEventListener('click', closeProjectSearch);
-            document.getElementById('projectSearchQuery')?.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') projectSearchExecute(projectSearchCtx.routineState, projectSearchCtx.editor);
+            document.getElementById('closeFindDialog')?.addEventListener('click', closeFindReplaceDialog);
+            document.getElementById('findOverlay')?.addEventListener('click', closeFindReplaceDialog);
+            document.getElementById('replaceAllBtn')?.addEventListener('click', confirmAndReplaceAll);
+            document.getElementById('findQueryInput')?.addEventListener('input', () => searchDebounce(() => executeFindReplacePreview(false), 200));
+            document.getElementById('findQueryInput')?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') executeFindReplacePreview(false);
+                if (e.key === 'Escape') closeFindReplaceDialog();
             });
-            document.getElementById('projectReplaceInput')?.addEventListener('keydown', (e) => {
+            document.getElementById('replaceQueryInput')?.addEventListener('input', () => {
+                if (findReplaceState.mode === 'replace') {
+                    searchDebounce(() => executeFindReplacePreview(false), 280);
+                }
+            });
+            document.getElementById('replaceQueryInput')?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') executeFindReplacePreview(e.ctrlKey || e.metaKey);
+                if (e.key === 'Escape') closeFindReplaceDialog();
+            });
+            ['findCaseOption', 'findWholeOption', 'findRegexOption'].forEach(id => {
+                document.getElementById(id)?.addEventListener('change', () => executeFindReplacePreview(false));
+            });
+            document.getElementById('findDialog')?.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
-                    projectSearchMode = 'replace';
-                    projectSearchExecute(projectSearchCtx.routineState, projectSearchCtx.editor, true);
+                    if (findReplaceState.mode === 'replace' && e.ctrlKey) {
+                        confirmAndReplaceAll();
+                    } else {
+                        executeFindReplacePreview(false);
+                    }
+                }
+                if (e.key === 'Escape') closeFindReplaceDialog();
+            });
+
+            document.getElementById('searchEverywhereOverlay')?.addEventListener('click', closeSearchEverywhere);
+            const searchEverywhereInput = document.getElementById('searchEverywhereInput');
+            searchEverywhereInput?.addEventListener('input', () => renderSearchEverywhereResults(searchEverywhereInput.value));
+            searchEverywhereInput?.addEventListener('keydown', async (e) => {
+                const resultsHost = document.getElementById('searchEverywhereResults');
+                const items = resultsHost?.querySelectorAll('.search-everywhere-item') || [];
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    searchEverywhereState.selectedIndex = Math.min(items.length - 1, searchEverywhereState.selectedIndex + 1);
+                    renderSearchEverywhereResults(searchEverywhereInput.value);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    searchEverywhereState.selectedIndex = Math.max(0, searchEverywhereState.selectedIndex - 1);
+                    renderSearchEverywhereResults(searchEverywhereInput.value);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const refreshedItems = document.getElementById('searchEverywhereResults')?.querySelectorAll('.search-everywhere-item') || [];
+                    const active = refreshedItems[searchEverywhereState.selectedIndex];
+                    const path = active?.dataset?.path;
+                    if (path) openSearchEverywhereResult(path);
+                } else if (e.key === 'Escape') {
+                    closeSearchEverywhere();
                 }
             });
-            document.getElementById('projectSearchCaseBtn')?.addEventListener('click', () => {
-                projectSearchMatchCase = !projectSearchMatchCase;
-                const caseBtn = document.getElementById('projectSearchCaseBtn');
-                caseBtn?.classList.toggle('active', projectSearchMatchCase);
-                caseBtn.title = projectSearchMatchCase ? 'Match Case (on)' : 'Match Case (off)';
-                projectSearchExecute(projectSearchCtx.routineState, projectSearchCtx.editor, false);
-            });
-            document.getElementById('projectSearchQuery')?.addEventListener('input', () => {
-                searchDebounce(() => projectSearchExecute(projectSearchCtx.routineState, projectSearchCtx.editor, false), 120);
-            });
-            document.getElementById('projectReplaceInput')?.addEventListener('input', () => {
-                if (projectSearchMode === 'replace') {
-                    searchDebounce(() => projectSearchExecute(projectSearchCtx.routineState, projectSearchCtx.editor, false), 300);
-                }
-            });
+
             let nativeSearchShortcutHandler = null;
             const bindSearchShortcuts = () => {
                 const handler = (e) => {
@@ -3344,22 +3614,22 @@
                     if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {
                         if (key === 'f') {
                             e.preventDefault();
-                            launchProjectSearch('find', 'all', { runImmediately: true, useSelection: true });
+                            openFindReplaceDialog('find', getSelectedText());
                             return;
                         }
                         if (key === 'r') {
                             e.preventDefault();
-                            launchProjectSearch('replace', 'all');
+                            openFindReplaceDialog('replace', getSelectedText());
                             return;
                         }
                     }
 
-                    if (!inTextField && !e.ctrlKey && !e.metaKey && !e.altKey && key === 'shift') {
+                    if (!e.ctrlKey && !e.metaKey && !e.altKey && key === 'shift') {
                         if (e.repeat) return;
                         const now = Date.now();
-                        if (now - lastShiftTap <= 400) {
+                        if (now - lastShiftTap <= 420) {
                             lastShiftTap = 0;
-                            launchProjectSearch('find', 'names', { prefill: '', useSelection: false, runImmediately: false });
+                            openSearchEverywhere('');
                             return;
                         }
                         lastShiftTap = now;
@@ -3367,7 +3637,8 @@
                     }
 
                     if (key === 'escape') {
-                        closeProjectSearch();
+                        closeFindReplaceDialog();
+                        closeSearchEverywhere();
                     }
                 };
 
@@ -4050,12 +4321,13 @@
                 }
             };
             const gitError = (text) => {
+                const message = normalizeGitError(text);
                 const out = document.getElementById('gitOutput');
                 if (out) {
-                    out.textContent += `✗ ${text}\n`;
+                    out.textContent += `✗ ${message}\n`;
                     out.scrollTop = out.scrollHeight;
                 }
-                showToast('error', 'Git', text);
+                showToast('error', 'Git', message);
             };
             const setDiffPanes = (left, right) => {
                 const l = document.getElementById('gitDiffLeft');
@@ -4180,7 +4452,7 @@
             const refreshGitStatus = async () => {
                 gitSelected.staged.clear();
                 gitSelected.unstaged.clear();
-                await runGit('git status --short --branch', {
+                const statusRes = await runGit('git status --short --branch', {
                     onSuccess: (out) => {
                         const lines = (out || '').split('\n').filter(Boolean);
                         const entries = [];
@@ -4196,7 +4468,8 @@
                         renderGitChanges(entries);
                     }
                 });
-                await runGit('git branch --format="%(refname:short)"', {
+                if (!statusRes.ok) return statusRes;
+                return runGit('git branch --format="%(refname:short)"', {
                     silent: true,
                     onSuccess: (out) => {
                         const select = document.getElementById('gitBranchSelect');
@@ -4217,6 +4490,23 @@
                     onSuccess: (out) => renderGitHistory((out || '').split('\n').filter(Boolean))
                 });
             };
+
+            openGitToolWindow = (opts = {}) => {
+                toggleToolWindowPanel('gitToolPanel', 'bottom');
+                if (!opts.skipRefresh) {
+                    refreshGitStatus().catch(() => {});
+                    loadGitHistory().catch(() => {});
+                }
+            };
+
+            openCommitToolWindow = () => {
+                openGitToolWindow();
+                const msg = document.getElementById('gitCommitMessage');
+                msg?.focus();
+            };
+
+            // Keep legacy alias in sync for older callers
+            openGitPanel = () => openGitToolWindow();
 
             document.getElementById('gitRefreshBtn')?.addEventListener('click', refreshGitStatus);
             document.getElementById('gitStatusBtn')?.addEventListener('click', refreshGitStatus);
@@ -4317,6 +4607,14 @@
                 );
                 const diffRes = await runGit(`git diff -- ${a} ${b}`);
                 if (diffRes.ok && diffRes.stdout) renderSideBySideDiff(diffRes.stdout);
+            });
+
+            document.getElementById('toolbarGitBtn')?.addEventListener('click', () => {
+                openGitToolWindow();
+            });
+
+            document.getElementById('toolbarCommitBtn')?.addEventListener('click', () => {
+                openCommitToolWindow();
             });
 
             // Initial refresh when tool window wires up
@@ -4529,37 +4827,140 @@
 
     // ---------- Terminal & Output ----------
 
+    // Lazy terminal loader; prefers local node_modules/xterm, falls back to CDN if offline assets are missing. TODO: bundle xterm locally once network install is available.
+    const terminalEngineSources = [
+        './node_modules/xterm/lib/xterm.js',
+        'https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js'
+    ];
+    let terminalEnginePromise = null;
+    let terminalFallbackMode = false;
+    let terminalResizeObserver = null;
+
     const getTerminalCwd = () => terminalConfig.startDir || currentProject?.projectPath || envInfoCache?.cwd || (typeof process !== 'undefined' && process.cwd ? process.cwd() : '');
     const focusTerminal = () => {
-        const log = document.getElementById('output');
-        if (log) {
-            log.focus();
+        const tab = getActiveTerminalTab(globalTerminalState);
+        if (tab?.term) {
+            tab.term.focus();
         }
     };
     const isTerminalFocused = () => {
         const active = document.activeElement;
         if (!active) return false;
-        return active.id === 'output' || !!active.closest?.('#terminalPanel');
+        return !!active.closest?.('#terminalViewport') || !!active.closest?.('.xterm');
     };
 
     function createTerminalState() {
         return { tabs: [], active: null, counter: 0, sessionMap: {}, _wiredTerminalEvents: false };
     }
 
+    function getActiveTerminalTab(state) {
+        if (!state) return null;
+        return state.tabs.find(t => t.id === state.active) || null;
+    }
+
+    function loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const existing = document.querySelector(`script[data-src="${src}"]`);
+            if (existing) {
+                if (existing.dataset.loaded === 'true') {
+                    resolve();
+                    return;
+                }
+                existing.addEventListener('load', () => resolve());
+                existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)));
+                return;
+            }
+            const s = document.createElement('script');
+            s.src = src;
+            s.async = true;
+            s.dataset.src = src;
+            s.onload = () => {
+                s.dataset.loaded = 'true';
+                resolve();
+            };
+            s.onerror = () => reject(new Error(`Failed to load ${src}`));
+            document.head.appendChild(s);
+        });
+    }
+
+    async function ensureTerminalEngine() {
+        if (window.Terminal) {
+            terminalFallbackMode = false;
+            return window.Terminal;
+        }
+        if (terminalEnginePromise) return terminalEnginePromise;
+        terminalEnginePromise = (async () => {
+            let lastErr = null;
+            for (const src of terminalEngineSources) {
+                try {
+                    await loadScript(src);
+                    if (window.Terminal) {
+                        terminalFallbackMode = false;
+                        return window.Terminal;
+                    }
+                } catch (err) {
+                    lastErr = err;
+                }
+            }
+            throw new Error(`Terminal engine unavailable. Install xterm locally or allow CDN. ${lastErr ? lastErr.message : ''}`);
+        })();
+        try {
+            const term = await terminalEnginePromise;
+            terminalFallbackMode = false;
+            return term;
+        } catch (err) {
+            terminalEnginePromise = null;
+            terminalFallbackMode = true;
+            throw err;
+        }
+    }
+
+    function setTerminalError(message) {
+        const errorBox = document.getElementById('terminalError');
+        if (!errorBox) return;
+        if (!message) {
+            errorBox.classList.add('hidden');
+            errorBox.textContent = '';
+            return;
+        }
+        errorBox.classList.remove('hidden');
+        errorBox.textContent = message;
+    }
+
+    function updateTerminalStatusPill() {
+        const pill = document.getElementById('terminalStatusPill');
+        if (!pill) return;
+        const shellLabel = terminalConfig.shellPath ? `Shell: ${terminalConfig.shellPath}` : 'Shell: Default';
+        const cwdLabel = getTerminalCwd() || '';
+        pill.textContent = shellLabel;
+        pill.title = `${shellLabel}\nStart in: ${cwdLabel || 'Project root'}`;
+    }
+
     function ensureTerminalListeners(state) {
         if (!window.ahmadIDE.onTerminalData || state._wiredTerminalEvents) return;
         window.ahmadIDE.onTerminalData((payload) => {
             if (!payload) return;
-            const tab = state.tabs.find(t => t.sessionId === payload.id);
+            const tabId = state.sessionMap[payload.id];
+            const tab = state.tabs.find(t => t.id === tabId);
             if (!tab) return;
-            tab.buffer += payload.data || '';
-            renderTerminalBuffer(state);
+            if (tab.term) {
+                tab.term.write(payload.data || '');
+            } else {
+                tab.buffer = tab.buffer || [];
+                tab.buffer.push(payload.data || '');
+            }
         });
         window.ahmadIDE.onTerminalExit((payload) => {
-            const tab = state.tabs.find(t => t.sessionId === payload.id);
+            const tabId = state.sessionMap[payload.id];
+            const tab = state.tabs.find(t => t.id === tabId);
             if (!tab) return;
-            tab.buffer += `\n[Process exited with code ${payload.code ?? ''}]`;
-            renderTerminalBuffer(state);
+            tab.exited = payload.code;
+            tab.sessionId = null;
+            delete state.sessionMap[payload.id];
+            const message = `\r\n[Process exited with code ${payload.code ?? ''}]`;
+            if (tab.term) tab.term.write(message);
+            if (tab.container) tab.container.classList.add('exited');
+            renderTerminalTabs(state);
         });
         state._wiredTerminalEvents = true;
     }
@@ -4570,16 +4971,13 @@
         host.innerHTML = '';
         state.tabs.forEach(t => {
             const tab = document.createElement('div');
-            tab.className = 'terminal-tab' + (t.id === state.active ? ' active' : '');
+            tab.className = 'terminal-tab' + (t.id === state.active ? ' active' : '') + (t.exited !== undefined ? ' exited' : '');
             tab.textContent = t.name;
-            tab.onclick = () => {
-                state.active = t.id;
-                renderTerminalTabs(state);
-                renderTerminalBuffer(state);
-            };
+            tab.onclick = () => activateTerminalTab(state, t.id);
             const close = document.createElement('span');
             close.className = 'tab-close';
             close.textContent = '✕';
+            close.title = 'Close tab';
             close.onclick = (e) => {
                 e.stopPropagation();
                 closeTerminalTab(state, t.id);
@@ -4589,202 +4987,369 @@
         });
     }
 
-    async function sendCtrlC(state) {
-        const active = state.tabs.find(t => t.id === state.active);
-        if (!active) return;
-        appendOutput('^C', state);
-        if (active.sessionId && window.ahmadIDE.terminalWrite) {
-            await window.ahmadIDE.terminalWrite(active.sessionId, '\u0003');
+    function activateTerminalTab(state, tabId) {
+        if (!state) return;
+        state.active = tabId;
+        renderTerminalTabs(state);
+        const viewport = document.getElementById('terminalViewport');
+        if (viewport) {
+            viewport.querySelectorAll('.terminal-instance').forEach(el => {
+                el.classList.toggle('active', el.dataset.tabId === tabId);
+            });
         }
-        active.lineBuffer = '';
-        renderTerminalBuffer(state);
+        refreshTerminalLayout(state);
+        setTimeout(() => focusTerminal(), 30);
     }
 
-    function handleTerminalKey(e, state) {
-        const active = state.tabs.find(t => t.id === state.active);
-        if (!active) return;
+    function createTerminalContainer(tabId) {
+        const viewport = document.getElementById('terminalViewport');
+        if (!viewport) return null;
+        const container = document.createElement('div');
+        container.className = 'terminal-instance';
+        container.dataset.tabId = tabId;
+        viewport.appendChild(container);
+        return container;
+    }
 
-        // Control combos
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
-            e.preventDefault();
-            sendCtrlC(state);
-            return;
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l') {
-            e.preventDefault();
-            clearOutput(state);
-            return;
-        }
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
-            e.preventDefault();
-            active.lineBuffer = '';
-            renderTerminalBuffer(state);
-            return;
-        }
+    function buildTerminalOptions() {
+        const styles = getComputedStyle(document.documentElement);
+        const font = (styles.getPropertyValue('--font-code') || '').trim() || 'monospace';
+        const fontSize = parseInt((styles.getPropertyValue('--font-size-code') || '').trim(), 10) || 13;
+        const background = (styles.getPropertyValue('--terminal-input-bg') || styles.getPropertyValue('--editor-bg') || '#1e1e1e').trim();
+        const foreground = (styles.getPropertyValue('--text') || '#ffffff').trim();
+        const selection = (styles.getPropertyValue('--selection-bg') || 'rgba(53,116,240,0.25)').trim();
+        return {
+            allowProposedApi: true,
+            convertEol: true,
+            fontFamily: font,
+            fontSize,
+            lineHeight: 1.2,
+            disableStdin: false,
+            cursorBlink: true,
+            theme: {
+                background,
+                foreground,
+                cursor: foreground,
+                selection
+            }
+        };
+    }
 
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const cmd = active.lineBuffer;
-            active.lineBuffer = '';
-            renderTerminalBuffer(state);
-            if (cmd && cmd.trim()) {
-                active.history = active.history || [];
-                active.history.push(cmd);
-                active.historyIndex = active.history.length;
-                execTerminalCommand(cmd, state);
-            } else {
-                appendOutput('', state);
+    function measureTerminal(tab) {
+        if (!tab?.term || !tab?.container) return null;
+        const rect = tab.container.getBoundingClientRect();
+        if (rect.width < 10 || rect.height < 10) return null;
+        if (terminalFallbackMode) return null;
+        let cellWidth = null;
+        let cellHeight = null;
+        const coreDims = tab.term._core?._renderService?.dimensions;
+        if (coreDims) {
+            cellWidth = coreDims.actualCellWidth || coreDims.css?.cellWidth || null;
+            cellHeight = coreDims.actualCellHeight || coreDims.css?.cellHeight || null;
+        }
+        if (!cellWidth || !cellHeight) {
+            const rowEl = tab.container.querySelector('.xterm-rows > div');
+            if (rowEl) {
+                const rowRect = rowEl.getBoundingClientRect();
+                if (rowRect.width && rowRect.height) {
+                    cellHeight = rowRect.height;
+                    cellWidth = rowRect.width / (tab.term.cols || 80);
+                }
             }
-            return;
         }
-        if (e.key === 'Backspace') {
-            e.preventDefault();
-            active.lineBuffer = active.lineBuffer.slice(0, -1);
-            renderTerminalBuffer(state);
-            return;
+        if (!cellWidth || !cellHeight) return null;
+        const cols = Math.max(20, Math.floor(rect.width / cellWidth));
+        const rows = Math.max(5, Math.floor(rect.height / cellHeight));
+        return { cols, rows };
+    }
+
+    function refreshTerminalLayout(state, { resizeSession = true } = {}) {
+        if (!state) return;
+        const tab = getActiveTerminalTab(state);
+        if (!tab?.term) return;
+        const dims = measureTerminal(tab);
+        if (!dims) return;
+        if (tab.lastSize && tab.lastSize.cols === dims.cols && tab.lastSize.rows === dims.rows) return;
+        try {
+            tab.term.resize(dims.cols, dims.rows);
+        } catch (e) {
+            console.warn('Terminal resize failed', e);
         }
-        if (e.key === 'ArrowUp') {
-            if (active.history && active.history.length) {
-                active.historyIndex = Math.max(0, (active.historyIndex ?? active.history.length) - 1);
-                active.lineBuffer = active.history[active.historyIndex] || '';
-                renderTerminalBuffer(state);
-            }
-            e.preventDefault();
-            return;
-        }
-        if (e.key === 'ArrowDown') {
-            if (active.history && active.history.length) {
-                active.historyIndex = Math.min(
-                    active.history.length,
-                    (active.historyIndex ?? active.history.length) + 1
-                );
-                active.lineBuffer = active.history[active.historyIndex] || '';
-                renderTerminalBuffer(state);
-            }
-            e.preventDefault();
-            return;
-        }
-        if (e.key === 'Tab') {
-            e.preventDefault();
-            active.lineBuffer += '\t';
-            renderTerminalBuffer(state);
-            return;
-        }
-        if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-            e.preventDefault();
-            active.lineBuffer += e.key;
-            renderTerminalBuffer(state);
+        tab.lastSize = dims;
+        if (resizeSession && tab.sessionId && window.ahmadIDE.terminalResize) {
+            window.ahmadIDE.terminalResize(tab.sessionId, dims.cols, dims.rows);
         }
     }
 
-    function renderTerminalBuffer(state) {
-        // TODO: Replace simple text buffer with xterm.js for full TUI/ANSI support (UNKNOWN – NEED DESIGN DECISION).
-        const log = document.getElementById('output');
-        if (!log) return;
-        log.setAttribute('tabindex', '0');
-        log.setAttribute('role', 'textbox');
-        log.setAttribute('aria-label', 'Terminal');
-        const active = state.tabs.find(t => t.id === state.active);
-        if (active) {
-            const base = active.buffer || '';
-            const needsNl = base && !base.endsWith('\n');
-            const promptLine = `$ ${active.lineBuffer || ''}`;
-            log.textContent = `${base}${needsNl ? '\n' : ''}${promptLine}`;
+    function ensureTerminalResizeObserver(state) {
+        if (terminalResizeObserver) return;
+        const viewport = document.getElementById('terminalViewport');
+        if (!viewport) return;
+        terminalResizeObserver = new ResizeObserver(() => refreshTerminalLayout(state));
+        terminalResizeObserver.observe(viewport);
+    }
+
+    function flushBufferedOutput(tab) {
+        if (!tab?.term || !tab?.buffer || !tab.buffer.length) return;
+        tab.buffer.forEach(chunk => tab.term.write(chunk));
+        tab.buffer = [];
+    }
+
+    async function startTerminalSession(tab, state) {
+        updateTerminalStatusPill();
+        const dims = measureTerminal(tab);
+        const sessionOptions = {
+            shell: terminalConfig.shellPath || undefined,
+            cwd: getTerminalCwd(),
+            cols: dims?.cols,
+            rows: dims?.rows
+        };
+        if (!window.ahmadIDE.terminalCreate) {
+            tab.term?.writeln('Terminal backend unavailable.');
+            return;
+        }
+        const res = await window.ahmadIDE.terminalCreate(sessionOptions);
+        if (res && res.ok) {
+            tab.sessionId = res.id;
+            state.sessionMap[res.id] = tab.id;
+            if (dims && !tab._plain) {
+                await window.ahmadIDE.terminalResize(tab.sessionId, dims.cols, dims.rows);
+            }
+            flushBufferedOutput(tab);
+            setTerminalError(null);
+            if (tab._plain) {
+                tab.term?.writeln('Running with basic renderer. Install xterm for full TUI/ANSI support.');
+            }
         } else {
-            log.textContent = 'Ready.';
+            const msg = res?.error || 'Unknown error starting terminal';
+            tab.term?.writeln(`\x1b[31m✗ Failed to start terminal: ${msg}\x1b[0m`);
+            setTerminalError(msg);
         }
-        log.scrollTop = log.scrollHeight;
-        log.onclick = () => log.focus();
-        log.onkeydown = (ev) => handleTerminalKey(ev, state);
-        log.onkeyup = (ev) => {
-            if (ev.key === 'Escape' && activeEditor) {
-                ev.preventDefault();
-                activeEditor.focus();
+    }
+
+    function createPlainTerminalTab(id, name, container, state) {
+        container.classList.add('plain-terminal');
+        const output = document.createElement('pre');
+        output.className = 'plain-terminal-output';
+        output.textContent = 'Starting...';
+        const hiddenInput = document.createElement('textarea');
+        hiddenInput.className = 'plain-terminal-input-hidden';
+        hiddenInput.setAttribute('aria-label', 'Terminal input');
+        container.appendChild(output);
+        container.appendChild(hiddenInput);
+
+        const tab = {
+            id,
+            name,
+            buffer: '',
+            sessionId: null,
+            term: null,
+            container,
+            lastSize: null,
+            _plain: true
+        };
+
+        const render = () => {
+            output.textContent = tab.buffer || '';
+            output.scrollTop = output.scrollHeight;
+        };
+
+        const send = async (data) => {
+            if (tab.sessionId && window.ahmadIDE.terminalWrite) {
+                await window.ahmadIDE.terminalWrite(tab.sessionId, data);
             }
         };
-        log.onpaste = (ev) => {
-            const txt = ev.clipboardData?.getData('text') || '';
-            if (!txt) return;
-            ev.preventDefault();
-            const activeTab = state.tabs.find(t => t.id === state.active);
-            if (!activeTab) return;
-            activeTab.lineBuffer += txt;
-            renderTerminalBuffer(state);
+
+        tab.term = {
+            write: (data) => {
+                tab.buffer += data || '';
+                render();
+            },
+            writeln: (data) => {
+                tab.buffer += `${data ?? ''}\n`;
+                render();
+            },
+            reset: () => {
+                tab.buffer = '';
+                render();
+            },
+            resize: () => {},
+            dispose: () => {},
+            focus: () => hiddenInput.focus()
         };
+
+        const handleKey = async (e) => {
+            if (e.key === 'Escape' && terminalConfig.escapeToEditor && !terminalConfig.overrideIdeShortcuts) {
+                e.preventDefault();
+                activeEditor?.focus();
+                return;
+            }
+            if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+                e.preventDefault();
+                await sendCtrlC(state);
+                return;
+            }
+            if (!tab.sessionId) return;
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                await send('\r');
+                return;
+            }
+            if (e.key === 'Backspace') {
+                e.preventDefault();
+                await send('\x7f');
+                return;
+            }
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                await send('\t');
+                return;
+            }
+            if (e.key.length === 1 && !e.metaKey) {
+                e.preventDefault();
+                await send(e.key);
+            }
+        };
+
+        hiddenInput.addEventListener('keydown', handleKey);
+        container.addEventListener('mousedown', () => hiddenInput.focus());
+        hiddenInput.tabIndex = 0;
+
+        render();
+        return tab;
+    }
+
+    async function addTerminalTab(state, isDefault = false) {
+        try {
+            let terminalCtor = null;
+            try {
+                terminalCtor = await ensureTerminalEngine();
+            } catch (err) {
+                console.warn('Falling back to basic terminal renderer', err);
+                setTerminalError(err?.message || 'Terminal engine unavailable; using fallback renderer');
+            }
+            ensureTerminalListeners(state);
+            ensureTerminalResizeObserver(state);
+            state.counter += 1;
+            const id = `term${state.counter}`;
+            const tabName = isDefault ? 'Local' : `Local ${state.counter}`;
+            const container = createTerminalContainer(id);
+            if (!container) {
+                showToast('error', 'Terminal', 'Missing terminal container');
+                return;
+            }
+            const tab = terminalCtor && !terminalFallbackMode
+                ? {
+                    id,
+                    name: tabName,
+                    buffer: [],
+                    sessionId: null,
+                    term: new terminalCtor(buildTerminalOptions()),
+                    container,
+                    lastSize: null
+                }
+                : createPlainTerminalTab(id, tabName, container, state);
+            state.tabs.push(tab);
+            state.active = id;
+
+            if (tab.term && !tab._plain) {
+                tab.term.onData(async (data) => {
+                    if (tab.sessionId && window.ahmadIDE.terminalWrite) {
+                        await window.ahmadIDE.terminalWrite(tab.sessionId, data);
+                    }
+                });
+                tab.term.onResize(({ cols, rows }) => {
+                    tab.lastSize = { cols, rows };
+                    if (tab.sessionId && window.ahmadIDE.terminalResize) {
+                        window.ahmadIDE.terminalResize(tab.sessionId, cols, rows);
+                    }
+                });
+                tab.term.attachCustomKeyEventHandler((ev) => {
+                    if (
+                        terminalConfig.escapeToEditor &&
+                        !terminalConfig.overrideIdeShortcuts &&
+                        ev.key === 'Escape' &&
+                        !ev.altKey && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey
+                    ) {
+                        activeEditor?.focus();
+                        return false;
+                    }
+                    return true;
+                });
+                tab.term.open(container);
+            }
+            renderTerminalTabs(state);
+            activateTerminalTab(state, id);
+            refreshTerminalLayout(state, { resizeSession: false });
+            setTimeout(() => refreshTerminalLayout(state), 50);
+            flushBufferedOutput(tab);
+            await startTerminalSession(tab, state);
+        } catch (err) {
+            console.error('Failed to create terminal tab', err);
+            setTerminalError(err?.message || 'Terminal engine unavailable');
+            showToast('error', 'Terminal', err?.message || 'Unable to start terminal');
+        }
     }
 
     async function closeTerminalTab(state, id) {
+        if (!state) return;
         const idx = state.tabs.findIndex(t => t.id === id);
         if (idx === -1) return;
         const tab = state.tabs[idx];
         if (tab.sessionId && window.ahmadIDE.terminalClose) {
             await window.ahmadIDE.terminalClose(tab.sessionId);
+            delete state.sessionMap[tab.sessionId];
         }
+        if (tab.term) {
+            tab.term.dispose();
+        }
+        tab.container?.remove();
         state.tabs.splice(idx, 1);
         if (state.active === id) {
             state.active = state.tabs.length ? state.tabs[state.tabs.length - 1].id : null;
         }
         renderTerminalTabs(state);
-        renderTerminalBuffer(state);
-        setTimeout(() => {
-            const termInput = document.getElementById('terminalInput');
-            if (termInput) termInput.focus();
-        }, 0);
-    }
-
-    async function addTerminalTab(state, isDefault = false) {
-        ensureTerminalListeners(state);
-        state.counter += 1;
-        const id = `term${state.counter}`;
-        const tab = {
-            id,
-            name: isDefault ? 'Local' : `Local ${state.counter}`,
-            buffer: 'Ready.',
-            history: [],
-            historyIndex: 0,
-            sessionId: null,
-            lineBuffer: ''
-        };
-        state.tabs.push(tab);
-        state.active = id;
-        if (window.ahmadIDE.terminalCreate) {
-            const sessionOptions = {
-                shell: terminalConfig.shellPath || undefined,
-                cwd: getTerminalCwd()
-            };
-            const res = await window.ahmadIDE.terminalCreate(sessionOptions);
-            if (res && res.ok) {
-                tab.sessionId = res.id;
-            } else {
-                tab.buffer = `Failed to start terminal: ${res?.error || 'Unknown error'}`;
-                showToast('error', 'Terminal', res?.error || 'Failed to start');
-            }
-        }
-        renderTerminalTabs(state);
-        renderTerminalBuffer(state);
+        refreshTerminalLayout(state);
     }
 
     function appendOutput(text, state) {
-        const log = document.getElementById('output');
-        if (!state || !state.tabs.length) {
-            log.textContent += `\n${text}`;
-            log.scrollTop = log.scrollHeight;
-            return;
+        if (!state || !state.tabs.length) return;
+        const tab = getActiveTerminalTab(state);
+        if (!tab) return;
+        const lines = Array.isArray(text) ? text : [text];
+        if (tab.term) {
+            lines.forEach(line => tab.term.writeln(line || ''));
+        } else {
+            tab.buffer = tab.buffer || [];
+            lines.forEach(line => tab.buffer.push((line || '') + '\n'));
         }
-        const active = state.tabs.find(t => t.id === state.active);
-        if (!active) return;
-        const prefix = active.buffer ? '\n' : '';
-        active.buffer += `${prefix}${text}`;
-        renderTerminalBuffer(state);
+        flushBufferedOutput(tab);
     }
 
     function clearOutput(state) {
-        if (!state || !state.tabs.length) return;
-        const active = state.tabs.find(t => t.id === state.active);
-        if (!active) return;
-        active.buffer = 'Ready.';
-        active.lineBuffer = '';
-        renderTerminalBuffer(state);
+        if (!state) return;
+        const tab = getActiveTerminalTab(state);
+        if (!tab?.term) return;
+        tab.term.reset();
+        tab.buffer = [];
+        tab.lastSize = null;
+        refreshTerminalLayout(state);
+    }
+
+    async function sendCtrlC(state) {
+        const tab = getActiveTerminalTab(state);
+        if (!tab || !tab.sessionId || !window.ahmadIDE.terminalWrite) return;
+        await window.ahmadIDE.terminalWrite(tab.sessionId, '\u0003');
+        tab.term?.write('^C\r\n');
+    }
+
+    async function execTerminalCommand(cmd, state) {
+        const tab = getActiveTerminalTab(state);
+        if (!tab) return;
+        const payload = `${cmd}\n`;
+        if (tab.sessionId && window.ahmadIDE.terminalWrite) {
+            await window.ahmadIDE.terminalWrite(tab.sessionId, payload);
+        }
     }
 
     // ---------- Breakpoints & Debug UI ----------
@@ -6398,7 +6963,8 @@
         const readRes = await window.ahmadIDE.readRoutine(targetRoutineKey);
         if (!readRes.ok) {
             appendOutput(`✗ Failed to load ${targetRoutineKey}: ${readRes.error || readRes.stderr}`, termState);
-            return;
+            showToast('error', 'Search', `Could not open ${targetRoutineKey}`);
+            return false;
         }
 
         // Create new tab with loaded content
@@ -6411,6 +6977,7 @@
         }
 
         appendOutput(`✓ Loaded routine ${targetRoutineKey}`, termState);
+        return true;
     }
 
     async function saveRoutineFlow(editor, state, termState) {
