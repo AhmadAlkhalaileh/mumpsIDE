@@ -4,6 +4,44 @@
 
     // Theme presets (IDE shell + Monaco code themes)
     const ideThemes = {
+        'jb-light': {
+            name: 'PhpStorm Light',
+            vars: {
+                '--bg': '#f5f7fb',
+                '--glass': 'rgba(255, 255, 255, 0.7)',
+                '--panel': '#ffffff',
+                '--panel-2': '#f4f6fb',
+                '--panel-strong': '#ffffff',
+                '--panel-soft': '#f5f7fb',
+                '--sidebar': '#f5f7fb',
+                '--rail-bg': '#eef1f7',
+                '--editor-bg': '#ffffff',
+                '--gutter-bg': '#f3f5f9',
+                '--terminal-bg': '#f8f9fb',
+                '--terminal-input-bg': '#edf0f7',
+                '--accent': '#3574f0',
+                '--accent-2': '#5b8def',
+                '--accent-blue': '#3574f0',
+                '--accent-green': '#3fb87f',
+                '--accent-orange': '#ed8b00',
+                '--accent-soft': 'rgba(53, 116, 240, 0.12)',
+                '--accent-soft-border': 'rgba(53, 116, 240, 0.24)',
+                '--text': '#1f232a',
+                '--text-bright': '#0f4c81',
+                '--muted': '#6a7280',
+                '--border': '#dfe3eb',
+                '--tree-selected': '#e6f0ff',
+                '--tree-selected-text': '#0f1b2d',
+                '--selection-bg': '#d9e4ff',
+                '--hover-bg': '#ecf0f7',
+                '--glow-1': 'rgba(53, 116, 240, 0.08)',
+                '--glow-2': 'rgba(91, 141, 239, 0.06)',
+                '--font-ui': 'Inter, \"Segoe UI\", \"SF Pro Display\", system-ui, sans-serif',
+                '--font-code': '\"JetBrains Mono\", \"SFMono-Regular\", \"Menlo\", \"Consolas\", \"Liberation Mono\", monospace',
+                '--font-size-ui': '13px',
+                '--font-size-code': '13px'
+            }
+        },
         earth: {
             name: 'Earth Dark',
             vars: {
@@ -11,11 +49,35 @@
                 '--glass': 'rgba(255,255,255,0.04)',
                 '--panel': 'rgba(37, 25, 19, 0.9)',
                 '--panel-2': 'rgba(45, 31, 23, 0.92)',
+                '--panel-strong': '#1b120e',
+                '--panel-soft': '#2a1b14',
+                '--sidebar': '#3c3f41',
+                '--rail-bg': '#313335',
+                '--editor-bg': '#2b2b2b',
+                '--gutter-bg': '#23160f',
+                '--terminal-bg': '#2b2b2b',
+                '--terminal-input-bg': '#313335',
                 '--accent': '#d67f3c',
                 '--accent-2': '#f0c27b',
+                '--accent-blue': '#4a9fe8',
+                '--accent-green': '#5fb865',
+                '--accent-orange': '#cc7832',
+                '--accent-soft': 'rgba(214,127,60,0.20)',
+                '--accent-soft-border': 'rgba(214,127,60,0.32)',
                 '--text': '#f5ede4',
+                '--text-bright': '#ffc66d',
                 '--muted': '#b8a99a',
-                '--border': 'rgba(255,255,255,0.08)'
+                '--border': 'rgba(255,255,255,0.08)',
+                '--tree-selected': '#2f4554',
+                '--tree-selected-text': '#ffffff',
+                '--selection-bg': '#214283',
+                '--hover-bg': '#393b3d',
+                '--glow-1': 'rgba(214,127,60,0.08)',
+                '--glow-2': 'rgba(240,194,123,0.06)',
+                '--font-ui': 'Inter, \"Segoe UI\", \"SF Pro Display\", system-ui, sans-serif',
+                '--font-code': '\"JetBrains Mono\", \"SFMono-Regular\", \"Menlo\", \"Consolas\", \"Liberation Mono\", monospace',
+                '--font-size-ui': '13px',
+                '--font-size-code': '13px'
             }
         },
         desert: {
@@ -25,17 +87,41 @@
                 '--glass': 'rgba(255,255,255,0.05)',
                 '--panel': 'rgba(42, 28, 20, 0.9)',
                 '--panel-2': 'rgba(52, 35, 24, 0.94)',
+                '--panel-strong': '#21160f',
+                '--panel-soft': '#2b1c14',
+                '--sidebar': '#2b1c14',
+                '--rail-bg': '#2f2017',
+                '--editor-bg': '#1f140e',
+                '--gutter-bg': '#1a100b',
+                '--terminal-bg': '#23160f',
+                '--terminal-input-bg': '#2e1e15',
                 '--accent': '#f0a35c',
                 '--accent-2': '#ffd59a',
+                '--accent-blue': '#4a9fe8',
+                '--accent-green': '#5fb865',
+                '--accent-orange': '#f0a35c',
+                '--accent-soft': 'rgba(240,163,92,0.20)',
+                '--accent-soft-border': 'rgba(240,163,92,0.32)',
                 '--text': '#f7ecde',
+                '--text-bright': '#ffd59a',
                 '--muted': '#c7b8a4',
-                '--border': 'rgba(255,255,255,0.1)'
+                '--border': 'rgba(255,255,255,0.1)',
+                '--tree-selected': '#2f4554',
+                '--tree-selected-text': '#ffffff',
+                '--selection-bg': '#214283',
+                '--hover-bg': '#3a2b22',
+                '--glow-1': 'rgba(240,163,92,0.10)',
+                '--glow-2': 'rgba(255,213,154,0.06)',
+                '--font-ui': 'Inter, \"Segoe UI\", \"SF Pro Display\", system-ui, sans-serif',
+                '--font-code': '\"JetBrains Mono\", \"SFMono-Regular\", \"Menlo\", \"Consolas\", \"Liberation Mono\", monospace',
+                '--font-size-ui': '13px',
+                '--font-size-code': '13px'
             }
         }
     };
-    const defaultIdeTheme = 'earth';
-    const defaultCodeTheme = 'mumps-earth';
-    const codeThemes = ['mumps-earth', 'mumps-dark'];
+    const defaultIdeTheme = 'jb-light';
+    const defaultCodeTheme = 'mumps-light';
+    const codeThemes = ['mumps-light', 'mumps-earth', 'mumps-dark'];
     let currentCodeTheme = (() => {
         try {
             const stored = localStorage.getItem('ahmadIDE:theme:code');
@@ -47,6 +133,13 @@
     })();
     const collapsedTreeNodes = new Set();
     let activeEditor = null;
+    // Terminal configuration (TODO: expose via Settings UI)
+    const terminalConfig = {
+        shellPath: null, // Default: system shell
+        startDir: null, // Default: project root
+        overrideIdeShortcuts: false // If true, terminal keeps shortcuts when focused
+    };
+    let envInfoCache = null;
     const mumpsValidator = typeof MUMPSValidator !== 'undefined' ? new MUMPSValidator() : null;
     const mumpsLinter = typeof MUMPSLinter !== 'undefined' ? new MUMPSLinter() : null;
     const MUMPSLexerClass = typeof MUMPSLexer !== 'undefined' ? MUMPSLexer : null;
@@ -55,6 +148,133 @@
     const expandedArrayKeys = new Set(); // track expanded arrays in Locals panel
     let activeRoutineName = null; // for breakpoint grouping and labels
     let routineStateRef = null; // shared ref for project search
+    let dbgStateRef = null; // shared debug state reference for helpers outside init scope
+    const menuConfig = [
+        {
+            id: 'file',
+            label: 'File',
+            items: [
+                { label: 'New', action: 'new-file' },
+                { label: 'Open...', action: 'open-project' },
+                { label: 'Close Project', action: 'close-project' },
+                { separator: true },
+                { label: 'Save All', action: 'save-all' },
+                { separator: true },
+                { label: 'Settings', action: 'settings' },
+                { label: 'Exit', action: 'exit-app', implemented: false }
+            ]
+        },
+        {
+            id: 'edit',
+            label: 'Edit',
+            items: [
+                { label: 'Undo', action: 'undo' },
+                { label: 'Redo', action: 'redo' },
+                { separator: true },
+                { label: 'Cut', action: 'cut' },
+                { label: 'Copy', action: 'copy' },
+                { label: 'Paste', action: 'paste' },
+                { separator: true },
+                { label: 'Find', action: 'find' },
+                { label: 'Replace', action: 'replace' },
+                { label: 'Duplicate Line', action: 'duplicate-line' },
+                { label: 'Toggle Comment', action: 'comment' }
+            ]
+        },
+        {
+            id: 'view',
+            label: 'View',
+            items: [
+                { label: 'Toggle Sidebar', action: 'toggle-sidebar' },
+                { label: 'Terminal (Tool Window)', action: 'toggle-terminal' },
+                { label: 'Appearance', action: 'appearance', implemented: false }
+            ]
+        },
+        {
+            id: 'navigate',
+            label: 'Navigate',
+            items: [
+                { label: 'Go to File...', action: 'goto-file' },
+                { label: 'Go to Line...', action: 'goto-line' },
+                { label: 'Recent Files', action: 'recent-files', implemented: false }
+            ]
+        },
+        {
+            id: 'code',
+            label: 'Code',
+            items: [
+                { label: 'Format Code', action: 'reformat' },
+                { label: 'Comment/Uncomment', action: 'comment' },
+                { label: 'Rename', action: 'rename' }
+            ]
+        },
+        {
+            id: 'refactor',
+            label: 'Refactor',
+            items: [
+                { label: 'Rename', action: 'rename' },
+                { label: 'Extract Method', action: 'refactor-extract', implemented: false }
+            ]
+        },
+        {
+            id: 'run',
+            label: 'Run',
+            items: [
+                { label: 'Run', action: 'run' },
+                { label: 'Debug', action: 'debug' },
+                { label: 'Stop', action: 'stop-debug' }
+            ]
+        },
+        {
+            id: 'tools',
+            label: 'Tools',
+            items: [
+                { label: 'Terminal', action: 'terminal' },
+                { label: 'Lint', action: 'lint' },
+                { label: 'Shortcuts', action: 'shortcuts' },
+                { label: 'Extensions', action: 'extensions' }
+            ]
+        },
+        {
+            id: 'vcs',
+            label: 'VCS',
+            items: [
+                { label: 'Git', action: 'git' },
+                { label: 'Git Status', action: 'git-status' },
+                { label: 'Git Diff', action: 'git-diff' },
+                { label: 'Git History', action: 'git-history' }
+            ]
+        },
+        {
+            id: 'window',
+            label: 'Window',
+            items: [
+                { label: 'Toggle Sidebar', action: 'toggle-sidebar' },
+                { label: 'Toggle Terminal', action: 'toggle-terminal' },
+                { label: 'Store Layout', action: 'window-store', implemented: false }
+            ]
+        },
+        {
+            id: 'help',
+            label: 'Help',
+            items: [
+                { label: 'Docs', action: 'docs', implemented: false },
+                { label: 'About', action: 'about', implemented: false }
+            ]
+        }
+    ];
+    const coreShortcutMap = {
+        'ctrl+n': { label: 'Go to File', action: 'goto-file' },
+        'ctrl+shift+n': { label: 'Go to File (Alt)', action: 'goto-file' },
+        'ctrl+f': { label: 'Find in File', action: 'find' },
+        'ctrl+shift+f': { label: 'Find in Path', action: 'find-in-files' },
+        'ctrl+s': { label: 'Save', action: 'save' },
+        'ctrl+shift+s': { label: 'Save All', action: 'save-all' },
+        'ctrl+w': { label: 'Expand Selection', action: 'expand-selection' },
+        'ctrl+shift+w': { label: 'Shrink Selection', action: 'shrink-selection' },
+        'ctrl+tab': { label: 'Next Tab', action: 'tab-next' },
+        'alt+f12': { label: 'Toggle Terminal', action: 'toggle-terminal' }
+    };
     let projectSearchMode = 'find';
     let projectSearchScope = 'all';
     let projectSearchMatchCase = false;
@@ -64,6 +284,14 @@
     let shortcutDefaults = {};
     let routineFilterTerm = '';
     let activeDebugTab = 'tab-breakpoints';
+    const maxLintTextLength = 120000;
+    const maxProblemItems = 300;
+    let lintSkipNotified = false;
+    const extensionsState = {
+        installed: [],
+        selectedId: null,
+        enabled: {}
+    };
     if (typeof window !== 'undefined') {
         window._mumpsLinter = mumpsLinter;
         window._mumpsValidator = mumpsValidator;
@@ -351,31 +579,109 @@
     }
 
     let globalTerminalState = null;
-    let openTabs = []; // Array of {id, name, content, isDirty, state}
+
+    const mumpsFileIconSvg = `<svg width="16" height="16" viewBox="0 0 16 16"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f0a35c"/><stop offset="100%" stop-color="#d67f3c"/></linearGradient></defs><rect width="16" height="16" rx="3" fill="url(#mg)"/><text x="4" y="12" font-size="10" font-weight="bold" fill="#19100c" font-family="monospace">M</text></svg>`;
+
+    // ============================================
+    // PhpStorm-style Tab Management
+    // ============================================
+    // Tab state: { id, name, path, folder, content, isDirty, state, model }
+    // - path: normalized unique routine key (folder/name)
+    // - model: Monaco editor model for instant switching
+    let openTabs = [];
     let activeTabId = null;
     let tabIdCounter = 0;
+    let tabModels = new Map(); // Map of tab id -> Monaco model
+    let tabShortcutsBound = false;
 
-    // Tab Management Functions
-    function createTab(name, content = '', state = null) {
+    // Tab icon (same as project tree)
+    const tabMumpsIcon = mumpsFileIconSvg;
+
+    function normalizeRoutineTarget(name, folderHint = null) {
+        const trimmed = (name || '').trim();
+        let folder = folderHint || null;
+        if (!trimmed) return { base: '', folder, path: '' };
+        let base = trimmed;
+        if (trimmed.includes('/')) {
+            const parts = trimmed.split('/');
+            folder = parts[0] || folder;
+            base = parts.slice(1).join('/') || parts[1] || '';
+        }
+        const normalizedBase = base.toUpperCase();
+        const path = folder ? `${folder}/${normalizedBase}` : normalizedBase;
+        return { base: normalizedBase, folder, path };
+    }
+
+    function findOpenTab(target, { exact = false } = {}) {
+        const normTarget = normalizeRoutineTarget(target);
+        const exactMatch = openTabs.find(t => {
+            const normTab = normalizeRoutineTarget(t.path || t.name);
+            return normTab.path === normTarget.path;
+        });
+        if (exact || exactMatch) return exactMatch || null;
+
+        const looseMatches = openTabs.filter(t => {
+            const normTab = normalizeRoutineTarget(t.path || t.name);
+            return normTab.base && normTab.base === normTarget.base;
+        });
+        return looseMatches.length === 1 ? looseMatches[0] : null;
+    }
+
+    function createTab(name, content = '', state = null, options = {}) {
+        const normalized = normalizeRoutineTarget(name, options.folder || state?.current?.split('/')?.[0]);
+        const tabPath = normalized.path || normalized.base || `UNTITLED_${tabIdCounter + 1}`;
+
+        // Check if tab already exists
+        const existingTab = findOpenTab(tabPath, { exact: true });
+        if (existingTab) {
+            switchTab(existingTab.id);
+            return existingTab;
+        }
+
         const id = `tab_${++tabIdCounter}`;
+        const tabState = state || { current: tabPath };
+        if (tabState && tabPath) {
+            tabState.current = tabPath;
+        }
+
         const tab = {
             id,
-            name,
+            name: normalized.base || tabPath,
+            path: tabPath,
+            folder: normalized.folder,
             content,
             isDirty: false,
-            state: state || { current: name }
+            state: tabState,
+            icon: tabMumpsIcon
         };
         openTabs.push(tab);
-        activeTabId = id;
+
+        // Create Monaco model for this tab (for instant switching)
+        if (typeof monaco !== 'undefined') {
+            const model = monaco.editor.createModel(content, 'mumps');
+            tabModels.set(id, model);
+
+            // Track changes for dirty state
+            model.onDidChangeContent(() => {
+                const t = openTabs.find(x => x.id === id);
+                if (t && !t.isDirty) {
+                    t.isDirty = true;
+                    renderTabs();
+                }
+            });
+        }
+
         renderTabs();
+        switchTab(id);
         return tab;
     }
 
     function switchTab(tabId) {
         const tab = openTabs.find(t => t.id === tabId);
         if (!tab) return;
+        if (tabId === activeTabId) return; // Already active
 
-        // Save current tab content if there's an active tab
+        // Save current tab content
         if (activeTabId && activeEditor) {
             const currentTab = openTabs.find(t => t.id === activeTabId);
             if (currentTab) {
@@ -384,13 +690,36 @@
         }
 
         activeTabId = tabId;
-        if (activeEditor) {
-            activeEditor.setValue(tab.content);
+        const normalizedTarget = normalizeRoutineTarget(tab.path || tab.name);
+        if (tab.state) {
+            tab.state.current = normalizedTarget.path || tab.state.current;
         }
-        setCurrentRoutine(tab.name);
-        decorateBreakpoints(activeEditor, dbgState);
-        renderBreakpoints(dbgState);
+        if (routineStateRef) {
+            routineStateRef.current = normalizedTarget.path || normalizedTarget.base;
+        }
+
+        // Switch Monaco model (instant, no setValue)
+        if (activeEditor) {
+            const model = tabModels.get(tabId);
+            if (model) {
+                activeEditor.setModel(model);
+            } else {
+                // Fallback: create model if missing
+                const newModel = monaco.editor.createModel(tab.content, 'mumps');
+                tabModels.set(tabId, newModel);
+                activeEditor.setModel(newModel);
+            }
+        }
+
+        setCurrentRoutine(normalizedTarget.path || normalizedTarget.base);
+        if (dbgStateRef) {
+            decorateBreakpoints(activeEditor, dbgStateRef);
+            renderBreakpoints(dbgStateRef);
+        }
         renderTabs();
+
+        // Scroll active tab into view
+        scrollActiveTabIntoView();
     }
 
     function closeTab(tabId, force = false) {
@@ -401,10 +730,7 @@
             showConfirmDialog(
                 'Unsaved Changes',
                 `"${tab.name}" has unsaved changes. Do you want to discard them?`,
-                () => {
-                    // User confirmed - close the tab
-                    performCloseTab(tabId);
-                }
+                () => performCloseTab(tabId)
             );
         } else {
             performCloseTab(tabId);
@@ -415,16 +741,24 @@
         const index = openTabs.findIndex(t => t.id === tabId);
         if (index === -1) return;
 
+        // Dispose Monaco model
+        const model = tabModels.get(tabId);
+        if (model) {
+            model.dispose();
+            tabModels.delete(tabId);
+        }
+
         openTabs.splice(index, 1);
 
-        // Switch to another tab or clear editor
+        // Switch to adjacent tab (PhpStorm: activate tab to the left, or right if none)
         if (openTabs.length > 0) {
-            const newActiveTab = openTabs[Math.max(0, index - 1)];
-            switchTab(newActiveTab.id);
+            const newIndex = Math.min(index, openTabs.length - 1);
+            switchTab(openTabs[newIndex].id);
         } else {
             activeTabId = null;
             if (activeEditor) {
-                activeEditor.setValue('');
+                const emptyModel = monaco.editor.createModel('', 'mumps');
+                activeEditor.setModel(emptyModel);
             }
             setCurrentRoutine('');
             renderTabs();
@@ -433,9 +767,47 @@
 
     function markTabDirty(tabId, isDirty = true) {
         const tab = openTabs.find(t => t.id === tabId);
-        if (tab) {
+        if (tab && tab.isDirty !== isDirty) {
             tab.isDirty = isDirty;
             renderTabs();
+        }
+    }
+
+    function markCurrentTabClean() {
+        if (activeTabId) {
+            markTabDirty(activeTabId, false);
+        }
+    }
+
+    // Cycle through tabs (Ctrl+Tab / Ctrl+Shift+Tab)
+    function cycleTab(direction = 1) {
+        if (openTabs.length <= 1) return;
+        const currentIndex = openTabs.findIndex(t => t.id === activeTabId);
+        if (currentIndex === -1) return;
+
+        let newIndex = (currentIndex + direction + openTabs.length) % openTabs.length;
+        switchTab(openTabs[newIndex].id);
+    }
+
+    function bindTabKeyboardShortcuts() {
+        if (tabShortcutsBound) return;
+        const handler = (e) => {
+            const key = (e.key || '').toLowerCase();
+            if (key !== 'tab') return;
+            if (!(e.ctrlKey || e.metaKey)) return;
+            e.preventDefault();
+            e.stopPropagation();
+            cycleTab(e.shiftKey ? -1 : 1);
+        };
+        window.addEventListener('keydown', handler, true);
+        tabShortcutsBound = true;
+    }
+
+    function scrollActiveTabIntoView() {
+        const tabBar = document.getElementById('tabBar');
+        const activeTab = tabBar?.querySelector('.tab.active');
+        if (activeTab) {
+            activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
         }
     }
 
@@ -446,36 +818,125 @@
         tabBar.empty();
 
         openTabs.forEach(tab => {
-            const tabElement = $(`<div class="tab ${tab.id === activeTabId ? 'active' : ''}"></div>`);
+            const isActive = tab.id === activeTabId;
+            const tabElement = $('<div class="tab"></div>');
+            if (isActive) tabElement.addClass('active');
+            if (tab.isDirty) tabElement.addClass('modified');
+            const tabTooltip = tab.path || tab.name || 'Untitled';
+            tabElement.attr('title', tabTooltip);
 
+            // File icon (PhpStorm style)
+            const iconSpan = $('<span class="tab-icon"></span>');
+            iconSpan.html(tab.icon || tabMumpsIcon);
+            tabElement.append(iconSpan);
+
+            // File name
             const nameSpan = $('<span class="tab-name"></span>');
-            nameSpan.text(tab.name + (tab.isDirty ? ' •' : ''));
+            nameSpan.text(tab.name || 'Untitled');
+            tabElement.append(nameSpan);
 
+            // Close button
             const closeBtn = $('<span class="tab-close">×</span>');
             closeBtn.on('click', (e) => {
                 e.stopPropagation();
                 closeTab(tab.id);
             });
-
-            tabElement.append(nameSpan);
             tabElement.append(closeBtn);
 
-            tabElement.on('click', () => switchTab(tab.id));
+            // Click to switch
+            tabElement.on('click', (e) => {
+                if (!$(e.target).hasClass('tab-close')) {
+                    switchTab(tab.id);
+                }
+            });
+
+            // Middle-click to close (PhpStorm behavior)
+            tabElement.on('mousedown', (e) => {
+                if (e.which === 2) { // Middle button
+                    e.preventDefault();
+                    closeTab(tab.id);
+                }
+            });
+
+            // Right-click context menu
+            tabElement.on('contextmenu', (e) => {
+                e.preventDefault();
+                showTabContextMenu(e.clientX, e.clientY, tab.id);
+            });
 
             tabBar.append(tabElement);
         });
 
-        // Add "New" button
-        const newBtn = $('<div class="tab ghost">+ New</div>');
+        // Add "+" button for new tab
+        const newBtn = $('<div class="tab ghost">+</div>');
+        newBtn.attr('title', 'New Routine');
         newBtn.on('click', () => {
             showCustomPrompt('New Routine', 'Routine name (e.g., NEWRTN)', (name) => {
-                createTab(name.toUpperCase(), '');
-                if (globalTerminalState) {
-                    appendOutput(`✓ Created new routine: ${name.toUpperCase()}`, globalTerminalState);
+                if (name) {
+                    createTab(name.toUpperCase(), `${name.toUpperCase()}\t; New routine\n\tQUIT\n`);
+                    if (globalTerminalState) {
+                        appendOutput(`✓ Created new routine: ${name.toUpperCase()}`, globalTerminalState);
+                    }
                 }
             });
         });
         tabBar.append(newBtn);
+    }
+
+    function showTabContextMenu(x, y, tabId) {
+        const tab = openTabs.find(t => t.id === tabId);
+        if (!tab) return;
+
+        $('.tab-context-menu').remove();
+        const menu = $('<div class="routines-context-menu tab-context-menu"></div>');
+        menu.css({ position: 'fixed', top: y, left: x, zIndex: 5000 });
+
+        const menuItems = [
+            { label: 'Close', action: () => closeTab(tabId) },
+            { label: 'Close Others', action: () => closeOtherTabs(tabId) },
+            { label: 'Close All', action: () => closeAllTabs() },
+            { separator: true },
+            { label: 'Close Tabs to the Left', action: () => closeTabsToSide(tabId, 'left') },
+            { label: 'Close Tabs to the Right', action: () => closeTabsToSide(tabId, 'right') }
+        ];
+
+        menuItems.forEach(item => {
+            if (item.separator) {
+                menu.append('<div class="ctx-separator"></div>');
+            } else {
+                const menuItem = $('<div class="ctx-item"></div>');
+                menuItem.html(`<span class="ctx-label">${item.label}</span>`);
+                menuItem.on('click', () => {
+                    menu.remove();
+                    item.action();
+                });
+                menu.append(menuItem);
+            }
+        });
+
+        $('body').append(menu);
+        setTimeout(() => $(document).one('click', () => menu.remove()), 100);
+    }
+
+    function closeOtherTabs(keepTabId) {
+        const tabsToClose = openTabs.filter(t => t.id !== keepTabId);
+        tabsToClose.forEach(t => performCloseTab(t.id));
+    }
+
+    function closeAllTabs() {
+        const allTabs = [...openTabs];
+        allTabs.forEach(t => performCloseTab(t.id));
+    }
+
+    function closeTabsToSide(tabId, side) {
+        const index = openTabs.findIndex(t => t.id === tabId);
+        if (index === -1) return;
+
+        const tabsToClose = side === 'left'
+            ? openTabs.slice(0, index)
+            : openTabs.slice(index + 1);
+
+        tabsToClose.forEach(t => performCloseTab(t.id));
     }
 
     function showConfirmDialog(title, message, onConfirm) {
@@ -539,52 +1000,244 @@
         });
     }
 
-    function showRoutinesFolderContextMenu(x, y, routineStateRef, editorRef) {
-        // Remove any existing context menu
+    // ============================================
+    // PhpStorm-style Project Tree Context Menu
+    // ============================================
+
+    function showProjectContextMenu(x, y, options = {}) {
+        const { type, path, name, routineStateRef, editorRef, folderName } = options;
         $('.routines-context-menu').remove();
 
         const menu = $('<div class="routines-context-menu"></div>');
         menu.css({ position: 'fixed', top: y, left: x, zIndex: 5000 });
 
-        const newRoutineItem = $('<div class="ctx-item"></div>');
-        newRoutineItem.html('<span style="font-size: 14px;">📄</span> <span>New Routine...</span>');
-        newRoutineItem.on('click', async (e) => {
-            e.stopPropagation();
-            menu.remove();
+        const resolvedPath = path || (folderName ? `${folderName}/${name || ''}` : null);
+        const projectRoot = currentProject?.projectPath || '';
+        const copyPathText = resolvedPath ? `${projectRoot ? projectRoot + '/' : ''}${resolvedPath}` : projectRoot || '';
 
-            showCustomPrompt('New Routine', 'Routine name (e.g., NEWRTN)', (name) => {
-                routineStateRef.current = name.toUpperCase();
-                editorRef.setValue('');
-                setCurrentRoutine(routineStateRef.current);
+        const copyToClipboard = async (text, label = 'Path copied') => {
+            try {
+                await navigator.clipboard.writeText(text);
+                showToast('success', 'Copied', label);
+            } catch (err) {
+                showToast('error', 'Copy failed', err.message || 'Could not copy');
+            }
+        };
 
-                if (globalTerminalState) {
-                    appendOutput(`✓ Created new routine: ${routineStateRef.current}`, globalTerminalState);
+        const ensureGitPanel = () => {
+            openGitPanel();
+        };
+
+        const gitActions = {
+            add: async (target) => {
+                if (!target) return;
+                ensureGitPanel();
+                await runGitQuickCmd(`git add -- "${target}"`, { toastLabel: 'Git Add' });
+                document.getElementById('gitStatusBtn')?.click();
+            },
+            commitFile: async (target) => {
+                ensureGitPanel();
+                const msg = document.getElementById('gitCommitMessage');
+                const diffPath = document.getElementById('gitDiffPath');
+                if (diffPath) diffPath.value = target || '';
+                await runGitQuickCmd(`git add -- "${target}"`, { toastLabel: 'Git Commit' });
+                showToast('info', 'Commit File', 'Staged file. Enter message in Git tool window to commit.');
+                msg?.focus();
+                document.getElementById('gitStatusBtn')?.click();
+            },
+            history: async (target) => {
+                ensureGitPanel();
+                await runGitQuickCmd(`git log --oneline -- "${target}"`, { toastLabel: 'Git History' });
+                const input = document.getElementById('gitDiffPath');
+                if (input) input.value = target || '';
+                document.getElementById('gitLogBtn')?.click();
+            },
+            compareHead: async (target) => {
+                ensureGitPanel();
+                const input = document.getElementById('gitDiffPath');
+                if (input) input.value = target || '';
+                document.getElementById('gitDiffFileBtn')?.click();
+            },
+            rollback: async (target) => {
+                ensureGitPanel();
+                await runGitQuickCmd(`git checkout -- "${target}"`, { toastLabel: 'Git Rollback' });
+                document.getElementById('gitStatusBtn')?.click();
+            }
+        };
+
+        const menuItems = [];
+
+        const normalizeSeparators = (items) => {
+            const cleaned = [];
+            let lastWasSeparator = false;
+            items.forEach(item => {
+                if (item.separator) {
+                    if (!cleaned.length || lastWasSeparator) return;
+                    cleaned.push(item);
+                    lastWasSeparator = true;
+                } else {
+                    cleaned.push(item);
+                    lastWasSeparator = false;
                 }
             });
-        });
+            if (cleaned.length && cleaned[cleaned.length - 1].separator) {
+                cleaned.pop();
+            }
+            return cleaned;
+        };
 
-        const refreshItem = $('<div class="ctx-item"></div>');
-        refreshItem.html('<span style="font-size: 14px;">🔄</span> <span>Refresh</span>');
-        refreshItem.on('click', async (e) => {
-            e.stopPropagation();
-            menu.remove();
-            if (routineStateRef && editorRef) {
-                await loadRoutineList(routineStateRef, editorRef);
+        if (type === 'folder' || type === 'root') {
+            menuItems.push({
+                label: 'New…',
+                submenu: [
+                    {
+                        label: 'MUMPS Routine',
+                        action: () => {
+                            showCustomPrompt('New MUMPS Routine', 'Routine name (e.g., MYRTN)', (val) => {
+                                if (!val) return;
+                                const routineName = val.toUpperCase();
+                                const targetFolder = folderName || 'routines';
+                                const fullPath = `${targetFolder}/${routineName}`;
+                                const newContent = `${routineName}\t; New routine created\n\tQUIT\n`;
+                                createTab(routineName, newContent, { current: fullPath });
+                                editorRef?.setValue(newContent);
+                                if (routineStateRef) routineStateRef.current = fullPath;
+                                setCurrentRoutine(fullPath);
+                                showToast('success', 'Created', `New routine: ${routineName}`);
+                            });
+                        }
+                    },
+                    { label: 'Folder', action: () => showToast('info', 'NOT IMPLEMENTED YET', 'Folder creation requires file system access') }
+                ]
+            });
+            menuItems.push({ separator: true });
+        }
+
+        if (type === 'file') {
+            menuItems.push({
+                label: 'Open',
+                action: async () => {
+                    if (path && routineStateRef && editorRef) {
+                        await loadRoutineByName(path, routineStateRef, editorRef);
+                    }
+                }
+            });
+            menuItems.push({ separator: true });
+        }
+
+        // Core actions
+        menuItems.push({ label: 'Cut', disabled: true, action: () => showToast('info', 'NOT IMPLEMENTED YET', 'Cut requires filesystem access') });
+        menuItems.push({ label: 'Copy', disabled: true, action: () => showToast('info', 'NOT IMPLEMENTED YET', 'Copy requires filesystem access') });
+        menuItems.push({ label: 'Paste', disabled: true, action: () => showToast('info', 'NOT IMPLEMENTED YET', 'Paste requires filesystem access') });
+        menuItems.push({ separator: true });
+
+        if (type === 'file') {
+            menuItems.push({
+                label: 'Rename…',
+                shortcut: 'F2',
+                disabled: true
+            });
+        }
+        menuItems.push({
+            label: 'Delete',
+            shortcut: '⌦',
+            disabled: true
+        });
+        menuItems.push({ separator: true });
+
+        menuItems.push({ label: 'Refactor', action: () => showToast('info', 'NOT IMPLEMENTED YET', 'Refactor operations not available yet') });
+        menuItems.push({ separator: true });
+
+        menuItems.push({
+            label: 'Copy Path',
+            action: () => {
+                if (copyPathText) copyToClipboard(copyPathText, 'Path copied');
+            }
+        });
+        menuItems.push({
+            label: 'Copy Reference',
+            action: () => {
+                const ref = resolvedPath || '';
+                copyToClipboard(ref, 'Reference copied');
+            }
+        });
+        menuItems.push({ separator: true });
+
+        menuItems.push({
+            label: 'Reveal in File Explorer',
+            action: () => {
+                if (window.ahmadIDE?.revealInExplorer) {
+                    window.ahmadIDE.revealInExplorer(copyPathText || currentProject?.projectPath);
+                } else {
+                    showToast('info', 'Not Available', 'File explorer integration not available');
+                }
+            }
+        });
+        menuItems.push({ separator: true });
+
+        // Git submenu
+        menuItems.push({
+            label: 'Git',
+            submenu: [
+                { label: 'Add', action: () => gitActions.add(resolvedPath || '.') },
+                { label: 'Commit…', action: () => gitActions.commitFile(resolvedPath || '.') },
+                { label: 'Show History', action: () => gitActions.history(resolvedPath || '.') },
+                { label: 'Compare with Latest Version', action: () => gitActions.compareHead(resolvedPath || '.') },
+                { label: 'Revert / Rollback', action: () => gitActions.rollback(resolvedPath || '.') }
+            ]
+        });
+        menuItems.push({ separator: true });
+
+        menuItems.push({
+            label: 'Refresh',
+            action: async () => {
+                if (routineStateRef && editorRef) {
+                    await loadRoutineList(routineStateRef, editorRef);
+                    showToast('success', 'Refreshed', 'Project tree updated');
+                }
             }
         });
 
-        menu.append(newRoutineItem);
-        menu.append($('<div class="ctx-separator"></div>'));
-        menu.append(refreshItem);
+        // Build DOM
+        const createMenuItem = (item) => {
+            if (item.separator) return $('<div class="ctx-separator"></div>');
+            const el = $('<div class="ctx-item"></div>');
+            if (item.disabled) el.addClass('disabled');
+            el.append($('<span class="ctx-label"></span>').text(item.label));
+            if (item.shortcut) el.append($('<span class="ctx-shortcut"></span>').text(item.shortcut));
+            if (item.submenu) {
+                el.addClass('has-submenu');
+                el.append($('<span class="ctx-arrow">▸</span>'));
+                const sub = $('<div class="ctx-submenu"></div>');
+                item.submenu.forEach(subItem => sub.append(createMenuItem(subItem)));
+                el.append(sub);
+            } else if (item.action && !item.disabled) {
+                el.on('click', (e) => {
+                    e.stopPropagation();
+                    menu.remove();
+                    item.action();
+                });
+            }
+            return el;
+        };
 
+        normalizeSeparators(menuItems).forEach(i => menu.append(createMenuItem(i)));
         $('body').append(menu);
 
-        // Close menu on click outside
-        setTimeout(() => {
-            $(document).one('click', () => menu.remove());
-        }, 100);
-
+        const rect = menu[0].getBoundingClientRect();
+        if (rect.right > window.innerWidth) menu.css('left', window.innerWidth - rect.width - 10);
+        if (rect.bottom > window.innerHeight) menu.css('top', window.innerHeight - rect.height - 10);
+        setTimeout(() => $(document).one('click', () => menu.remove()), 100);
         return false;
+    }
+
+    // Legacy wrapper for compatibility
+    function showRoutinesFolderContextMenu(x, y, routineStateRef, editorRef) {
+        return showProjectContextMenu(x, y, {
+            type: 'folder',
+            routineStateRef,
+            editorRef
+        });
     }
 
     function getFileIcon(filename) {
@@ -664,48 +1317,128 @@
         return iconMap[ext] || { icon: '📄', cls: 'default' };
     }
 
+    // ============================================
+    // PhpStorm-style SVG Icons for Project Tree
+    // ============================================
+    const treeIcons = {
+        folder: `<svg width="16" height="16" viewBox="0 0 16 16" fill="#8c7a65"><path d="M2 3h5l1 1h6v9H2V3zm1 1v8h10V5H7.5L6.5 4H3z"/></svg>`,
+        folderOpen: `<svg width="16" height="16" viewBox="0 0 16 16" fill="#c4a97a"><path d="M2 3h5l1 1h6v2h-1l-1 7H3L2 6V3zm1 1v1.5l.8 6.5h8.4l.8-5H4V4z"/></svg>`,
+        project: `<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="2" fill="#6b8dad"/><path d="M4 5h8v1H4zm0 3h8v1H4zm0 3h5v1H4z" fill="#fff" opacity="0.8"/></svg>`,
+        mumps: mumpsFileIconSvg,
+        arrow: `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>`
+    };
+
+    let projectTreeRenderPending = null;
+    let projectTreeRenderArgs = null;
+
     function renderProjectTree(routines = [], routineStateRef = null, editorRef = null) {
+        projectTreeRenderArgs = { routines, routineStateRef, editorRef };
+        if (projectTreeRenderPending) return;
+        projectTreeRenderPending = window.requestAnimationFrame(() => {
+            projectTreeRenderPending = null;
+            const args = projectTreeRenderArgs || { routines: [], routineStateRef: null, editorRef: null };
+            projectTreeRenderArgs = null;
+            renderProjectTreeImmediate(args.routines, args.routineStateRef, args.editorRef);
+        });
+    }
+
+    function renderProjectTreeImmediate(routines = [], routineStateRef = null, editorRef = null) {
         const host = $('#projectTree');
         if (!host.length) return;
-        host.empty();
+        const hostEl = host[0];
+        hostEl.innerHTML = '';
+        const frag = document.createDocumentFragment();
 
-        const addItem = (label, iconClass, depth = 0, opts = {}) => {
+        // PhpStorm-style tree item builder
+        const createTreeItem = (label, options = {}) => {
+            const { icon, isFolder, hasChildren, expanded, depth = 0, togglePath, onClick, onContext, isActive, isDisabled } = options;
+
             const item = $('<div class="tree-item"></div>');
-            if (opts.disabled) item.addClass('disabled');
-            item.css('padding-left', `${2 + depth * 4}px`);
-            if (opts.togglePath) {
-                const toggler = $('<span class="tree-toggle"></span>');
-                toggler.text(collapsedTreeNodes.has(opts.togglePath) ? '+' : '−');
-                toggler.on('click', (e) => {
+            if (isFolder) item.addClass('folder');
+            if (isActive) item.addClass('active');
+            if (isDisabled) item.addClass('disabled');
+
+            // Indentation based on depth
+            item.css('padding-left', `${4 + depth * 16}px`);
+
+            // Expand/collapse arrow (PhpStorm style)
+            if (hasChildren) {
+                const arrow = $('<span class="tree-arrow"></span>');
+                arrow.html(treeIcons.arrow);
+                if (expanded) arrow.addClass('expanded');
+                arrow.on('click', (e) => {
                     e.stopPropagation();
-                    if (collapsedTreeNodes.has(opts.togglePath)) {
-                        collapsedTreeNodes.delete(opts.togglePath);
-                    } else {
-                        collapsedTreeNodes.add(opts.togglePath);
+                    if (togglePath) {
+                        if (collapsedTreeNodes.has(togglePath)) {
+                            collapsedTreeNodes.delete(togglePath);
+                        } else {
+                            collapsedTreeNodes.add(togglePath);
+                        }
+                        renderProjectTree(routines, routineStateRef, editorRef);
                     }
-                    renderProjectTree(routines, routineStateRef, editorRef);
                 });
-                item.append(toggler);
+                item.append(arrow);
             } else {
-                item.append('<span class="tree-toggle" style="opacity:0; border-color:transparent;"></span>');
+                // Empty placeholder for alignment
+                const arrow = $('<span class="tree-arrow empty"></span>');
+                item.append(arrow);
             }
-            item.append(`<span class="icon ${iconClass}"></span>`);
-            const text = $('<span class="tree-label"></span>').text(label);
-            item.append(text);
-            if (opts.onclick) {
-                item.on('click', opts.onclick);
+
+            // Icon
+            const iconSpan = $('<span class="tree-icon"></span>');
+            iconSpan.html(icon || treeIcons.mumps);
+            item.append(iconSpan);
+
+            // Label
+            const labelSpan = $('<span class="tree-label"></span>').text(label);
+            item.append(labelSpan);
+
+            // Click handler
+            if (onClick && !isDisabled) {
+                item.on('click', (e) => {
+                    if (!$(e.target).hasClass('tree-arrow') && !$(e.target).closest('.tree-arrow').length) {
+                        onClick(e);
+                    }
+                });
             }
-            if (opts.oncontext) {
-                item.on('contextmenu', opts.oncontext);
+
+            // Context menu handler
+            if (onContext) {
+                item.on('contextmenu', (e) => {
+                    e.preventDefault();
+                    onContext(e);
+                });
             }
+
             return item;
         };
 
+        // Project root
         const rootPath = 'root';
-        const root = addItem('Project', 'icon-root folder open', 0, { togglePath: rootPath });
-        const children = $('<div class="tree-children"></div>');
+        const rootExpanded = !collapsedTreeNodes.has(rootPath);
+        const projectName = currentProject?.projectPath?.split('/').pop() || 'Project';
 
-        // Group routines by folder (localr vs routines)
+        const rootItem = createTreeItem(projectName, {
+            icon: rootExpanded ? treeIcons.folderOpen : treeIcons.project,
+            isFolder: true,
+            hasChildren: true,
+            expanded: rootExpanded,
+            depth: 0,
+            togglePath: rootPath,
+            onContext: (e) => showProjectContextMenu(e.clientX, e.clientY, {
+                type: 'root',
+                routineStateRef,
+                editorRef
+            })
+        });
+        frag.appendChild(rootItem[0]);
+
+        if (!rootExpanded) {
+            hostEl.appendChild(frag);
+            return; // Don't render children if collapsed
+        }
+
+        // Group routines by folder
         const routinesByFolder = { localr: [], routines: [] };
         (routines || []).forEach(r => {
             if (r.startsWith('localr/')) {
@@ -716,65 +1449,101 @@
         });
 
         // Helper to create folder with routines
-        const createRoutineFolder = (folderName, folderRoutines, folderDepth) => {
+        const createRoutineFolder = (folderName, folderRoutines, depth) => {
             const folderPath = `root/${folderName}`;
-            const folderNode = addItem(folderName, 'icon-folder', folderDepth, {
+            const folderExpanded = !collapsedTreeNodes.has(folderPath);
+            const hasRoutines = folderRoutines.length > 0;
+
+            const container = $('<div></div>');
+
+            const folderItem = createTreeItem(folderName, {
+                icon: folderExpanded ? treeIcons.folderOpen : treeIcons.folder,
+                isFolder: true,
+                hasChildren: hasRoutines,
+                expanded: folderExpanded,
+                depth: depth,
                 togglePath: folderPath,
-                oncontext: (e) => {
-                    e.preventDefault();
-                    showRoutinesFolderContextMenu(e.clientX, e.clientY, routineStateRef, editorRef);
-                }
+                onContext: (e) => showProjectContextMenu(e.clientX, e.clientY, {
+                    type: 'folder',
+                    folderName: folderName,
+                    routineStateRef,
+                    editorRef
+                })
             });
-            const folderChildren = $('<div class="tree-children"></div>');
+            container.append(folderItem);
 
-            const filteredRoutines = folderRoutines.filter(r =>
-                !routineFilterTerm || r.toLowerCase().includes(routineFilterTerm.toLowerCase())
-            );
+            if (folderExpanded) {
+                const children = $('<div class="tree-children"></div>');
 
-            if (!collapsedTreeNodes.has(folderPath)) {
+                const filteredRoutines = folderRoutines.filter(r =>
+                    !routineFilterTerm || r.toLowerCase().includes(routineFilterTerm.toLowerCase())
+                );
+
                 if (!filteredRoutines.length) {
-                    const msg = routineFilterTerm ? `No routines match "${routineFilterTerm}"` : '(empty)';
-                    folderChildren.append(addItem(msg, 'icon-mumps', folderDepth + 1, { disabled: true }));
+                    const msg = routineFilterTerm ? `No match for "${routineFilterTerm}"` : '(empty)';
+                    const emptyItem = createTreeItem(msg, {
+                        icon: treeIcons.mumps,
+                        depth: depth + 1,
+                        isDisabled: true
+                    });
+                    children.append(emptyItem);
                 } else {
-                    filteredRoutines.forEach(r => {
-                        // Remove folder prefix for display
-                        const displayName = r.replace(/^(localr|routines)\//, '');
-                        const item = addItem(displayName, 'icon-mumps', folderDepth + 1, {
-                            onclick: async () => {
-                                await loadRoutineByName(r, routineStateRef, editorRef || activeEditor, routines);
-                            }
+                    filteredRoutines.forEach(routinePath => {
+                        const displayName = routinePath.replace(/^(localr|routines)\//, '');
+                        const isCurrentRoutine = routineStateRef && routineStateRef.current === routinePath;
+
+                        const fileItem = createTreeItem(displayName, {
+                            icon: treeIcons.mumps,
+                            depth: depth + 1,
+                            isActive: isCurrentRoutine,
+                            onClick: async () => {
+                                // Remove selection from all items
+                                host.find('.tree-item').removeClass('selected active');
+                                // Mark this item as selected
+                                fileItem.addClass('selected active');
+                                // Load the routine
+                                await loadRoutineByName(routinePath, routineStateRef, editorRef || activeEditor, routines);
+                            },
+                            onContext: (e) => showProjectContextMenu(e.clientX, e.clientY, {
+                                type: 'file',
+                                path: routinePath,
+                                name: displayName,
+                                folderName: folderName,
+                                routineStateRef,
+                                editorRef
+                            })
                         });
-                        if (routineStateRef && routineStateRef.current === r) item.addClass('active');
-                        folderChildren.append(item);
+                        children.append(fileItem);
                     });
                 }
-            } else {
-                folderChildren.hide();
+                container.append(children);
             }
-            folderNode.append(folderChildren);
-            return folderNode;
+
+            return container;
         };
 
-        // Create localr folder
+        // Create folders
+        const rootChildren = $('<div class="tree-children"></div>');
+
         if (routinesByFolder.localr.length > 0) {
-            children.append(createRoutineFolder('localr', routinesByFolder.localr, 1));
+            rootChildren.append(createRoutineFolder('localr', routinesByFolder.localr, 1));
         }
 
-        // Create routines folder
         if (routinesByFolder.routines.length > 0) {
-            children.append(createRoutineFolder('routines', routinesByFolder.routines, 1));
+            rootChildren.append(createRoutineFolder('routines', routinesByFolder.routines, 1));
         }
 
-        // Show message if no routines at all
         if (routinesByFolder.localr.length === 0 && routinesByFolder.routines.length === 0) {
-            const emptyMsg = addItem('No routines yet', 'icon-mumps', 1, { disabled: true });
-            children.append(emptyMsg);
+            const emptyItem = createTreeItem('No routines found', {
+                icon: treeIcons.mumps,
+                depth: 1,
+                isDisabled: true
+            });
+            rootChildren.append(emptyItem);
         }
-        if (collapsedTreeNodes.has(rootPath)) {
-            children.hide();
-        }
-        host.append(root);
-        host.append(children);
+
+        frag.appendChild(rootChildren[0]);
+        hostEl.appendChild(frag);
     }
 
     function defaultShortcut(actionId) {
@@ -815,51 +1584,214 @@
         const menu = $('#editorContextMenu');
         if (!menu.length || !editor) return;
 
+        const getEditor = () => activeEditor || editor;
         const hideMenu = () => menu.hide();
-        $(document).on('click', hideMenu);
+        const toggleDisabled = (actionId, disabled) => {
+            const el = menu.find(`[data-action="${actionId}"]`);
+            el.toggleClass('disabled', !!disabled);
+        };
+
+        if (!menu.data('ctx-bound')) {
+            $(document).on('click', hideMenu);
+            $(document).on('keydown', (e) => {
+                if (e.key === 'Escape') hideMenu();
+            });
+            menu.data('ctx-bound', true);
+        }
+
+        const gitContextActions = (targetPath) => {
+            const ensurePath = (fnLabel) => {
+                if (!targetPath) {
+                    showToast('info', 'Git', `NOT IMPLEMENTED YET: Git → ${fnLabel} (no active file)`);
+                    return null;
+                }
+                return targetPath;
+            };
+            return {
+                'ctx-git-add': () => {
+                    const target = ensurePath('Add');
+                    if (target) runGitContextAction('add', target);
+                },
+                'ctx-git-commit-file': () => {
+                    const target = ensurePath('Commit…');
+                    if (target) runGitContextAction('commit', target);
+                },
+                'ctx-git-history': () => {
+                    const target = ensurePath('Show History');
+                    if (target) runGitContextAction('history', target);
+                },
+                'ctx-git-compare': () => {
+                    const target = ensurePath('Compare with Latest Version');
+                    if (target) runGitContextAction('compare', target);
+                },
+                'ctx-git-rollback': () => {
+                    const target = ensurePath('Revert / Rollback');
+                    if (target) runGitContextAction('rollback', target);
+                }
+            };
+        };
 
         const actionMap = {
             'ctx-cut': () => document.execCommand('cut'),
             'ctx-copy': () => document.execCommand('copy'),
             'ctx-paste': () => document.execCommand('paste'),
-            'ctx-comment': () => editor.trigger('keyboard', 'editor.action.commentLine', null),
+            'ctx-format': async () => {
+                const ed = getEditor();
+                if (!ed) return;
+                const action = ed.getAction && ed.getAction('editor.action.formatDocument');
+                if (action && action.isSupported && action.isSupported()) {
+                    try {
+                        await action.run();
+                        return;
+                    } catch (err) {
+                        // Fall through to toast when formatter rejects
+                    }
+                }
+                showToast('info', 'Format Code', 'NOT IMPLEMENTED YET for this file type');
+            },
+            'ctx-declare': () => goToDeclaration(getEditor(), null, { silentIfMissing: false }),
+            'ctx-usages': () => showToast('info', 'Find Usages', 'NOT IMPLEMENTED YET'),
+            'ctx-comment': () => {
+                const ed = getEditor();
+                if (ed) ed.trigger('keyboard', 'editor.action.commentLine', null);
+            },
             'ctx-run': () => $('#runBtn').trigger('click'),
-            'ctx-debug': () => $('#debugStartBtn').trigger('click'),
-            'ctx-git-diff': () => {
-                openGitPanel();
-                $('#gitDiffBtn').trigger('click');
-            },
-            'ctx-git-history': () => {
-                openGitPanel();
-                $('#gitLogBtn').trigger('click');
-            },
-            'ctx-git-status': () => {
-                openGitPanel();
-                $('#gitStatusBtn').trigger('click');
-            },
-            'ctx-git-push': () => {
-                openGitPanel();
-                $('#gitPushBtn').trigger('click');
-            },
-            'ctx-git-pull': () => {
-                openGitPanel();
-                $('#gitPullBtn').trigger('click');
-            }
+            'ctx-debug': () => $('#debugStartBtn').trigger('click')
         };
 
-        Object.entries(actionMap).forEach(([id, fn]) => {
-            menu.find(`[data-action="${id}"]`).on('click', (e) => {
-                e.stopPropagation();
-                hideMenu();
-                fn();
+        const bindActions = (map) => {
+            Object.entries(map).forEach(([id, fn]) => {
+                const item = menu.find(`[data-action="${id}"]`);
+                item.off('click').on('click', async (e) => {
+                    e.stopPropagation();
+                    hideMenu();
+                    if (item.hasClass('disabled')) return;
+                    try {
+                        await fn();
+                    } catch (err) {
+                        console.error('Context menu action failed', err);
+                    }
+                });
             });
-        });
+        };
+        bindActions(actionMap);
+
+        const showEditorMenu = (clientX, clientY) => {
+            const ed = getEditor();
+            const model = ed?.getModel();
+            const position = ed?.getPosition();
+            const refParser = typeof parseRoutineReferenceAtPosition === 'function'
+                ? parseRoutineReferenceAtPosition
+                : null;
+            const ref = (model && position && refParser)
+                ? refParser(model, position)
+                : null;
+            toggleDisabled('ctx-declare', !ref);
+            const activePath = getActiveRoutine();
+            bindActions(gitContextActions(activePath));
+            menu.css({ top: clientY, left: clientX }).show();
+        };
 
         editor.onContextMenu((e) => {
             e.event.preventDefault();
-            const pos = { x: e.event.browserEvent.clientX, y: e.event.browserEvent.clientY };
-            menu.css({ top: pos.y, left: pos.x }).show();
+            e.event.stopPropagation();
+            const evt = e.event.browserEvent || e.event;
+            const x = (evt && evt.clientX != null) ? evt.clientX : e.event.posx || 0;
+            const y = (evt && evt.clientY != null) ? evt.clientY : e.event.posy || 0;
+            showEditorMenu(x, y);
         });
+
+        const domNode = editor.getDomNode();
+        if (domNode && !domNode._ctxMenuHooked) {
+            const handleDomContextMenu = (ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                showEditorMenu(ev.clientX, ev.clientY);
+            };
+            domNode.addEventListener('contextmenu', handleDomContextMenu, true); // capture to bypass Monaco handlers
+            domNode._ctxMenuHooked = true;
+        }
+    }
+
+    async function goToDeclaration(editor, position = null, options = {}) {
+        const { silentIfMissing = false } = options;
+        const ed = editor || activeEditor;
+        if (!ed) return false;
+
+        const model = ed.getModel();
+        const pos = position || ed.getPosition();
+        if (!model || !pos) return false;
+
+        const ref = parseRoutineReferenceAtPosition(model, pos);
+        if (!ref) {
+            if (!silentIfMissing) {
+                showToast('info', 'Go to Declaration', 'No symbol under cursor');
+            }
+            return false;
+        }
+
+        const revealTagInEditor = (targetEditor, tag) => {
+            if (!targetEditor || !tag) return false;
+            const targetModel = targetEditor.getModel();
+            if (!targetModel) return false;
+            const lineCount = targetModel.getLineCount();
+            for (let i = 1; i <= lineCount; i++) {
+                const lineContent = targetModel.getLineContent(i).trim();
+                if (new RegExp(`^${tag}(?:\\s|;|\\()`, 'i').test(lineContent)) {
+                    targetEditor.revealLineInCenter(i);
+                    targetEditor.setPosition({ lineNumber: i, column: 1 });
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        if (ref.type === 'external') {
+            const routine = ref.routine;
+            const tag = ref.tag || '';
+            try {
+                const existingTab = findOpenTab(routine);
+                if (existingTab) {
+                    switchTab(existingTab.id);
+                } else {
+                    const readRes = await window.ahmadIDE.readRoutine(routine);
+                    if (!readRes?.ok) {
+                        showToast('error', 'Go to Declaration', `Could not load ${routine}: ${readRes?.error || 'Unknown error'}`);
+                        return false;
+                    }
+                    createTab(routine, readRes.code || '');
+                }
+            } catch (err) {
+                showToast('error', 'Go to Declaration', err.message || `Failed to open ${routine}`);
+                return false;
+            }
+
+            setTimeout(() => {
+                const targetEditor = activeEditor || ed;
+                if (tag && targetEditor) {
+                    const found = revealTagInEditor(targetEditor, tag);
+                    if (!found && !silentIfMissing) {
+                        showToast('info', 'Go to Declaration', `Tag ${tag} not found in ${routine}`);
+                    }
+                }
+            }, 50);
+
+            const jumpLabel = tag ? `${tag}^${routine}` : routine;
+            showToast('success', 'Navigated', jumpLabel);
+            return true;
+        }
+
+        if (ref.type === 'local') {
+            const found = revealTagInEditor(ed, ref.tag);
+            if (found) {
+                showToast('success', 'Navigated', `Tag: ${ref.tag}`);
+            } else if (!silentIfMissing) {
+                showToast('info', 'Go to Declaration', `Tag ${ref.tag} not found in this routine`);
+            }
+            return found;
+        }
+
+        return false;
     }
 
     function loadShortcutPrefs() {
@@ -1097,10 +2029,15 @@
                 if (mode === 'replace' && replaceTerm && applyReplace && mutated !== code) {
                     await window.ahmadIDE.saveRoutine(name, mutated);
                     // Sync open tab content if loaded
-                    const openTab = openTabs.find(t => t.name === name);
+                    const openTab = findOpenTab(name, { exact: true });
                     if (openTab) {
                         openTab.content = mutated;
-                        if (activeTabId === openTab.id && editor) {
+                        const model = tabModels.get(openTab.id);
+                        if (model) {
+                            model.setValue(mutated);
+                            openTab.isDirty = false;
+                            renderTabs();
+                        } else if (activeTabId === openTab.id && editor) {
                             editor.setValue(mutated);
                         }
                     }
@@ -1353,23 +2290,94 @@
     }
 
     function openGitPanel() {
-        const gitBtn = Array.from(document.querySelectorAll('.toolwindow-btn')).find(b => b.getAttribute('data-panel') === 'gitToolPanel');
-        if (gitBtn) gitBtn.click();
+        // Use new tool window system - Git is on the bottom bar
+        toggleToolWindowPanel('gitToolPanel', 'bottom');
     }
 
     function closeGitPanel() {
-        const panels = ['gitToolPanel'];
-        panels.forEach(id => document.getElementById(id)?.classList.add('hidden'));
+        // Switch back to terminal in bottom panel
+        toggleToolWindowPanel('terminalPanel', 'bottom');
+    }
+
+    const gitOutputGlobal = (text) => {
+        const out = document.getElementById('gitOutput');
+        if (out) {
+            out.textContent += `${text}\n`;
+            out.scrollTop = out.scrollHeight;
+        }
+    };
+
+    async function runGitQuickCmd(cmd, { toastLabel = 'Git', silent = false } = {}) {
+        if (!silent) gitOutputGlobal(`$ ${cmd}`);
+        const res = await window.ahmadIDE.git(cmd);
+        if (res.ok) {
+            if (!silent) {
+                if (res.stdout) gitOutputGlobal(res.stdout);
+                if (res.stderr) gitOutputGlobal(res.stderr);
+            }
+        } else {
+            showToast('error', toastLabel, res.error || res.stderr || 'Git command failed');
+        }
+        return res;
+    }
+
+    async function runGitContextAction(action, path) {
+        const target = path || '.';
+        const safe = target.replace(/"/g, '\\"');
+        const setPath = (val) => {
+            const input = document.getElementById('gitDiffPath');
+            if (input) input.value = val;
+        };
+        const focusCommit = () => {
+            const msg = document.getElementById('gitCommitMessage');
+            msg?.focus();
+        };
+        const refresh = () => document.getElementById('gitStatusBtn')?.click();
+
+        switch (action) {
+            case 'add':
+                openGitPanel();
+                await runGitQuickCmd(`git add -- "${safe}"`, { toastLabel: 'Git Add' });
+                refresh();
+                return;
+            case 'commit':
+                openGitPanel();
+                setPath(target);
+                await runGitQuickCmd(`git add -- "${safe}"`, { toastLabel: 'Commit File' });
+                showToast('info', 'Commit File', 'File staged. Enter a commit message in Git tool window.');
+                focusCommit();
+                refresh();
+                return;
+            case 'history':
+                openGitPanel();
+                setPath(target);
+                await runGitQuickCmd(`git log --oneline -- "${safe}"`, { toastLabel: 'Git History' });
+                document.getElementById('gitLogBtn')?.click();
+                return;
+            case 'compare':
+                openGitPanel();
+                setPath(target);
+                document.getElementById('gitDiffFileBtn')?.click();
+                return;
+            case 'rollback':
+                openGitPanel();
+                await runGitQuickCmd(`git checkout -- "${safe}"`, { toastLabel: 'Rollback' });
+                refresh();
+                return;
+            default:
+                showToast('info', 'UNKNOWN – NEED DESIGN DECISION', `Git action ${action} not wired`);
+        }
     }
 
     function toggleSidebar() {
-        const body = document.querySelector('.body');
-        if (!body) return;
-        body.classList.toggle('collapsed');
+        // Toggle the left tool window (Project panel) using new PhpStorm-style layout
+        toggleToolWindowPanel('projectPanel', 'left');
     }
 
     function toggleTerminal() {
-        document.body.classList.toggle('hide-terminal');
+        // Toggle the bottom tool window (Terminal panel) using new PhpStorm-style layout
+        toggleToolWindowPanel('terminalPanel', 'bottom');
+        setTimeout(() => focusTerminal(), 80);
     }
 
     function revealLine(lineNumber) {
@@ -1423,30 +2431,6 @@
     }
 
     function wireMenuBar(editor, routineState, terminalState) {
-        const $items = $ ? $('.menu-item') : null;
-        if ($items && $items.length) {
-            $items.on('click', function (e) {
-                e.stopPropagation();
-                const $self = $(this);
-                const wasOpen = $self.hasClass('open');
-                $items.removeClass('open');
-                if (!wasOpen) $self.addClass('open');
-            });
-            $(document).on('click', () => $items.removeClass('open'));
-        } else {
-            document.querySelectorAll('.menu-item').forEach((item) => {
-                item.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const open = item.classList.contains('open');
-                    document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('open'));
-                    if (!open) item.classList.add('open');
-                });
-            });
-            document.addEventListener('click', () => {
-                document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('open'));
-            });
-        }
-
         const clickEl = (id) => {
             if ($) {
                 const $el = $('#' + id);
@@ -1457,118 +2441,235 @@
             }
         };
 
-        const handler = async (action) => {
+        const notImplemented = (label) => {
+            showToast('info', 'Not implemented', `${label || 'This action'} is not implemented yet.`);
+        };
+
+        const runMenuAction = async (action) => {
             switch (action) {
                 case 'save':
                 case 'save-all':
                     clickEl('saveRoutineBtn');
-                    break;
+                    return;
                 case 'undo':
-                    editor.trigger('keyboard', 'undo', null);
-                    break;
+                    editor?.trigger('keyboard', 'undo', null);
+                    return;
                 case 'redo':
-                    editor.trigger('keyboard', 'redo', null);
-                    break;
+                    editor?.trigger('keyboard', 'redo', null);
+                    return;
                 case 'cut':
                     document.execCommand('cut');
-                    break;
+                    return;
                 case 'copy':
                     document.execCommand('copy');
-                    break;
+                    return;
                 case 'paste':
                     document.execCommand('paste');
-                    break;
+                    return;
+                case 'find':
+                    editor?.trigger('keyboard', 'actions.find', null);
+                    return;
+                case 'replace':
+                    editor?.trigger('keyboard', 'editor.action.startFindReplaceAction', null);
+                    return;
+                case 'find-in-files':
+                    launchProjectSearch('find', 'all', { runImmediately: true });
+                    return;
                 case 'comment':
-                    editor.trigger('keyboard', 'editor.action.commentLine', null);
-                    break;
-                case 'goto-line': {
-                    const line = prompt('Go to line:');
-                    if (line) {
-                        const ln = parseInt(line, 10);
-                        if (!isNaN(ln)) editor.revealLineInCenter(ln);
-                    }
-                    break;
-                }
+                    editor?.trigger('keyboard', 'editor.action.commentLine', null);
+                    return;
+                case 'duplicate-line':
+                    duplicateLine(editor);
+                    return;
+                case 'goto-line':
+                    editor?.trigger('keyboard', 'editor.action.gotoLine', null);
+                    return;
+                case 'goto-file':
+                    launchProjectSearch('find', 'names');
+                    return;
+                case 'expand-selection':
+                    editor?.trigger('keyboard', 'editor.action.smartSelect.expand', null);
+                    return;
+                case 'shrink-selection':
+                    editor?.trigger('keyboard', 'editor.action.smartSelect.shrink', null);
+                    return;
+                case 'tab-next':
+                    cycleTab(1);
+                    return;
+                case 'reformat':
+                    editor?.trigger('keyboard', 'editor.action.formatDocument', null);
+                    return;
+                case 'rename':
+                    editor?.trigger('keyboard', 'editor.action.rename', null);
+                    return;
                 case 'lint':
                     clickEl('lintBtn');
-                    break;
-                case 'connections':
-                    openConnectionsPanel();
-                    await refreshDockerList();
-                    break;
-                case 'docker':
-                    openConnectionsPanel(false);
-                    await refreshDockerList();
-                    break;
-                case 'ssh':
-                    openConnectionsPanel(true);
-                    break;
+                    return;
+                case 'toggle-sidebar':
+                    toggleSidebar();
+                    return;
+                case 'toggle-terminal':
+                    toggleTerminal();
+                    return;
+                case 'terminal':
+                    if (!terminalState.tabs.length) {
+                        await addTerminalTab(terminalState, true);
+                    }
+                    toggleToolWindowPanel('terminalPanel', 'bottom');
+                    setTimeout(() => focusTerminal(), 50);
+                    return;
+                case 'extensions':
+                    toggleToolWindowPanel('extensionsPanel', 'bottom');
+                    return;
+                case 'run':
+                    clickEl('runBtn');
+                    return;
+                case 'debug':
+                    clickEl('debugStartBtn');
+                    return;
+                case 'stop-debug':
+                    clickEl('dbgStopBtn');
+                    return;
+                case 'shortcuts':
+                    openShortcutsPanel();
+                    return;
+                case 'settings':
+                    openSettingsPanel();
+                    return;
+                case 'new-project':
+                    openNewProjectPanel();
+                    return;
+                case 'open-project':
+                    await openProjectDialog();
+                    return;
+                case 'close-project':
+                    closeCurrentProject();
+                    return;
+                case 'new-file':
+                    await createNewFile();
+                    return;
                 case 'git':
                     openGitPanel();
-                    break;
+                    return;
                 case 'git-status':
                     openGitPanel();
                     $('#gitStatusBtn').trigger('click');
-                    break;
+                    return;
                 case 'git-diff':
                     openGitPanel();
                     $('#gitDiffBtn').trigger('click');
-                    break;
+                    return;
                 case 'git-history':
                     openGitPanel();
                     $('#gitLogBtn').trigger('click');
-                    break;
-                case 'toggle-sidebar':
-                    toggleSidebar();
-                    break;
-                case 'toggle-terminal':
-                    toggleTerminal();
-                    break;
-                case 'terminal':
-                    await addTerminalTab(terminalState);
-                    break;
-                case 'duplicate-line':
-                    duplicateLine(editor);
-                    break;
-                case 'settings':
-                    openSettingsPanel();
-                    break;
-                case 'shortcuts':
-                    openShortcutsPanel();
-                    break;
-                case 'new-project':
-                    openNewProjectPanel();
-                    break;
-                case 'open-project':
-                    await openProjectDialog();
-                    break;
-                case 'close-project':
-                    closeCurrentProject();
-                    break;
-                case 'new-file':
-                    await createNewFile();
-                    break;
+                    return;
+                case 'appearance':
+                case 'recent-files':
+                case 'refactor-extract':
+                case 'window-store':
+                case 'docs':
+                case 'about':
+                case 'exit-app':
+                    notImplemented(action.replace('-', ' '));
+                    return;
                 default:
-                    break;
+                    notImplemented(action);
             }
         };
 
-        if ($) {
-            $('.menu-action').on('click', async (e) => {
-                e.stopPropagation();
-                const action = $(e.currentTarget).data('action');
-                await handler(action);
-                $('.menu-item').removeClass('open');
+        const buildMenuBar = () => {
+            const host = document.getElementById('mainMenu');
+            if (!host) return;
+            host.innerHTML = '';
+
+            menuConfig.forEach(menu => {
+                const item = document.createElement('div');
+                item.className = 'menu-item';
+                item.dataset.menu = menu.id;
+                item.textContent = menu.label;
+
+                const dropdown = document.createElement('div');
+                dropdown.className = 'menu-dropdown';
+
+                menu.items.forEach(entry => {
+                    if (entry.separator) {
+                        const sep = document.createElement('div');
+                        sep.className = 'menu-separator';
+                        dropdown.appendChild(sep);
+                        return;
+                    }
+                    const btn = document.createElement('button');
+                    btn.className = 'menu-action';
+                    btn.dataset.action = entry.action;
+                    btn.textContent = entry.label + (entry.implemented === false ? ' (Not implemented)' : '');
+                    dropdown.appendChild(btn);
+                });
+
+                item.appendChild(dropdown);
+                host.appendChild(item);
             });
-        } else {
+        };
+
+        buildMenuBar();
+
+        const wireMenuClicks = () => {
+            const menuItems = document.querySelectorAll('.menu-item');
+            menuItems.forEach(item => {
+                item.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const open = item.classList.contains('open');
+                    document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('open'));
+                    if (!open) item.classList.add('open');
+                });
+            });
+            document.addEventListener('click', () => {
+                document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('open'));
+            });
+
             document.querySelectorAll('.menu-action').forEach((btn) => {
                 btn.addEventListener('click', async (e) => {
                     e.stopPropagation();
-                    await handler(btn.getAttribute('data-action'));
+                    const action = btn.getAttribute('data-action');
+                    await runMenuAction(action);
                     document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('open'));
                 });
             });
-        }
+        };
+
+        wireMenuClicks();
+    }
+
+    function bindGlobalShortcuts() {
+        const normalizeCombo = (e) => {
+            const parts = [];
+            if (e.ctrlKey || e.metaKey) parts.push('ctrl');
+            if (e.shiftKey) parts.push('shift');
+            if (e.altKey) parts.push('alt');
+            const key = (e.key || '').toLowerCase();
+            if (key === ' ') parts.push('space');
+            else parts.push(key);
+            return parts.join('+');
+        };
+
+        const isEditableTarget = (el) => {
+            if (!el) return false;
+            const tag = (el.tagName || '').toLowerCase();
+            const editable = el.isContentEditable;
+            if (terminalConfig.overrideIdeShortcuts && isTerminalFocused()) return true;
+            return editable || tag === 'input' || tag === 'textarea' || tag === 'select';
+        };
+
+        const handler = async (e) => {
+            const combo = normalizeCombo(e);
+            const match = coreShortcutMap[combo];
+            if (!match) return;
+            if (isEditableTarget(e.target) && combo !== 'ctrl+s' && combo !== 'ctrl+shift+s') return;
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            await runMenuAction(match.action);
+        };
+
+        window.addEventListener('keydown', handler, true);
     }
 
     // --- Shared debug controls (hoisted) ---
@@ -1594,19 +2695,87 @@
         });
     }
 
-    function setActiveToolWindow(panelId) {
-        const buttons = document.querySelectorAll('.toolwindow-btn');
-        const panels = ['terminalPanel', 'debugPanel', 'gitToolPanel', 'problemsPanel', 'servicesPanel'];
-        const targetBtn = Array.from(buttons).find(b => b.getAttribute('data-panel') === panelId);
-        if (targetBtn) {
-            buttons.forEach(b => b.classList.toggle('active', b === targetBtn));
+    function setDebugBarVisibility(show, active) {
+        const bar = document.getElementById('debugBar');
+        if (!bar) return;
+        if (!show) {
+            bar.classList.add('hidden');
+            bar.classList.remove('inactive');
+            bar.style.display = 'none';
+            bar.style.pointerEvents = 'none';
+            bar.querySelectorAll('button').forEach(btn => { btn.disabled = true; });
+            return;
         }
-        panels.forEach(id => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            if (id === panelId) el.classList.remove('hidden');
-            else el.classList.add('hidden');
+        bar.classList.remove('hidden');
+        bar.style.display = 'flex';
+        bar.style.pointerEvents = 'auto';
+        if (active) {
+            bar.classList.remove('inactive');
+            bar.querySelectorAll('button').forEach(btn => { btn.disabled = false; });
+        } else {
+            bar.classList.add('inactive');
+            bar.querySelectorAll('button').forEach(btn => { btn.disabled = true; });
+        }
+    }
+
+    // PhpStorm-style tool window management
+    const toolWindowState = {
+        left: { visible: true, activePanel: 'projectPanel' },
+        right: { visible: false, activePanel: null },
+        bottom: { visible: true, activePanel: 'terminalPanel' }
+    };
+
+    function setActiveToolWindow(panelId) {
+        // Legacy support - map to new structure
+        const btn = document.querySelector(`.tool-window-stripe-btn[data-panel="${panelId}"]`);
+        if (btn) {
+            const position = btn.getAttribute('data-position');
+            toggleToolWindowPanel(panelId, position);
+        }
+    }
+
+    function toggleToolWindowPanel(panelId, position) {
+        const state = toolWindowState[position];
+        if (!state) return;
+
+        const contentArea = document.getElementById(`${position}ToolWindow`);
+        const buttons = document.querySelectorAll(`.tool-window-stripe-btn[data-position="${position}"]`);
+
+        // If clicking the same panel, toggle visibility
+        if (state.activePanel === panelId && state.visible) {
+            state.visible = false;
+            if (contentArea) contentArea.classList.add('hidden');
+            buttons.forEach(b => b.classList.remove('active'));
+            state.activePanel = null;
+            return;
+        }
+
+        // Show the content area and switch panels
+        state.visible = true;
+        state.activePanel = panelId;
+        if (contentArea) contentArea.classList.remove('hidden');
+
+        // Update button states
+        buttons.forEach(b => {
+            b.classList.toggle('active', b.getAttribute('data-panel') === panelId);
         });
+
+        // Show/hide panels within the content area
+        const panels = contentArea ? contentArea.querySelectorAll('.tool-window-panel') : [];
+        panels.forEach(p => {
+            p.classList.toggle('hidden', p.id !== panelId);
+        });
+
+        // Handle bottom panels specially (they're in bottom-panels-container)
+        if (position === 'bottom') {
+            const bottomPanels = ['terminalPanel', 'debugPanel', 'problemsPanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel'];
+            bottomPanels.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.toggle('hidden', id !== panelId);
+            });
+        }
+
+        // Special handling for problems panel
         if (panelId === 'problemsPanel') {
             const src = document.getElementById('problemsList');
             const dst = document.getElementById('problemsListStandalone');
@@ -1615,17 +2784,56 @@
     }
 
     function bindToolWindows() {
-        const buttons = document.querySelectorAll('.toolwindow-btn');
-        buttons.forEach(btn => {
+        // Bind new PhpStorm-style tool window stripe buttons
+        const stripeButtons = document.querySelectorAll('.tool-window-stripe-btn');
+        stripeButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const panelId = btn.getAttribute('data-panel');
+                const position = btn.getAttribute('data-position');
+                toggleToolWindowPanel(panelId, position);
+            });
+        });
+
+        // Bind hide buttons in tool window headers
+        document.querySelectorAll('.hide-panel-btn, #hideProjectBtn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const panel = btn.closest('.tool-window-panel');
+                if (panel) {
+                    const panelId = panel.id;
+                    const stripeBtn = document.querySelector(`.tool-window-stripe-btn[data-panel="${panelId}"]`);
+                    if (stripeBtn) {
+                        const position = stripeBtn.getAttribute('data-position');
+                        toggleToolWindowPanel(panelId, position);
+                    }
+                }
+            });
+        });
+
+        // Initialize: show left (project) and bottom (terminal) by default
+        toolWindowState.left.visible = true;
+        toolWindowState.left.activePanel = 'projectPanel';
+        toolWindowState.bottom.visible = true;
+        toolWindowState.bottom.activePanel = 'terminalPanel';
+        toolWindowState.right.visible = false;
+
+        // Set initial UI state
+        document.getElementById('leftToolWindow')?.classList.remove('hidden');
+        document.getElementById('rightToolWindow')?.classList.add('hidden');
+        document.getElementById('bottomToolWindow')?.classList.remove('hidden');
+
+        // Hide non-active bottom panels
+        ['debugPanel', 'problemsPanel', 'servicesPanel', 'gitToolPanel'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add('hidden');
+        });
+
+        // Legacy binding for old toolwindow-btn (if any still exist)
+        const legacyButtons = document.querySelectorAll('.toolwindow-btn');
+        legacyButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 const target = btn.getAttribute('data-panel');
                 setActiveToolWindow(target);
             });
-        });
-        // Default to terminal visible; hide others
-        ['debugPanel','gitToolPanel','problemsPanel','servicesPanel'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.classList.add('hidden');
         });
     }
 
@@ -1699,20 +2907,34 @@
             const editorHost = document.getElementById('editor');
 
             registerMumpsLanguage();
-            registerMumpsThemes();
-            const mumpsAutoData = await loadAutocompleteData();
-            registerMumpsCompletion(mumpsAutoData);
+        registerMumpsThemes();
+        const mumpsAutoData = await loadAutocompleteData();
+        registerMumpsCompletion(mumpsAutoData);
+
+        const rootStyles = getComputedStyle(document.documentElement);
+        const codeFont = (rootStyles.getPropertyValue('--font-code') || '').trim() || 'JetBrains Mono';
+        const codeFontSizeValue = (rootStyles.getPropertyValue('--font-size-code') || '').trim();
+        const codeFontSize = parseInt(codeFontSizeValue, 10) || 13;
 
             const editor = monaco.editor.create(editorHost, {
                 value: sampleMumps(),
                 language: 'mumps',
                 theme: currentCodeTheme || defaultCodeTheme,
-                fontSize: 14,
+                fontSize: codeFontSize,
+                fontFamily: codeFont,
+                fontLigatures: true,
                 tabSize: 2,
                 insertSpaces: true,
+                detectIndentation: false,
+                lineNumbers: 'on',
+                renderLineHighlight: 'line',
+                renderLineHighlightOnlyWhenFocus: false,
+                cursorBlinking: 'blink',
+                smoothScrolling: true,
                 minimap: { enabled: true },
                 automaticLayout: true,
-                glyphMargin: true
+                glyphMargin: true,
+                contextmenu: false
             });
             activeEditor = editor;
 
@@ -1721,8 +2943,6 @@
                 id: 'cut',
                 label: 'Cut',
                 keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX],
-                contextMenuGroupId: '9_cutcopypaste',
-                contextMenuOrder: 1,
                 run: (ed) => {
                     document.execCommand('cut');
                 }
@@ -1732,8 +2952,6 @@
                 id: 'copy',
                 label: 'Copy',
                 keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC],
-                contextMenuGroupId: '9_cutcopypaste',
-                contextMenuOrder: 2,
                 run: (ed) => {
                     document.execCommand('copy');
                 }
@@ -1743,8 +2961,6 @@
                 id: 'paste',
                 label: 'Paste',
                 keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV],
-                contextMenuGroupId: '9_cutcopypaste',
-                contextMenuOrder: 3,
                 run: (ed) => {
                     document.execCommand('paste');
                 }
@@ -1754,8 +2970,6 @@
                 id: 'selectAll',
                 label: 'Select All',
                 keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyA],
-                contextMenuGroupId: '9_cutcopypaste',
-                contextMenuOrder: 4,
                 run: (ed) => {
                     ed.setSelection(ed.getModel().getFullModelRange());
                 }
@@ -1765,8 +2979,6 @@
                 id: 'commentLine',
                 label: 'Comment Line',
                 keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Slash],
-                contextMenuGroupId: 'formatting',
-                contextMenuOrder: 1,
                 run: (ed) => {
                     ed.trigger('keyboard', 'editor.action.commentLine', {});
                 }
@@ -1776,8 +2988,6 @@
                 id: 'formatDocument',
                 label: 'Reformat Code',
                 keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyL],
-                contextMenuGroupId: 'formatting',
-                contextMenuOrder: 2,
                 run: (ed) => {
                     ed.trigger('keyboard', 'editor.action.formatDocument', {});
                 }
@@ -1787,8 +2997,6 @@
                 id: 'gotoLine',
                 label: 'Go to Line...',
                 keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyG],
-                contextMenuGroupId: 'navigation',
-                contextMenuOrder: 1,
                 run: (ed) => {
                     ed.trigger('keyboard', 'editor.action.gotoLine', {});
                 }
@@ -1798,8 +3006,6 @@
                 id: 'findReplace',
                 label: 'Find and Replace...',
                 keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR],
-                contextMenuGroupId: 'navigation',
-                contextMenuOrder: 2,
                 run: (ed) => {
                     ed.trigger('keyboard', 'editor.action.startFindReplaceAction', {});
                 }
@@ -1809,8 +3015,6 @@
                 id: 'deleteLineAction',
                 label: 'Delete Line',
                 keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyY],
-                contextMenuGroupId: 'editing',
-                contextMenuOrder: 1,
                 run: (ed) => {
                     ed.trigger('keyboard', 'editor.action.deleteLines', {});
                 }
@@ -1820,8 +3024,6 @@
                 id: 'duplicateLine',
                 label: 'Duplicate Line',
                 keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyD],
-                contextMenuGroupId: 'editing',
-                contextMenuOrder: 2,
                 run: (ed) => {
                     const selection = ed.getSelection();
                     const lineNumber = selection.startLineNumber;
@@ -1838,8 +3040,6 @@
                 id: 'moveLineUp',
                 label: 'Move Line Up',
                 keybindings: [monaco.KeyMod.Alt | monaco.KeyMod.Shift | monaco.KeyCode.UpArrow],
-                contextMenuGroupId: 'editing',
-                contextMenuOrder: 3,
                 run: (ed) => {
                     ed.trigger('keyboard', 'editor.action.moveLinesUpAction', {});
                 }
@@ -1849,8 +3049,6 @@
                 id: 'moveLineDown',
                 label: 'Move Line Down',
                 keybindings: [monaco.KeyMod.Alt | monaco.KeyMod.Shift | monaco.KeyCode.DownArrow],
-                contextMenuGroupId: 'editing',
-                contextMenuOrder: 4,
                 run: (ed) => {
                     ed.trigger('keyboard', 'editor.action.moveLinesDownAction', {});
                 }
@@ -1865,14 +3063,19 @@
                 sessionId: null,
                 breakpoints: new Set(),
                 stack: [],
+                engine: 'legacy',
                 locals: {},
                 state: 'stopped',
                 currentLine: null,
+                currentRoutine: null,
+                homeTabId: null,
+                homeRoutine: null,
                 debugModeEnabled: false // Track if debug button was clicked
             };
             const debugBar = document.getElementById('debugBar');
             projectSearchCtx.routineState = routineState;
             projectSearchCtx.editor = editor;
+            dbgStateRef = dbgState;
 
             // Register hover provider for variable inspection during debug
             monaco.languages.registerHoverProvider('mumps', {
@@ -1935,6 +3138,54 @@
                 }
             });
 
+            // Helper function to parse routine/tag reference at cursor position
+            function parseRoutineReferenceAtPosition(model, position) {
+                const lineContent = model.getLineContent(position.lineNumber);
+                const column = position.column;
+
+                // Check if we're on a tag or routine name
+                // Pattern 1: TAG^ROUTINE (e.g., MAIN^ROUTINE, $$FUNC^ROUTINE)
+                const tagRoutineMatch = lineContent.match(/([A-Z%][A-Z0-9]*)\^([A-Z%][A-Z0-9]+)/gi);
+                if (tagRoutineMatch) {
+                    for (const match of tagRoutineMatch) {
+                        const idx = lineContent.indexOf(match);
+                        const endIdx = idx + match.length;
+                        if (column >= idx + 1 && column <= endIdx + 1) {
+                            const parts = match.split('^');
+                            const tag = parts[0];
+                            const routine = parts[1];
+                            return { type: 'external', routine, tag };
+                        }
+                    }
+                }
+
+                // Pattern 2: ^ROUTINE (standalone)
+                const routineMatch = lineContent.match(/\^([A-Z%][A-Z0-9]+)/gi);
+                if (routineMatch) {
+                    for (const match of routineMatch) {
+                        const idx = lineContent.indexOf(match);
+                        const endIdx = idx + match.length;
+                        if (column >= idx + 1 && column <= endIdx + 1) {
+                            const routine = match.substring(1); // Remove ^
+                            return { type: 'external', routine, tag: '' };
+                        }
+                    }
+                }
+
+                // Pattern 3: D TAG, DO TAG (local tag call)
+                const localTagMatch = lineContent.match(/(?:^|\s)(?:D(?:O)?)\s+([A-Z%][A-Z0-9]+)(?:\s|$|,|\()/i);
+                if (localTagMatch) {
+                    const tagName = localTagMatch[1];
+                    const idx = lineContent.indexOf(tagName);
+                    const endIdx = idx + tagName.length;
+                    if (column >= idx + 1 && column <= endIdx + 1) {
+                        return { type: 'local', tag: tagName };
+                    }
+                }
+
+                return null;
+            }
+
             applyCodeTheme(currentCodeTheme || defaultCodeTheme);
             bindThemeSelectors(editor);
             const shortcutPrefs = loadShortcutPrefs();
@@ -1977,9 +3228,11 @@
                 'tool-find': monaco.KeyMod.Alt | monaco.KeyCode.Digit3,
                 'tool-run': monaco.KeyMod.Alt | monaco.KeyCode.Digit4,
                 'tool-debug': monaco.KeyMod.Alt | monaco.KeyCode.Digit5,
-                'tool-todo': monaco.KeyMod.Alt | monaco.KeyCode.Digit6,
+                'tool-todo': monaco.KeyMod.Alt | monaco.KeyCode.Digit6, // Problems
                 'tool-structure': monaco.KeyMod.Alt | monaco.KeyCode.Digit7,
-                'tool-git': monaco.KeyMod.Alt | monaco.KeyCode.Digit9
+                'tool-services': monaco.KeyMod.Alt | monaco.KeyCode.Digit8,
+                'tool-git': monaco.KeyMod.Alt | monaco.KeyCode.Digit9,
+                'tool-terminal': monaco.KeyMod.Alt | monaco.KeyCode.F12
             };
             const dupBinding = shortcutPrefs['duplicate-line'] || shortcutDefaults['duplicate-line'];
             const dupHandler = () => duplicateLine(editor);
@@ -1989,7 +3242,7 @@
             registerKeybinding(editor, 'Lint', 'lint-code', () => clickEl('lintBtn'), shortcutDefaults['lint-code']);
             registerKeybinding(editor, 'Toggle Sidebar', 'toggle-sidebar', () => toggleSidebar(), shortcutDefaults['toggle-sidebar']);
             registerKeybinding(editor, 'Toggle Terminal', 'toggle-terminal', () => toggleTerminal(), shortcutDefaults['toggle-terminal']);
-            registerKeybinding(editor, 'New Terminal', 'new-terminal', () => document.getElementById('newTerminalBtn')?.click(), shortcutDefaults['new-terminal']);
+            registerKeybinding(editor, 'New Terminal', 'new-terminal', () => document.getElementById('terminalNewTabBtn')?.click(), shortcutDefaults['new-terminal']);
             registerKeybinding(editor, 'Search in Project', 'project-search', () => launchProjectSearch('find', 'all', { runImmediately: true }), shortcutDefaults['project-search']);
 
             // PhpStorm Navigation shortcuts
@@ -2015,23 +3268,30 @@
             // PhpStorm Refactoring
             registerKeybinding(editor, 'Rename', 'rename', () => editor.trigger('keyboard', 'editor.action.rename', null), shortcutDefaults['rename']);
 
-            // PhpStorm Tool Windows
-            registerKeybinding(editor, 'Tool: Project', 'tool-project', () => toggleSidebar(), shortcutDefaults['tool-project']);
+            // PhpStorm Tool Windows (Alt+Number to toggle panels)
+            registerKeybinding(editor, 'Tool: Project', 'tool-project', () => toggleToolWindowPanel('projectPanel', 'left'), shortcutDefaults['tool-project']);
             registerKeybinding(editor, 'Tool: Find', 'tool-find', () => launchProjectSearch('find', 'all'), shortcutDefaults['tool-find']);
-            registerKeybinding(editor, 'Tool: Run', 'tool-run', () => clickEl('runBtn'), shortcutDefaults['tool-run']);
-            registerKeybinding(editor, 'Tool: Debug', 'tool-debug', () => clickEl('debugStartBtn'), shortcutDefaults['tool-debug']);
-            registerKeybinding(editor, 'Tool: Git', 'tool-git', () => openGitPanel(), shortcutDefaults['tool-git']);
+            registerKeybinding(editor, 'Tool: Run', 'tool-run', () => toggleToolWindowPanel('terminalPanel', 'bottom'), shortcutDefaults['tool-run']);
+            registerKeybinding(editor, 'Tool: Debug', 'tool-debug', () => toggleToolWindowPanel('debugPanel', 'bottom'), shortcutDefaults['tool-debug']);
+            registerKeybinding(editor, 'Tool: Problems', 'tool-todo', () => toggleToolWindowPanel('problemsPanel', 'bottom'), shortcutDefaults['tool-todo']);
+            registerKeybinding(editor, 'Tool: Structure', 'tool-structure', () => toggleToolWindowPanel('structurePanel', 'left'), shortcutDefaults['tool-structure']);
+            registerKeybinding(editor, 'Tool: Services', 'tool-services', () => toggleToolWindowPanel('servicesPanel', 'bottom'), shortcutDefaults['tool-services']);
+            registerKeybinding(editor, 'Tool: Git', 'tool-git', () => toggleToolWindowPanel('gitToolPanel', 'bottom'), shortcutDefaults['tool-git']);
+            registerKeybinding(editor, 'Tool: Terminal', 'tool-terminal', () => toggleToolWindowPanel('terminalPanel', 'bottom'), shortcutDefaults['tool-terminal']);
 
             renderProjectTree([], routineState, editor);
             // Initialize empty tab bar
             renderTabs();
-            // Note: Using Monaco's built-in context menu with custom actions instead
-            // bindEditorContextMenu(editor);
+            bindTabKeyboardShortcuts();
+            // PhpStorm-like editor context menu
+            bindEditorContextMenu(editor);
             projectSearchCtx.editor = editor;
             bindSettingsPanelThemes();
             bindGitSettingsPanel();
             bindDebugTabs();
             bindToolWindows();
+            bindGlobalShortcuts();
+            initExtensionsView();
 
             // Project search modal controls
             const searchDebounce = (() => {
@@ -2207,6 +3467,7 @@
 
             // --- Env info ---
             const envInfo = await window.ahmadIDE.getEnv();
+            envInfoCache = envInfo;
             document.getElementById('envInfo').textContent =
                 `${envInfo.platform} | electron ${envInfo.versions.electron}`;
             setConnStatus('Docker (local)', 'info');
@@ -2230,8 +3491,8 @@
 
                     const bpLines = getBpLines();
 
-                    // If debug mode enabled AND breakpoints exist, start debugging (DON'T execute all code)
-                    if (dbgState.debugModeEnabled && bpLines.length > 0) {
+                    // If debug mode enabled, start debugging (even if no breakpoints)
+                    if (dbgState.debugModeEnabled) {
                         await startDebugSession(editor, dbgState, terminalState, debugBar, bpLines);
                     } else {
                         // Normal execution (no debugging)
@@ -2277,8 +3538,8 @@
 
                     const bpLines = getBpLines();
 
-                    // If debug mode enabled AND breakpoints exist, start debugging (DON'T execute all code)
-                    if (dbgState.debugModeEnabled && bpLines.length > 0) {
+                    // If debug mode enabled, start debugging (even if no breakpoints)
+                    if (dbgState.debugModeEnabled) {
                         await startDebugSession(editor, dbgState, terminalState, debugBar, bpLines);
                     } else {
                         // Normal execution (no debugging)
@@ -2308,19 +3569,14 @@
                         appendOutput('🛑 Debug mode disabled. Run will execute normally.', terminalState);
                     }
                 });
-            }
+        }
 
-            if ($) {
-                $('#clearOutputBtn').on('click', () => clearOutput(terminalState));
-                $('#newTerminalBtn').on('click', async () => await addTerminalTab(terminalState));
-            } else {
-                document.getElementById('clearOutputBtn')?.addEventListener('click', () => {
-                    clearOutput(terminalState);
-                });
-                document.getElementById('newTerminalBtn')?.addEventListener('click', async () => {
-                    await addTerminalTab(terminalState);
-                });
-            }
+            const clearBtn = document.getElementById('terminalClearBtn');
+            const newTabBtn = document.getElementById('terminalNewTabBtn');
+            const hideBtn = document.getElementById('terminalHideBtn');
+            clearBtn?.addEventListener('click', () => clearOutput(terminalState));
+            newTabBtn?.addEventListener('click', async () => await addTerminalTab(terminalState));
+            hideBtn?.addEventListener('click', () => toggleToolWindowPanel('terminalPanel', 'bottom'));
 
             if ($) {
                 $('#saveRoutineBtn').on('click', async () => {
@@ -2850,46 +4106,98 @@
                 r.innerHTML = rightLines.join('') || 'No right changes';
             };
 
+            const gitSelected = { staged: new Set(), unstaged: new Set() };
+
             const renderGitChanges = (entries = []) => {
-                const host = document.getElementById('gitChangesList');
+                const unstagedHost = document.getElementById('gitChangesUnstaged');
+                const stagedHost = document.getElementById('gitChangesStaged');
+                if (unstagedHost) unstagedHost.innerHTML = '';
+                if (stagedHost) stagedHost.innerHTML = '';
+                const render = (host, list, staged) => {
+                    if (!host) return;
+                    if (!list.length) {
+                        host.textContent = staged ? 'No staged files.' : 'No local changes.';
+                        return;
+                    }
+                    list.forEach(ent => {
+                        const row = document.createElement('div');
+                        row.className = 'git-change-row' + (staged ? ' staged' : '');
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.checked = staged ? gitSelected.staged.has(ent.path) : gitSelected.unstaged.has(ent.path);
+                        checkbox.addEventListener('change', () => {
+                            const targetSet = staged ? gitSelected.staged : gitSelected.unstaged;
+                            checkbox.checked ? targetSet.add(ent.path) : targetSet.delete(ent.path);
+                        });
+                        const status = document.createElement('span');
+                        status.className = 'git-change-status';
+                        status.textContent = ent.status;
+                        const path = document.createElement('span');
+                        path.className = 'git-change-path';
+                        path.textContent = ent.path;
+                        row.appendChild(checkbox);
+                        row.appendChild(status);
+                        row.appendChild(path);
+                        host.appendChild(row);
+                    });
+                };
+                const stagedList = entries.filter(e => e.staged);
+                const unstagedList = entries.filter(e => !e.staged);
+                render(unstagedHost, unstagedList, false);
+                render(stagedHost, stagedList, true);
+            };
+
+            const renderGitHistory = (lines = []) => {
+                const host = document.getElementById('gitHistoryList');
                 if (!host) return;
                 host.innerHTML = '';
-                if (!entries.length) {
-                    host.textContent = 'No changes.';
+                if (!lines.length) {
+                    host.textContent = 'No history yet.';
                     return;
                 }
-                entries.forEach(ent => {
+                lines.forEach(line => {
                     const div = document.createElement('div');
-                    div.textContent = `${ent.status} ${ent.path}`;
+                    div.textContent = line;
                     host.appendChild(div);
                 });
             };
 
             const runGit = async (cmd, opts = {}) => {
-                gitOutput(`$ ${cmd}`);
+                if (!opts.silent) gitOutput(`$ ${cmd}`);
                 const res = await window.ahmadIDE.git(cmd);
                 if (res.ok) {
                     if (opts.onSuccess) opts.onSuccess(res.stdout || '');
-                    if (res.stdout) gitOutput(res.stdout);
-                    if (res.stderr) gitOutput(res.stderr);
+                    if (!opts.silent) {
+                        if (res.stdout) gitOutput(res.stdout);
+                        if (res.stderr) gitOutput(res.stderr);
+                    }
                 } else {
-                gitError(res.error || res.stderr || 'Git command failed');
-            }
-            return res;
-        };
+                    gitError(res.error || res.stderr || 'Git command failed');
+                }
+                return res;
+            };
 
-            document.getElementById('gitStatusBtn')?.addEventListener('click', () => {
-                runGit('git status --short', {
+            const refreshGitStatus = async () => {
+                gitSelected.staged.clear();
+                gitSelected.unstaged.clear();
+                await runGit('git status --short --branch', {
                     onSuccess: (out) => {
-                        const entries = (out || '').split('\n').filter(Boolean).map(line => {
-                            const status = line.slice(0, 2).trim();
-                            const path = line.slice(2).trim();
-                            return { status, path };
+                        const lines = (out || '').split('\n').filter(Boolean);
+                        const entries = [];
+                        lines.forEach(line => {
+                            if (line.startsWith('##')) return; // branch info
+                            const indexStatus = line[0];
+                            const worktreeStatus = line[1];
+                            const path = line.slice(3).trim();
+                            const staged = indexStatus !== ' ' && indexStatus !== '?';
+                            const status = staged ? indexStatus : worktreeStatus;
+                            entries.push({ status, path, staged });
                         });
                         renderGitChanges(entries);
                     }
                 });
-                runGit('git branch --format="%(refname:short)"', {
+                await runGit('git branch --format="%(refname:short)"', {
+                    silent: true,
                     onSuccess: (out) => {
                         const select = document.getElementById('gitBranchSelect');
                         if (!select) return;
@@ -2902,9 +4210,47 @@
                         });
                     }
                 });
-            });
-            document.getElementById('gitLogBtn')?.addEventListener('click', () => runGit('git log -5 --oneline'));
+            };
+
+            const loadGitHistory = async () => {
+                await runGit('git log -10 --oneline', {
+                    onSuccess: (out) => renderGitHistory((out || '').split('\n').filter(Boolean))
+                });
+            };
+
+            document.getElementById('gitRefreshBtn')?.addEventListener('click', refreshGitStatus);
+            document.getElementById('gitStatusBtn')?.addEventListener('click', refreshGitStatus);
+            document.getElementById('gitLogBtn')?.addEventListener('click', loadGitHistory);
             document.getElementById('gitDiffBtn')?.addEventListener('click', () => runGit('git diff --stat'));
+            document.getElementById('gitClearBtn')?.addEventListener('click', () => {
+                document.getElementById('gitOutput').textContent = 'Git ready.';
+            });
+
+            const stageOrUnstage = async (targetSet, staged) => {
+                const files = Array.from(targetSet);
+                if (!files.length) {
+                    gitOutput(staged ? 'No staged selection.' : 'No unstaged selection.');
+                    return;
+                }
+                const cmd = staged
+                    ? `git restore --staged ${files.map(f => `"${f.replace(/"/g, '\\"')}"`).join(' ')}`
+                    : `git add ${files.map(f => `"${f.replace(/"/g, '\\"')}"`).join(' ')}`;
+                await runGit(cmd);
+                await refreshGitStatus();
+            };
+
+            document.getElementById('gitStageSelectedBtn')?.addEventListener('click', () => stageOrUnstage(gitSelected.unstaged, false));
+            document.getElementById('gitUnstageSelectedBtn')?.addEventListener('click', () => stageOrUnstage(gitSelected.staged, true));
+
+            document.getElementById('gitDiffSelectedBtn')?.addEventListener('click', async () => {
+                const path = [...gitSelected.unstaged, ...gitSelected.staged][0];
+                if (!path) {
+                    gitError('Select a file to diff');
+                    return;
+                }
+                await runGit(`git diff -- ${path}`);
+            });
+
             document.getElementById('gitCommitBtn')?.addEventListener('click', async () => {
                 const msgEl = document.getElementById('gitCommitMessage');
                 const message = msgEl?.value.trim() || '';
@@ -2912,7 +4258,12 @@
                     gitOutput('✗ Commit message required');
                     return;
                 }
-                await runGit(`git commit -am "${message.replace(/"/g, '\\"')}"`);
+                const res = await runGit(`git commit -m "${message.replace(/"/g, '\\"')}"`);
+                if (res?.ok) {
+                    msgEl.value = '';
+                    await refreshGitStatus();
+                    await loadGitHistory();
+                }
             });
             document.getElementById('gitPushBtn')?.addEventListener('click', () => runGit('git push'));
             document.getElementById('gitPullBtn')?.addEventListener('click', () => runGit('git pull'));
@@ -2926,7 +4277,7 @@
                     return;
                 }
                 await runGit(`git checkout ${target}`);
-                document.getElementById('gitStatusBtn')?.click();
+                await refreshGitStatus();
             });
             document.getElementById('gitDiffFileBtn')?.addEventListener('click', async () => {
                 const path = document.getElementById('gitDiffPath')?.value.trim();
@@ -2967,6 +4318,10 @@
                 const diffRes = await runGit(`git diff -- ${a} ${b}`);
                 if (diffRes.ok && diffRes.stdout) renderSideBySideDiff(diffRes.stdout);
             });
+
+            // Initial refresh when tool window wires up
+            refreshGitStatus();
+            loadGitHistory(); // TODO: add pagination / filters for larger histories
 
             // --- Debug bar buttons wiring (overlay only, NO main debugStartBtn here) ---
             const debugButtonIds = [
@@ -3049,9 +4404,105 @@
             renderDebugConsole([]);
             setDebugState('stopped', { currentLine: null, barEl: debugBar }, editor, dbgState);
 
-            // --- Breakpoint gutter toggle (decorations only, no debug start) ---
-            editor.onMouseDown((e) => {
+            // Ctrl+Hover: Change cursor to pointer only when hovering over valid tag/routine
+            let isCtrlPressed = false;
+            let currentHoverDecoration = [];
+
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    isCtrlPressed = true;
+                }
+            });
+
+            document.addEventListener('keyup', (e) => {
+                if (!e.ctrlKey && !e.metaKey) {
+                    isCtrlPressed = false;
+                    // Clear cursor override
+                    const editorDom = editor.getDomNode();
+                    if (editorDom) {
+                        editorDom.style.cursor = '';
+                    }
+                    // Clear hover decoration
+                    if (currentHoverDecoration.length > 0) {
+                        editor.deltaDecorations(currentHoverDecoration, []);
+                        currentHoverDecoration = [];
+                    }
+                }
+            });
+
+            // Track mouse movement to detect hovering over clickable targets
+            editor.onMouseMove((e) => {
+                if (!isCtrlPressed || !e.target.position) {
+                    // Clear cursor and decoration if not Ctrl+hovering
+                    const editorDom = editor.getDomNode();
+                    if (editorDom && !isCtrlPressed) {
+                        editorDom.style.cursor = '';
+                    }
+                    if (currentHoverDecoration.length > 0 && !isCtrlPressed) {
+                        editor.deltaDecorations(currentHoverDecoration, []);
+                        currentHoverDecoration = [];
+                    }
+                    return;
+                }
+
+                const model = editor.getModel();
+                if (!model) return;
+
+                const ref = parseRoutineReferenceAtPosition(model, e.target.position);
+
+                if (ref) {
+                    // Valid target detected - change cursor to pointer
+                    const editorDom = editor.getDomNode();
+                    if (editorDom) {
+                        editorDom.style.cursor = 'pointer';
+                    }
+
+                    // Add underline decoration to show it's clickable
+                    const lineContent = model.getLineContent(e.target.position.lineNumber);
+                    const column = e.target.position.column;
+
+                    // Find the exact range of the tag/routine text
+                    let startCol = column;
+                    let endCol = column;
+
+                    // Expand left to find start of word
+                    while (startCol > 1 && /[A-Z0-9%^]/.test(lineContent[startCol - 2])) {
+                        startCol--;
+                    }
+                    // Expand right to find end of word
+                    while (endCol <= lineContent.length && /[A-Z0-9%^]/.test(lineContent[endCol - 1])) {
+                        endCol++;
+                    }
+
+                    currentHoverDecoration = editor.deltaDecorations(currentHoverDecoration, [{
+                        range: new monaco.Range(
+                            e.target.position.lineNumber,
+                            startCol,
+                            e.target.position.lineNumber,
+                            endCol
+                        ),
+                        options: {
+                            inlineClassName: 'ctrl-hover-underline'
+                        }
+                    }]);
+                } else {
+                    // No valid target - reset cursor
+                    const editorDom = editor.getDomNode();
+                    if (editorDom) {
+                        editorDom.style.cursor = '';
+                    }
+                    if (currentHoverDecoration.length > 0) {
+                        editor.deltaDecorations(currentHoverDecoration, []);
+                        currentHoverDecoration = [];
+                    }
+                }
+            });
+
+            // --- Breakpoint gutter toggle + Ctrl+Click navigation ---
+            editor.onMouseDown(async (e) => {
                 const t = e.target.type;
+
+                // Handle breakpoint toggle in gutter
                 if (
                     t === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
                     t === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS
@@ -3060,12 +4511,36 @@
                     if (!line) return;
                     toggleBreakpoint(line, dbgState, editor);
                     e.event.preventDefault();
+                    return;
+                }
+
+                // Handle Ctrl+Click navigation
+                const isCtrlPressed = e.event.ctrlKey || e.event.metaKey;
+                if (isCtrlPressed && e.target.position) {
+                    const handled = await goToDeclaration(editor, e.target.position, { silentIfMissing: true });
+                    if (handled) {
+                        e.event.preventDefault();
+                        e.event.stopPropagation();
+                    }
                 }
             });
         });
     }
 
     // ---------- Terminal & Output ----------
+
+    const getTerminalCwd = () => terminalConfig.startDir || currentProject?.projectPath || envInfoCache?.cwd || (typeof process !== 'undefined' && process.cwd ? process.cwd() : '');
+    const focusTerminal = () => {
+        const log = document.getElementById('output');
+        if (log) {
+            log.focus();
+        }
+    };
+    const isTerminalFocused = () => {
+        const active = document.activeElement;
+        if (!active) return false;
+        return active.id === 'output' || !!active.closest?.('#terminalPanel');
+    };
 
     function createTerminalState() {
         return { tabs: [], active: null, counter: 0, sessionMap: {}, _wiredTerminalEvents: false };
@@ -3203,6 +4678,7 @@
     }
 
     function renderTerminalBuffer(state) {
+        // TODO: Replace simple text buffer with xterm.js for full TUI/ANSI support (UNKNOWN – NEED DESIGN DECISION).
         const log = document.getElementById('output');
         if (!log) return;
         log.setAttribute('tabindex', '0');
@@ -3220,6 +4696,12 @@
         log.scrollTop = log.scrollHeight;
         log.onclick = () => log.focus();
         log.onkeydown = (ev) => handleTerminalKey(ev, state);
+        log.onkeyup = (ev) => {
+            if (ev.key === 'Escape' && activeEditor) {
+                ev.preventDefault();
+                activeEditor.focus();
+            }
+        };
         log.onpaste = (ev) => {
             const txt = ev.clipboardData?.getData('text') || '';
             if (!txt) return;
@@ -3256,7 +4738,7 @@
         const id = `term${state.counter}`;
         const tab = {
             id,
-            name: isDefault ? 'Main' : `Terminal ${state.counter}`,
+            name: isDefault ? 'Local' : `Local ${state.counter}`,
             buffer: 'Ready.',
             history: [],
             historyIndex: 0,
@@ -3266,11 +4748,15 @@
         state.tabs.push(tab);
         state.active = id;
         if (window.ahmadIDE.terminalCreate) {
-            const res = await window.ahmadIDE.terminalCreate();
+            const sessionOptions = {
+                shell: terminalConfig.shellPath || undefined,
+                cwd: getTerminalCwd()
+            };
+            const res = await window.ahmadIDE.terminalCreate(sessionOptions);
             if (res && res.ok) {
                 tab.sessionId = res.id;
             } else {
-                tab.buffer = `Failed to start terminal: ${res?.error || ''}`;
+                tab.buffer = `Failed to start terminal: ${res?.error || 'Unknown error'}`;
                 showToast('error', 'Terminal', res?.error || 'Failed to start');
             }
         }
@@ -3312,9 +4798,13 @@
     };
 
     const getActiveRoutine = () => {
-        if (activeRoutineName) return activeRoutineName;
+        const normalized = normalizeRoutineTarget(activeRoutineName);
+        if (normalized.path || normalized.base) {
+            return normalized.path || normalized.base;
+        }
         const tab = openTabs.find(t => t.id === activeTabId);
-        return tab?.name || 'Untitled';
+        const tabNorm = normalizeRoutineTarget(tab?.path || tab?.name || '');
+        return tabNorm.path || tabNorm.base || 'Untitled';
     };
 
     function toggleBreakpoint(line, dbgState, editor) {
@@ -3349,6 +4839,11 @@
             li.className = 'bp-item';
             const isCurrentFile = bp.file === getActiveRoutine();
             if (isCurrentFile) li.classList.add('active');
+            li.style.cursor = 'pointer';
+            li.onclick = async () => {
+                await focusDebugLocation(bp.file, bp.line, globalTerminalState, dbgStateRef);
+                highlightLine(activeEditor, bp.line);
+            };
 
             const meta = document.createElement('div');
             meta.className = 'bp-meta';
@@ -3474,6 +4969,18 @@
         stack.forEach((frame, idx) => {
             const li = document.createElement('li');
             li.textContent = `#${idx} ${frame}`;
+            li.style.cursor = 'pointer';
+            li.onclick = async () => {
+                const match = `${frame}`.match(/^([^:]+):(\d+)/);
+                const routine = match ? match[1] : null;
+                const line = match ? parseInt(match[2], 10) : null;
+                if (routine && line) {
+                    await focusDebugLocation(routine, line, globalTerminalState, dbgStateRef);
+                    highlightLine(activeEditor, line);
+                } else {
+                    showToast('info', 'Debug', 'Frame navigation not available (TODO: richer frame data).');
+                }
+            };
             host.appendChild(li);
         });
     }
@@ -3506,7 +5013,10 @@
         if (!active) return;
 
         if (!active.sessionId && window.ahmadIDE.terminalCreate) {
-            const resCreate = await window.ahmadIDE.terminalCreate();
+            const resCreate = await window.ahmadIDE.terminalCreate({
+                shell: terminalConfig.shellPath || undefined,
+                cwd: getTerminalCwd()
+            });
             if (resCreate && resCreate.ok) {
                 active.sessionId = resCreate.id;
             } else {
@@ -3584,11 +5094,61 @@
         }
     }
 
+    function normalizeCallStack(stack) {
+        if (!Array.isArray(stack)) return [];
+        return stack.map(frame => {
+            if (typeof frame === 'string') return frame;
+            const routine = routineKey(frame?.routine || frame?.returnRoutine || 'TMPDBG');
+            const line = frame?.line || frame?.returnLine || '?';
+            const tag = frame?.tag || frame?.returnTag;
+            return tag ? `${routine}:${line} (${tag})` : `${routine}:${line}`;
+        });
+    }
+
+    const routineKey = (value, fallback = 'TMPDBG') => {
+        const info = normalizeRoutineTarget(value);
+        return info.path || info.base || fallback;
+    };
+
+    async function focusDebugLocation(routineName, lineNumber, termState, dbgState) {
+        const targetInfo = normalizeRoutineTarget(routineName);
+        if (!targetInfo.base) return false;
+
+        // TMPDBG (or the active buffer) should map back to the user's current tab
+        const homeRoutine = normalizeRoutineTarget(dbgState?.homeRoutine || '');
+        if (targetInfo.base === 'TMPDBG' || (homeRoutine.base && targetInfo.base === homeRoutine.base)) {
+            if (dbgState?.homeTabId) {
+                switchTab(dbgState.homeTabId);
+            }
+        } else {
+            const targetRoutineKey = targetInfo.path || targetInfo.base;
+            let tab = findOpenTab(targetRoutineKey);
+            if (!tab) {
+                const readRes = await window.ahmadIDE.readRoutine(targetRoutineKey);
+                if (!readRes.ok) {
+                    appendOutput(`✗ Failed to load ${targetRoutineKey}: ${readRes.error || 'Unable to read routine'}`, termState);
+                    showToast('error', 'Debug', `Cannot open ${targetRoutineKey}`);
+                    return false;
+                }
+                tab = createTab(targetRoutineKey, readRes.code || '');
+            }
+            switchTab(tab.id);
+        }
+
+        if (activeEditor && lineNumber) {
+            activeEditor.revealLineInCenter(lineNumber);
+            activeEditor.setPosition({ lineNumber, column: 1 });
+        }
+        return true;
+    }
+
     async function startDebugSession(editor, dbgState, termState, debugMenu, bpLines = []) {
         const model = editor.getModel();
         if (!model) return;
 
         const code = editor.getValue();
+        dbgState.homeTabId = activeTabId;
+        dbgState.homeRoutine = routineKey(getActiveRoutine(), 'TMPDBG');
 
         // Call backend to start debug session
         appendOutput('🐞 Starting debug session...', termState);
@@ -3596,18 +5156,50 @@
 
         if (!result || !result.ok) {
             appendOutput(`✗ Debug start failed: ${result?.error || 'Unknown error'}`, termState);
+            if (result?.output) {
+                appendOutput(result.output, termState);
+            }
+            setDebugBarVisibility(false, false);
             return;
         }
 
         // Store session ID and initial state
         dbgState.sessionId = result.sessionId;
-        dbgState.currentLine = result.currentLine || 1;
-        dbgState.locals = result.locals || {};
-        dbgState.stack = result.stack || ['MAIN^TMP'];
+        dbgState.engine = result.engine || 'legacy';
+        let initialLine = result.currentLine || 1;
+        let initialLocals = result.locals || {};
+        let initialStack = normalizeCallStack(result.stack || result.callStack || ['TMPDBG:1']);
+        let initialRoutine = routineKey(result.currentRoutine || result.routine || dbgState.homeRoutine || 'TMPDBG');
+
+        // Auto-run to the next breakpoint so we start paused where the user expects
+        if (bpLines && bpLines.length) {
+            const cont = await window.ahmadIDE.debugContinue(dbgState.sessionId);
+            if (cont?.ok) {
+                initialLine = cont.currentLine || initialLine;
+                initialLocals = cont.locals || initialLocals;
+                initialStack = normalizeCallStack(cont.stack || cont.callStack || initialStack);
+                initialRoutine = routineKey(cont.currentRoutine || initialRoutine || 'TMPDBG');
+                if (cont.output) {
+                    appendOutput(cont.output, termState);
+                }
+            }
+        }
+
+        dbgState.currentLine = initialLine;
+        dbgState.locals = initialLocals;
+        dbgState.stack = initialStack;
+        dbgState.currentRoutine = initialRoutine;
+        setDebugBarVisibility(true, true);
 
         logDebug(['🐞 Debug session started. Use Step/Continue buttons to execute code.'], termState, false);
-        appendOutput(`📍 Stopped at line ${dbgState.currentLine}. Press Step to execute.`, termState);
+        appendOutput(
+            `📍 Stopped at line ${dbgState.currentLine}${bpLines && bpLines.length ? ' (breakpoint)' : ''}. Press Step to execute.`,
+            termState
+        );
+        showToast('success', 'Debug Started', 'Debug session is active');
         setActiveToolWindow('debugPanel');
+
+        await focusDebugLocation(dbgState.currentRoutine, dbgState.currentLine, termState, dbgState);
 
         setDebugState(
             'paused',
@@ -3615,6 +5207,7 @@
                 currentLine: dbgState.currentLine,
                 locals: dbgState.locals,
                 stack: dbgState.stack,
+                currentRoutine: dbgState.currentRoutine,
                 barEl: debugMenu
             },
             editor,
@@ -3623,6 +5216,14 @@
     }
 
     async function performStep(type, editor, dbgState, termState, bar) {
+        if (!dbgState.sessionId) {
+            const bpLines = typeof getBpLines === 'function' ? getBpLines() : [];
+            dbgState.debugModeEnabled = true;
+            const btn = document.getElementById('debugStartBtn');
+            if (btn) btn.classList.add('active');
+            await startDebugSession(editor, dbgState, termState, bar, bpLines);
+        }
+
         if (!dbgState.sessionId) return;
 
         const label =
@@ -3631,35 +5232,151 @@
                     'Step into';
 
         appendOutput(`⏭️  ${label}...`, termState);
+        const prevRoutine = routineKey(dbgState.currentRoutine || dbgState.homeRoutine || getActiveRoutine() || 'TMPDBG');
 
-        // Call backend to execute current line
+        // Call backend to execute current line (normal step behavior)
+        console.log(`[FRONTEND] Calling debugStep with type="${type}", currentLine=${dbgState.currentLine}`);
         const result = await window.ahmadIDE.debugStep(dbgState.sessionId, type);
+        console.log('[FRONTEND] debugStep result:', result);
 
         if (!result || !result.ok) {
-            if (result?.error === 'End of code reached') {
-                stopDebug(editor, dbgState, termState, bar);
-                appendOutput('✅ Execution completed (end of code).', termState);
+            const errMsg = result?.error || 'Unknown error';
+            if (errMsg === 'End of code reached' || errMsg === 'Program finished') {
+                stopDebug(editor, dbgState, termState, bar, { keepMode: true });
+                appendOutput('✅ Execution completed.', termState);
+                showToast('success', 'Debug', 'Execution completed');
             } else {
-                appendOutput(`✗ Step failed: ${result?.error || 'Unknown error'}`, termState);
+                appendOutput(`✗ Step failed: ${errMsg}`, termState);
+                showToast('error', 'Debug', `Step failed: ${errMsg}`);
             }
             return;
         }
 
+        // Handle local tag call (same routine) when using legacy engine
+        if (dbgState.engine !== 'zstep' && result.isLocalTagCall && result.tagLine) {
+            const {tagLine, tagName} = result;
+            dbgState.currentLine = tagLine;
+            dbgState.currentRoutine = prevRoutine;
+            dbgState.locals = result.locals || dbgState.locals;
+            dbgState.stack = normalizeCallStack(result.stack || dbgState.stack);
+            appendOutput(`🔍 Stepping into local tag ${tagName} at line ${tagLine}...`, termState);
+            await focusDebugLocation(prevRoutine, dbgState.currentLine, termState, dbgState);
+            setDebugState('paused', {
+                currentLine: dbgState.currentLine,
+                locals: dbgState.locals,
+                stack: dbgState.stack,
+                currentRoutine: dbgState.currentRoutine,
+                barEl: bar
+            }, editor, dbgState);
+            appendOutput(`📍 Positioned at tag ${tagName} (line ${tagLine})`, termState);
+            showToast('info', 'Step Into', `Jumped to ${tagName}`);
+            return;
+        }
+
+        // Handle external routine call (backend signals this) for legacy engine
+        if (dbgState.engine !== 'zstep' && result.isExternalCall && result.callTarget) {
+            const {routine, tag} = result.callTarget;
+            appendOutput(`🔍 Stepping into ${tag ? tag + '^' : '^'}${routine}...`, termState);
+
+            // Load external routine
+            const existingTab = findOpenTab(routine);
+            if (existingTab) {
+                switchTab(existingTab.id);
+            } else {
+                const readRes = await window.ahmadIDE.readRoutine(routine);
+                if (readRes.ok) {
+                    createTab(routine, readRes.code || '');
+                    appendOutput(`✓ Loaded routine: ${routine}`, termState);
+                } else {
+                    appendOutput(`✗ Failed to load ${routine}: ${readRes.error}`, termState);
+                    showToast('error', 'Failed', `Could not load ${routine}`);
+                    return;
+                }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 50));
+
+            // Jump to tag if specified, otherwise start at line 1
+            let targetLine = 1;
+            if (tag && activeEditor) {
+                const newModel = activeEditor.getModel();
+                if (newModel) {
+                    const lineCount = newModel.getLineCount();
+                    for (let i = 1; i <= lineCount; i++) {
+                        const content = newModel.getLineContent(i);
+                        if (new RegExp(`^${tag}(?:\\s|;|\\(|$)`, 'i').test(content.trim())) {
+                            targetLine = i;
+                            activeEditor.revealLineInCenter(i);
+                            activeEditor.setPosition({ lineNumber: i, column: 1 });
+                            appendOutput(`📍 Found tag ${tag} at line ${i}`, termState);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // Stop old session, start new in external routine at the tag line
+            await window.ahmadIDE.debugStop(dbgState.sessionId);
+
+            const newCode = activeEditor.getValue();
+            const bpLines = typeof getBpLines === 'function' ? getBpLines() : [];
+
+            // CRITICAL: Start debug session at the tag line, not line 1
+            const newSession = await window.ahmadIDE.debugStart(newCode, bpLines, targetLine);
+
+            if (newSession?.ok) {
+                dbgState.sessionId = newSession.sessionId;
+                dbgState.engine = newSession.engine || 'legacy';
+                dbgState.currentLine = newSession.currentLine;  // Backend now starts at targetLine
+                dbgState.locals = newSession.locals || {};
+                dbgState.stack = normalizeCallStack(newSession.stack || newSession.callStack || []);
+                dbgState.currentRoutine = routineKey(newSession.currentRoutine || routine || 'TMPDBG');
+
+                appendOutput(`🐞 Debug session started in ${routine} at line ${dbgState.currentLine}`, termState);
+                showToast('info', 'Debug', `Stepped into ${tag ? tag + '^' : '^'}${routine}`);
+
+                await focusDebugLocation(dbgState.currentRoutine, dbgState.currentLine, termState, dbgState);
+
+                setDebugState('paused', {
+                    currentLine: dbgState.currentLine,
+                    locals: dbgState.locals,
+                    stack: dbgState.stack,
+                    currentRoutine: dbgState.currentRoutine,
+                    barEl: bar
+                }, editor, dbgState);
+            }
+
+            return;
+        }
+
         // Update state with real execution results
-        dbgState.currentLine = result.currentLine;
-        dbgState.locals = result.locals || {};
+        const topFrame = (result.callStack || []).slice(-1)[0] || {};
+        const stackRoutine = routineKey(topFrame.routine || topFrame.returnRoutine || '');
+        const nextRoutine = routineKey(result.currentRoutine || result.routine || stackRoutine || prevRoutine || 'TMPDBG');
+        dbgState.currentRoutine = nextRoutine;
+        dbgState.currentLine = topFrame.line || result.currentLine;
+        dbgState.locals = result.locals || dbgState.locals || {};
+        dbgState.stack = normalizeCallStack(result.stack || result.callStack || dbgState.stack);
+
+        // Handle QUIT return from tag
+        if (result.isReturn) {
+            appendOutput(`↩️  Returned from tag to line ${dbgState.currentLine}`, termState);
+            showToast('info', 'Return', `Returned to caller`);
+        }
+
+        await focusDebugLocation(nextRoutine, dbgState.currentLine, termState, dbgState);
 
         // Show execution output if any
         if (result.output) {
             appendOutput(result.output, termState);
         }
 
-        // Log WRITE/READ if present
-        logDebugIO(editor, dbgState.currentLine - 1, termState);
+        // Log WRITE/READ if present (after focusing correct routine)
+        logDebugIO(editor, Math.max(1, dbgState.currentLine), termState);
 
-        // Check if we've reached a QUIT line
-        if (isStopLine(editor, dbgState.currentLine)) {
-            stopDebug(editor, dbgState, termState, bar);
+        // Check if we've reached a QUIT line at the top level (end of routine)
+        if (dbgState.engine !== 'zstep' && isStopLine(editor, dbgState.currentLine)) {
+            stopDebug(editor, dbgState, termState, bar, { keepMode: true });
             appendOutput('🛑 Execution stopped (QUIT/Q or end of file).', termState);
             return;
         }
@@ -3669,7 +5386,8 @@
             {
                 currentLine: dbgState.currentLine,
                 locals: dbgState.locals,
-                stack: result.stack || dbgState.stack,
+                stack: dbgState.stack,
+                currentRoutine: dbgState.currentRoutine,
                 barEl: bar
             },
             editor,
@@ -3688,22 +5406,35 @@
         const result = await window.ahmadIDE.debugContinue(dbgState.sessionId);
 
         if (!result || !result.ok) {
-            appendOutput(`✗ Continue failed: ${result?.error || 'Unknown error'}`, termState);
+            const errMsg = result?.error || 'Unknown error';
+            if (errMsg === 'Program finished') {
+                stopDebug(editor, dbgState, termState, debugMenu, { keepMode: true });
+                appendOutput('✅ Execution completed.', termState);
+                return;
+            }
+            appendOutput(`✗ Continue failed: ${errMsg}`, termState);
             return;
         }
 
         // Update state with results
-        dbgState.currentLine = result.currentLine;
-        dbgState.locals = result.locals || {};
+        const topFrame = (result.callStack || []).slice(-1)[0] || {};
+        const stackRoutine = routineKey(topFrame.routine || topFrame.returnRoutine || '');
+        const nextRoutine = routineKey(result.currentRoutine || result.routine || stackRoutine || dbgState.currentRoutine || dbgState.homeRoutine || 'TMPDBG');
+        dbgState.currentRoutine = nextRoutine;
+        dbgState.currentLine = topFrame.line || result.currentLine;
+        dbgState.locals = result.locals || dbgState.locals || {};
+        dbgState.stack = normalizeCallStack(result.stack || result.callStack || dbgState.stack);
 
         // Show all execution output
         if (result.output) {
             appendOutput(result.output, termState);
         }
 
+        await focusDebugLocation(nextRoutine, dbgState.currentLine, termState, dbgState);
+
         // Check if we've reached end or QUIT
-        if (isStopLine(editor, dbgState.currentLine)) {
-            stopDebug(editor, dbgState, termState, debugMenu);
+        if (dbgState.engine !== 'zstep' && isStopLine(editor, dbgState.currentLine)) {
+            stopDebug(editor, dbgState, termState, debugMenu, { keepMode: true });
             appendOutput('✅ Execution completed.', termState);
             return;
         }
@@ -3713,7 +5444,8 @@
             {
                 currentLine: dbgState.currentLine,
                 locals: dbgState.locals,
-                stack: result.stack || dbgState.stack,
+                stack: dbgState.stack,
+                currentRoutine: dbgState.currentRoutine,
                 barEl: debugMenu
             },
             editor,
@@ -3723,12 +5455,13 @@
         appendOutput(`📍 Stopped at line ${dbgState.currentLine} (breakpoint)`, termState);
     }
 
-    async function stopDebug(editor, dbgState, termState, debugMenu) {
+    async function stopDebug(editor, dbgState, termState, debugMenu, opts = {}) {
+        const keepMode = !!opts.keepMode;
         if (!dbgState.sessionId) {
             // Still make sure bar + buttons reset
             setDebugState(
                 'stopped',
-                { currentLine: null, output: ['Stopped'], barEl: debugMenu },
+                { currentLine: null, output: ['Stopped'], barEl: debugMenu, keepMode },
                 editor,
                 dbgState
             );
@@ -3741,30 +5474,44 @@
         logDebug(['Debug session stopped.'], termState, false);
         dbgState.sessionId = null;
         dbgState.locals = {};
+        dbgState.stack = [];
+        dbgState.currentRoutine = null;
+        dbgState.homeTabId = null;
+        dbgState.homeRoutine = null;
 
         // Disable debug mode and update button state
-        dbgState.debugModeEnabled = false;
-        if ($) {
-            $('#debugStartBtn').removeClass('active');
-        } else {
-            const debugBtn = document.getElementById('debugStartBtn');
-            if (debugBtn) debugBtn.classList.remove('active');
+        if (!keepMode) {
+            dbgState.debugModeEnabled = false;
+            if ($) {
+                $('#debugStartBtn').removeClass('active');
+            } else {
+                const debugBtn = document.getElementById('debugStartBtn');
+                if (debugBtn) debugBtn.classList.remove('active');
+            }
         }
 
         setDebugState(
             'stopped',
-            { currentLine: null, output: ['Stopped'], barEl: debugMenu },
+            { currentLine: null, output: ['Stopped'], barEl: debugMenu, keepMode },
             editor,
             dbgState
         );
-        appendOutput('🛑 Debug session stopped. Debug mode disabled.', termState);
+        appendOutput(
+            keepMode
+                ? '🛑 Debug session stopped. Debug mode still enabled.'
+                : '🛑 Debug session stopped. Debug mode disabled.',
+            termState
+        );
+        showToast('info', 'Debug Stopped', keepMode ? 'Session stopped' : 'Debug mode disabled');
     }
 
     function setDebugState(state, payload, editor, dbgState) {
+        const keepMode = !!(payload && payload.keepMode);
         dbgState.state = state;
         if (payload?.currentLine !== undefined) dbgState.currentLine = payload.currentLine;
         if (payload?.locals) dbgState.locals = payload.locals;
         if (payload?.stack) dbgState.stack = payload.stack;
+        if (payload?.currentRoutine) dbgState.currentRoutine = payload.currentRoutine;
 
         renderLocals(dbgState.locals || {});
         renderStack(dbgState.stack || []);
@@ -3780,17 +5527,12 @@
         }
 
         const bar = payload?.barEl || document.getElementById('debugBar');
-        if (bar) {
-            if (state === 'stopped') {
-                bar.classList.add('hidden');
-                bar.style.display = 'none';
-            } else {
-                bar.classList.remove('hidden');
-                bar.style.display = 'flex';
-            }
-        }
+        setDebugBarVisibility(!(state === 'stopped' && !keepMode), state !== 'stopped');
 
-        setDebugButtons(state !== 'stopped');
+        setDebugButtons(state !== 'stopped' || keepMode);
+        if (state === 'stopped' && !keepMode) {
+            setDebugBarVisibility(false, false);
+        }
     }
 
     function handleDebugAction(action, editor, dbgState, termState, bar) {
@@ -3821,7 +5563,9 @@
         if (!list) return;
         list.innerHTML = '';
         const problems = Array.isArray(items) ? items : [];
-        if (!problems.length) {
+        const limited = problems.slice(0, maxProblemItems);
+        const trimmed = problems.length > limited.length;
+        if (!limited.length) {
             const li = document.createElement('li');
             li.textContent = 'No problems.';
             list.appendChild(li);
@@ -3835,7 +5579,7 @@
             return 'ℹ';
         };
 
-        problems.forEach(item => {
+        limited.forEach(item => {
             const li = document.createElement('li');
             const sev = item.severity || 'info';
             li.className = `problem-item ${sev.toLowerCase()}`;
@@ -3861,7 +5605,13 @@
             };
             list.appendChild(li);
         });
-        updateProblemSummary(problems);
+        if (trimmed) {
+            const li = document.createElement('li');
+            li.className = 'problem-item info';
+            li.textContent = `Showing first ${maxProblemItems} issues...`;
+            list.appendChild(li);
+        }
+        updateProblemSummary(limited);
         setActiveDebugTab(activeDebugTab);
     }
 
@@ -3912,12 +5662,146 @@
             : '#38bdf8';
     }
 
+    function loadExtensionState() {
+        try {
+            const raw = localStorage.getItem('ahmadIDE:extensions');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                extensionsState.enabled = parsed.enabled || {};
+                extensionsState.selectedId = parsed.selectedId || null;
+            }
+        } catch (e) {
+            // ignore storage errors
+        }
+    }
+
+    function persistExtensionState() {
+        try {
+            localStorage.setItem('ahmadIDE:extensions', JSON.stringify({
+                enabled: extensionsState.enabled,
+                selectedId: extensionsState.selectedId
+            }));
+        } catch (e) {
+            // ignore storage failures
+        }
+    }
+
+    function initExtensionsData() {
+        extensionsState.installed = [
+            {
+                id: 'mumps-lint',
+                name: 'MUMPS Lint',
+                description: 'Runs MUMPS lint checks on save.',
+                icon: '🧹'
+            },
+            {
+                id: 'code-formatter',
+                name: 'Code Formatter',
+                description: 'Formats MUMPS routines using built-in formatter.',
+                icon: '✨'
+            },
+            {
+                id: 'ssh-tools',
+                name: 'SSH Tools',
+                description: 'Adds SSH utilities and quick commands.',
+                icon: '🔑'
+            }
+        ];
+        extensionsState.installed.forEach(ext => {
+            if (extensionsState.enabled[ext.id] === undefined) {
+                extensionsState.enabled[ext.id] = true;
+            }
+        });
+        if (!extensionsState.selectedId && extensionsState.installed.length) {
+            extensionsState.selectedId = extensionsState.installed[0].id;
+        }
+    }
+
+    function renderExtensionsDetail(ext) {
+        const host = document.getElementById('extensionDetail');
+        if (!host) return;
+        if (!ext) {
+            host.innerHTML = '<div class="pane-title">Select an extension</div><div class="pane-subtitle">Details will appear here.</div>';
+            return;
+        }
+        const enabled = !!extensionsState.enabled[ext.id];
+        host.innerHTML = `
+            <div class="detail-title">${ext.name}</div>
+            <div class="detail-desc">${ext.description || 'No description available.'}</div>
+            <div class="detail-status">Status: <strong>${enabled ? 'Enabled' : 'Disabled'}</strong></div>
+            <button class="btn ${enabled ? 'ghost' : 'primary'}" id="extToggleBtn">${enabled ? 'Disable' : 'Enable'}</button>
+        `;
+        document.getElementById('extToggleBtn')?.addEventListener('click', () => {
+            extensionsState.enabled[ext.id] = !enabled;
+            persistExtensionState();
+            renderExtensionsList();
+        });
+    }
+
+    function renderExtensionsList() {
+        const host = document.getElementById('extensionsList');
+        if (!host) return;
+        host.innerHTML = '';
+        if (!extensionsState.installed.length) {
+            host.textContent = 'No extensions installed.';
+            return;
+        }
+        extensionsState.installed.forEach(ext => {
+            const row = document.createElement('div');
+            row.className = 'extension-row';
+            if (extensionsState.selectedId === ext.id) row.classList.add('active');
+            const icon = document.createElement('div');
+            icon.className = 'extension-icon';
+            icon.textContent = ext.icon || '⋯';
+            const meta = document.createElement('div');
+            meta.className = 'extension-meta';
+            const name = document.createElement('div');
+            name.className = 'extension-name';
+            name.textContent = ext.name;
+            const desc = document.createElement('div');
+            desc.className = 'extension-desc';
+            desc.textContent = ext.description || '';
+            meta.appendChild(name);
+            meta.appendChild(desc);
+            const toggle = document.createElement('input');
+            toggle.type = 'checkbox';
+            toggle.className = 'extension-toggle';
+            toggle.checked = !!extensionsState.enabled[ext.id];
+            toggle.addEventListener('click', (e) => {
+                e.stopPropagation();
+                extensionsState.enabled[ext.id] = !extensionsState.enabled[ext.id];
+                persistExtensionState();
+                renderExtensionsDetail(ext);
+            });
+            row.appendChild(icon);
+            row.appendChild(meta);
+            row.appendChild(toggle);
+            row.addEventListener('click', () => {
+                extensionsState.selectedId = ext.id;
+                persistExtensionState();
+                renderExtensionsList();
+                renderExtensionsDetail(ext);
+            });
+            host.appendChild(row);
+        });
+        const selected = extensionsState.installed.find(e => e.id === extensionsState.selectedId);
+        renderExtensionsDetail(selected);
+    }
+
+    function initExtensionsView() {
+        loadExtensionState();
+        initExtensionsData();
+        renderExtensionsList();
+    }
+
     function highlightLine(editor, lineNumber) {
         if (!editor) return;
         if (editor._debugDecorations) {
             editor._debugDecorations = editor.deltaDecorations(editor._debugDecorations, []);
         }
         if (!lineNumber) return;
+
+        // Trust backend - it already skips comment lines
         editor._debugDecorations = editor.deltaDecorations([], [
             {
                 range: new monaco.Range(lineNumber, 1, lineNumber, 1),
@@ -3986,6 +5870,36 @@
     }
 
     function registerMumpsThemes() {
+        monaco.editor.defineTheme('mumps-light', {
+            base: 'vs',
+            inherit: true,
+            rules: [
+                { token: 'comment', foreground: '7a8294', fontStyle: 'italic' },
+                { token: 'string', foreground: '1b7f4d' },
+                { token: 'number', foreground: 'b05a00' },
+                { token: 'keyword', foreground: '0f5ccd', fontStyle: 'bold' },
+                { token: 'predefined', foreground: '8a4fd8', fontStyle: 'bold' },
+                { token: 'label', foreground: '0f5ccd', fontStyle: 'bold' },
+                { token: 'type.identifier', foreground: '2f6db5' },
+            ],
+            colors: {
+                'editor.background': '#ffffff',
+                'editorGutter.background': '#f3f5f9',
+                'editorLineNumber.foreground': '#a4acb9',
+                'editorLineNumber.activeForeground': '#1f4fff',
+                'editor.selectionBackground': '#d9e4ff',
+                'editor.selectionHighlightBackground': '#e8eefc',
+                'editor.inactiveSelectionBackground': '#eef2fb',
+                'editor.lineHighlightBackground': '#eef3ff',
+                'editor.lineHighlightBorder': '#c9d6f9',
+                'editorCursor.foreground': '#1f4fff',
+                'editorBracketMatch.border': '#89a7f2',
+                'editorIndentGuide.background': '#e1e6ef',
+                'editorIndentGuide.activeBackground': '#c6d3e8',
+                'editorWhitespace.foreground': '#e1e6ef'
+            }
+        });
+
         monaco.editor.defineTheme('mumps-dark', {
             base: 'vs-dark',
             inherit: true,
@@ -4004,10 +5918,15 @@
                 'editorLineNumber.foreground': '#6e5a51',
                 'editorLineNumber.activeForeground': '#f0c27b',
                 'editor.selectionBackground': '#2a1a12',
+                'editor.selectionHighlightBackground': '#2f1b13',
                 'editor.inactiveSelectionBackground': '#23160f',
                 'editor.lineHighlightBackground': '#1a120e',
+                'editor.lineHighlightBorder': '#3b241a',
                 'editorCursor.foreground': '#f0c27b',
-                'editorIndentGuide.background': '#2c1e17'
+                'editorBracketMatch.border': '#f0c27b',
+                'editorIndentGuide.background': '#2c1e17',
+                'editorIndentGuide.activeBackground': '#3b291f',
+                'editorWhitespace.foreground': '#2c1e17'
             }
         });
 
@@ -4029,10 +5948,15 @@
                 'editorLineNumber.foreground': '#7a6358',
                 'editorLineNumber.activeForeground': '#f0c27b',
                 'editor.selectionBackground': '#2f1b13',
+                'editor.selectionHighlightBackground': '#362015',
                 'editor.inactiveSelectionBackground': '#27160f',
                 'editor.lineHighlightBackground': '#241813',
+                'editor.lineHighlightBorder': '#3a2417',
                 'editorCursor.foreground': '#f0c27b',
-                'editorIndentGuide.background': '#332419'
+                'editorBracketMatch.border': '#f0c27b',
+                'editorIndentGuide.background': '#332419',
+                'editorIndentGuide.activeBackground': '#403023',
+                'editorWhitespace.foreground': '#332419'
             }
         });
     }
@@ -4194,6 +6118,25 @@
     function validateMumps(model) {
         if (!model) return;
         const text = model.getValue();
+        const isHuge = text.length > maxLintTextLength;
+        if (isHuge) {
+            monaco.editor.setModelMarkers(model, 'mumps-check', []);
+            renderProblems([{
+                severity: 'info',
+                message: `Lint disabled for large file (${Math.round(text.length / 1000)} KB)`,
+                line: 1,
+                code: 'LINT_SKIPPED'
+            }]);
+            if (!lintSkipNotified) {
+                showToast('info', 'Linting paused', 'Large file detected; skipping lint to keep typing responsive.');
+                lintSkipNotified = true;
+            }
+            return [];
+        }
+        // Reset the skip notification only after we are back under the threshold
+        if (lintSkipNotified && !isHuge) {
+            lintSkipNotified = false;
+        }
         const linter = window._mumpsLinter || mumpsLinter;
         const combinedMarkers = [];
         const problems = [];
@@ -4350,9 +6293,10 @@
             }
         }
 
-        monaco.editor.setModelMarkers(model, 'mumps-check', combinedMarkers);
+        const limitedMarkers = combinedMarkers.slice(0, maxProblemItems);
+        monaco.editor.setModelMarkers(model, 'mumps-check', limitedMarkers);
         renderProblems(problems);
-        return combinedMarkers;
+        return limitedMarkers;
     }
 
     async function runMumpsCode(editor, terminalState) {
@@ -4373,9 +6317,12 @@
     // ---------- Routines ----------
 
     function setCurrentRoutine(name) {
-        activeRoutineName = name || null;
+        const normalized = normalizeRoutineTarget(name);
+        activeRoutineName = normalized.path || normalized.base || null;
+        const displayName = normalized.base || (name || 'None');
+        const displayFolder = normalized.folder || 'routines';
         const label = document.getElementById('currentRoutineLabel');
-        label.textContent = name || 'None';
+        if (label) label.textContent = normalized.base || 'None';
 
         // Update PhpStorm-style breadcrumbs
         const breadcrumbsContainer = document.getElementById('breadcrumbs');
@@ -4391,7 +6338,7 @@
             };
             breadcrumbsContainer.appendChild(projectItem);
 
-            if (name) {
+            if (normalized.base) {
                 // Separator
                 const sep1 = document.createElement('span');
                 sep1.className = 'breadcrumb-separator';
@@ -4401,7 +6348,7 @@
                 // Routines folder
                 const routinesItem = document.createElement('span');
                 routinesItem.className = 'breadcrumb-item';
-                routinesItem.textContent = 'routines';
+                routinesItem.textContent = displayFolder;
                 routinesItem.onclick = () => {
                     showToast('info', 'Navigation', 'Routines folder');
                 };
@@ -4416,7 +6363,7 @@
                 // Current file
                 const fileItem = document.createElement('span');
                 fileItem.className = 'breadcrumb-item active';
-                fileItem.textContent = `${name}.m`;
+                fileItem.textContent = `${displayName}.m`;
                 breadcrumbsContainer.appendChild(fileItem);
             }
         }
@@ -4435,8 +6382,12 @@
     }
 
     async function loadRoutineByName(name, state, editor, routinesCache = [], termState) {
+        const targetInfo = normalizeRoutineTarget(name);
+        const targetRoutineKey = targetInfo.path || targetInfo.base;
+        if (!targetRoutineKey) return;
+
         // Check if tab already exists for this routine
-        const existingTab = openTabs.find(t => t.name === name);
+        const existingTab = findOpenTab(targetRoutineKey);
         if (existingTab) {
             // Just switch to existing tab
             switchTab(existingTab.id);
@@ -4444,22 +6395,22 @@
         }
 
         // Load routine from backend
-        const readRes = await window.ahmadIDE.readRoutine(name);
+        const readRes = await window.ahmadIDE.readRoutine(targetRoutineKey);
         if (!readRes.ok) {
-            appendOutput(`✗ Failed to load ${name}: ${readRes.error || readRes.stderr}`, termState);
+            appendOutput(`✗ Failed to load ${targetRoutineKey}: ${readRes.error || readRes.stderr}`, termState);
             return;
         }
 
         // Create new tab with loaded content
-        const newTab = createTab(name, readRes.code || '', state);
+        createTab(targetRoutineKey, readRes.code || '', state);
 
-        // Update editor with content
-        if (editor) {
-            editor.setValue(readRes.code || '');
-            validateMumps(editor.getModel());
+        // Validate the freshly loaded model
+        const modelToValidate = editor?.getModel ? editor.getModel() : activeEditor?.getModel?.();
+        if (modelToValidate) {
+            validateMumps(modelToValidate);
         }
 
-        appendOutput(`✓ Loaded routine ${name}`, termState);
+        appendOutput(`✓ Loaded routine ${targetRoutineKey}`, termState);
     }
 
     async function saveRoutineFlow(editor, state, termState) {
@@ -4491,7 +6442,8 @@
         const code = editor.getValue();
         const res = await window.ahmadIDE.saveRoutine(name, code);
         if (res.ok) {
-            state.current = res.routine || name;
+            const savedPath = res.folder ? `${res.folder}/${res.routine}` : (res.routine || name);
+            state.current = savedPath;
             setCurrentRoutine(state.current);
             appendOutput(`✓ Saved routine ${state.current}`, termState);
             await window.ahmadIDE.zlinkRoutine(state.current);
@@ -4503,8 +6455,11 @@
                 markTabDirty(activeTabId, false);
                 // Update tab name if it changed
                 const currentTab = openTabs.find(t => t.id === activeTabId);
-                if (currentTab && currentTab.name !== state.current) {
-                    currentTab.name = state.current;
+                if (currentTab) {
+                    currentTab.name = res.routine || currentTab.name;
+                    currentTab.path = savedPath || currentTab.path;
+                    currentTab.folder = res.folder || currentTab.folder;
+                    if (currentTab.state) currentTab.state.current = savedPath;
                     renderTabs();
                 }
             }

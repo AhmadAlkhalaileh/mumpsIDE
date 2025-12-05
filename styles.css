@@ -1,48 +1,64 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
-
 :root {
-    /* PhpStorm Darcula theme colors */
-    --bg: #2b2b2b;
-    --glass: rgba(255,255,255,0.03);
-    --panel: #3c3f41;
-    --panel-2: #313335;
+    /* PhpStorm New UI (Light) palette */
+    --bg: #f5f7fb;
+    --glass: rgba(255, 255, 255, 0.7);
+    --panel: #ffffff;
+    --panel-2: #f4f6fb;
+    --panel-strong: #ffffff;
+    --panel-soft: #f5f7fb;
+    --sidebar: #f5f7fb;
+    --rail-bg: #eef1f7;
+    --editor-bg: #ffffff;
+    --gutter-bg: #f3f5f9;
+    --terminal-bg: #f8f9fb;
+    --terminal-input-bg: #edf0f7;
 
-    /* PhpStorm accent colors */
-    --accent: #cc7832;
-    --accent-2: #6897bb;
-    --accent-blue: #4a9fe8;
-    --accent-green: #5fb865;
-    --accent-orange: #cc7832;
+    /* Accents */
+    --accent: #3574f0;
+    --accent-2: #5b8def;
+    --accent-blue: #3574f0;
+    --accent-green: #3fb87f;
+    --accent-orange: #ed8b00;
+    --accent-soft: rgba(53, 116, 240, 0.12);
+    --accent-soft-border: rgba(53, 116, 240, 0.24);
 
-    --text: #a9b7c6;
-    --text-bright: #ffc66d;
-    --muted: #808080;
-    --border: rgba(255,255,255,0.1);
+    /* Text */
+    --text: #1f232a;
+    --text-bright: #0f4c81;
+    --muted: #6a7280;
+    --border: #dfe3eb;
 
-    /* PhpStorm panel colors */
-    --panel-strong: #2b2b2b;
-    --panel-soft: #3c3f41;
-    --sidebar: #3c3f41;
-    --rail-bg: #313335;
-    --editor-bg: #2b2b2b;
-    --terminal-bg: #2b2b2b;
-    --terminal-input-bg: #313335;
+    /* Selection / hover */
+    --tree-selected: #e6f0ff;
+    --tree-selected-text: #0f1b2d;
+    --selection-bg: #d9e4ff;
+    --hover-bg: #ecf0f7;
 
-    /* PhpStorm selection colors */
-    --tree-selected: #2f4554;
-    --tree-selected-text: #ffffff;
-    --selection-bg: #214283;
-    --hover-bg: #393b3d;
+    /* Soft glows */
+    --glow-1: rgba(53, 116, 240, 0.08);
+    --glow-2: rgba(91, 141, 239, 0.06);
+
+    /* Typography */
+    --font-ui: 'Inter', 'Segoe UI', 'SF Pro Display', system-ui, sans-serif;
+    --font-code: 'JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
+    --font-size-ui: 13px;
+    --font-size-code: 13px;
 }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
     margin: 0;
-    font-family: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
-    background: linear-gradient(135deg, #2b2b2b 0%, #2f3234 50%, #26282a 100%);
+    font-family: var(--font-ui);
+    font-size: var(--font-size-ui);
+    background: var(--bg);
     color: var(--text);
     overflow: hidden;
+}
+
+button, input, select, textarea {
+    font-family: var(--font-ui);
+    font-size: var(--font-size-ui);
 }
 
 .hidden { display: none !important; }
@@ -50,7 +66,7 @@ body {
 .app-shell {
     position: relative;
     display: grid;
-    grid-template-rows: 56px 1fr 32px;
+    grid-template-rows: 40px 1fr 24px;
     height: 100vh;
 }
 
@@ -59,8 +75,8 @@ body {
     content: '';
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at 22% 78%, rgba(214,127,60,0.08), transparent 30%),
-                radial-gradient(circle at 86% 62%, rgba(240,194,123,0.08), transparent 26%);
+    background: radial-gradient(circle at 22% 78%, var(--glow-1), transparent 30%),
+                radial-gradient(circle at 86% 62%, var(--glow-2), transparent 26%);
     pointer-events: none;
     filter: blur(60px);
     opacity: 0.8;
@@ -70,43 +86,42 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 10px 14px;
+    padding: 0 10px;
+    height: 40px;
     border-bottom: 1px solid var(--border);
-    background: linear-gradient(90deg, #3c3f41 0%, #323436 45%, #2b2b2b 100%);
-    backdrop-filter: blur(12px);
-    box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+    background: var(--panel-strong);
     position: relative;
-    z-index: 2;
+    z-index: 100;
 }
 .menu-left, .menu-right { display: flex; align-items: center; gap: 12px; }
 .menu-cluster { display: flex; align-items: center; gap: 10px; }
 .menu-item {
     position: relative;
-    padding: 8px 10px;
-    border-radius: 8px;
+    padding: 4px 8px;
+    border-radius: 4px;
     cursor: pointer;
     color: var(--text);
-    font-weight: 600;
-    letter-spacing: -0.01em;
+    font-size: 13px;
+    font-weight: 500;
 }
 .menu-item:hover, .menu-item.open { background: var(--hover-bg); }
 .menu-dropdown {
     position: absolute;
-    top: 36px;
+    top: 28px;
     left: 0;
     display: grid;
-    gap: 4px;
-    padding: 8px;
+    gap: 2px;
+    padding: 4px;
     min-width: 180px;
     background: var(--panel-strong);
     border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 10px;
-    box-shadow: 0 16px 32px rgba(0,0,0,0.45);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
     opacity: 0;
     pointer-events: none;
     transform: translateY(-4px);
     transition: all 0.12s ease;
-    z-index: 12;
+    z-index: 200;
 }
 .menu-item:hover .menu-dropdown,
 .menu-item.open .menu-dropdown {
@@ -114,15 +129,21 @@ body {
     pointer-events: auto;
     transform: translateY(0);
 }
+.menu-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 6px;
+}
 .menu-action {
     background: transparent;
-    border: 1px solid transparent;
-    border-radius: 8px;
-    padding: 8px 10px;
+    border: none;
+    border-radius: 4px;
+    padding: 6px 10px;
     color: var(--text);
     text-align: left;
     cursor: pointer;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 500;
 }
 .menu-action:hover {
     background: var(--hover-bg);
@@ -152,39 +173,116 @@ body {
 }
 .theme-switcher label { color: var(--muted); font-weight: 600; }
 
+/* ============================================
+   PhpStorm-style Context Menu
+   ============================================ */
 .context-menu,
 .routines-context-menu {
     position: fixed;
-    z-index: 4000;
-    min-width: 220px;
-    background: var(--panel-soft);
+    z-index: 5000;
+    min-width: 200px;
+    background: var(--panel-strong);
     border: 1px solid var(--border);
-    border-radius: 6px;
-    box-shadow: 0 16px 32px rgba(0,0,0,0.5);
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
     padding: 4px 0;
     display: block;
+    font-size: 12px;
 }
 .context-menu { display: none; }
+
 .context-menu .ctx-item,
 .routines-context-menu .ctx-item {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 4px 12px 4px 8px;
     color: var(--text);
     cursor: pointer;
-    font-weight: 600;
+    min-height: 24px;
+    position: relative;
 }
+
 .context-menu .ctx-item:hover,
 .routines-context-menu .ctx-item:hover {
-    background: var(--hover-bg);
+    background: var(--tree-selected);
 }
-.context-menu .ctx-item.disabled { opacity: 0.5; cursor: default; }
+
+.context-menu .ctx-item.disabled,
+.routines-context-menu .ctx-item.disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.context-menu .ctx-item.disabled:hover,
+.routines-context-menu .ctx-item.disabled:hover {
+    background: transparent;
+}
+
 .context-menu .ctx-separator,
 .routines-context-menu .ctx-separator {
     height: 1px;
     background: var(--border);
-    margin: 4px 0;
+    margin: 4px 8px;
+}
+
+/* Context menu icon */
+.ctx-icon {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--muted);
+}
+
+.ctx-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Context menu label */
+.ctx-label {
+    flex: 1;
+    white-space: nowrap;
+}
+
+/* Context menu shortcut */
+.ctx-shortcut {
+    color: var(--muted);
+    font-size: 11px;
+    margin-left: auto;
+    padding-left: 16px;
+}
+
+/* Context menu submenu arrow */
+.ctx-arrow {
+    color: var(--muted);
+    font-size: 10px;
+    margin-left: auto;
+}
+
+/* Submenu styling */
+.ctx-item.has-submenu {
+    position: relative;
+}
+
+.ctx-submenu {
+    position: absolute;
+    left: 100%;
+    top: 0;
+    min-width: 180px;
+    background: var(--panel-strong);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    padding: 4px 0;
+    display: none;
+}
+
+.ctx-item.has-submenu:hover > .ctx-submenu {
+    display: block;
 }
 
 /* Custom Prompt Dialog */
@@ -224,7 +322,7 @@ body {
     background: var(--editor-bg);
     color: var(--text);
     font-size: 14px;
-    font-family: 'Space Grotesk', monospace;
+    font-family: var(--font-ui);
     outline: none;
 }
 
@@ -279,123 +377,424 @@ body {
 .toast .toast-title { font-weight: 700; margin-bottom: 2px; }
 .toast .toast-close { cursor: pointer; }
 
-.brand { display: flex; align-items: center; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 8px; }
 .brand-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
     display: grid;
     place-items: center;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    font-size: 18px;
-    box-shadow: 0 10px 20px rgba(0,0,0,0.35);
+    font-size: 14px;
 }
-.brand-meta { display: flex; flex-direction: column; gap: 2px; }
-.brand-name { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
-.brand-sub { font-size: 12px; color: var(--muted); letter-spacing: 0.04em; }
+.brand-meta { display: flex; flex-direction: column; gap: 0; }
+.brand-name { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; }
+.brand-sub { font-size: 10px; color: var(--muted); letter-spacing: 0.03em; }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
 
-/* PhpStorm-style layout: content area + bottom panel */
-.body {
+/* ============================================
+   PhpStorm-style IDE Layout (CSS Grid)
+   ============================================ */
+
+/* Main IDE body - 5-column grid layout */
+.ide-body {
     position: relative;
     display: grid;
-    grid-template-rows: 1fr auto;
-    gap: 0;
+    grid-template-columns: auto auto 1fr auto auto;
+    grid-template-rows: 1fr;
     overflow: hidden;
     z-index: 1;
-}
-
-.content-area {
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 10px;
-    padding: 10px 10px 0 10px;
-    overflow: hidden;
     min-height: 0;
 }
 
-.content-area.collapsed { grid-template-columns: 1fr; }
-.content-area.collapsed .sidebar { display: none; }
-
-.bottom-panel {
-    border-top: 1px solid var(--border);
-    background: var(--panel-strong);
-    min-height: 32px;
-    max-height: 400px;
+/* Tool Window Bars (icon strips on edges) */
+.tool-window-bar {
+    background: var(--rail-bg);
+    display: flex;
+    z-index: 10;
 }
 
-.sidebar {
+.tool-window-bar-left {
+    flex-direction: column;
+    width: 36px;
+    border-right: 1px solid var(--border);
+    grid-column: 1;
+}
+
+.tool-window-bar-right {
+    flex-direction: column;
+    width: 36px;
+    border-left: 1px solid var(--border);
+    grid-column: 5;
+}
+
+.tool-window-bar-bottom {
+    flex-direction: row;
+    height: 28px;
+    border-top: 1px solid var(--border);
+    align-items: center;
+    padding: 0 4px;
+}
+
+/* Tool Window Stripe Buttons (PhpStorm-style) */
+.tool-window-stripe-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 6px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.12s ease;
+    position: relative;
+}
+
+.tool-window-stripe-btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.tool-window-stripe-btn .stripe-text {
+    writing-mode: vertical-lr;
+    text-orientation: mixed;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transform: rotate(180deg);
+}
+
+.tool-window-stripe-btn.horizontal {
+    padding: 4px 8px;
+}
+
+.tool-window-stripe-btn.horizontal .stripe-text {
+    writing-mode: horizontal-tb;
+    transform: none;
+}
+
+.tool-window-stripe-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+
+.tool-window-stripe-btn:hover svg {
+    opacity: 1;
+}
+
+.tool-window-stripe-btn.active {
+    background: var(--panel-soft);
+    color: var(--text);
+}
+
+.tool-window-bar-left .tool-window-stripe-btn.active {
+    border-left: 2px solid var(--accent-blue);
+    padding-left: 4px;
+}
+
+.tool-window-bar-right .tool-window-stripe-btn.active {
+    border-right: 2px solid var(--accent-blue);
+    padding-right: 4px;
+}
+
+.tool-window-bar-bottom .tool-window-stripe-btn.active {
+    border-bottom: 2px solid var(--accent-blue);
+    margin-bottom: -2px;
+}
+
+.stripe-spacer {
+    flex: 1;
+}
+
+/* Tool Window Content Areas */
+.tool-window-content {
     background: var(--sidebar);
-    border: 1px solid var(--border);
-    border-radius: 8px 8px 0 0;
-    padding: 10px;
-    box-shadow: 0 16px 36px rgba(0,0,0,0.35);
+    overflow: hidden;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    min-height: 0;
-    height: 100%;
-    overflow-y: auto;
-    overflow-x: auto; /* Allow horizontal scroll for long routine names */
-    backdrop-filter: blur(10px);
 }
 
-.project-tree {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 6px;
-    padding: 6px 8px;
-    display: grid;
-    gap: 4px;
-    margin-bottom: 6px;
-    max-height: none;
-    overflow-y: auto;
-    overflow-x: auto; /* Allow horizontal scroll for long routine names */
+.tool-window-left {
+    width: 280px;
+    min-width: 200px;
+    max-width: 500px;
+    border-right: 1px solid var(--border);
+    grid-column: 2;
+    resize: horizontal;
 }
+
+.tool-window-left.hidden {
+    display: none;
+}
+
+.tool-window-right {
+    width: 300px;
+    min-width: 200px;
+    max-width: 500px;
+    border-left: 1px solid var(--border);
+    grid-column: 4;
+    resize: horizontal;
+}
+
+.tool-window-right.hidden {
+    display: none;
+}
+
+.tool-window-bottom {
+    border-top: 1px solid var(--border);
+    min-height: 150px;
+    max-height: 400px;
+    resize: vertical;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.tool-window-bottom.hidden {
+    display: none;
+}
+
+/* Tool Window Panel (content inside tool window) */
+.tool-window-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.tool-window-panel.hidden {
+    display: none;
+}
+
+.tool-window-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: var(--panel-strong);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.tool-window-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.tool-window-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.tool-window-action-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tool-window-action-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+
+.tool-window-body {
+    flex: 1;
+    overflow: auto;
+    padding: 8px;
+}
+
+.placeholder-content {
+    color: var(--muted);
+    font-size: 12px;
+    padding: 20px;
+    text-align: center;
+    font-style: italic;
+}
+
+/* IDE Center (Editor + Bottom panels) */
+.ide-center {
+    grid-column: 3;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Editor Area */
+.editor-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Bottom Panels Container */
+.bottom-panels-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* Legacy compatibility - hide old classes */
+.body { display: none; }
+.content-area { display: none; }
+.sidebar { display: none; }
+.bottom-panel { display: none; }
+
+/* ============================================
+   PhpStorm-style Project Tree
+   ============================================ */
+.project-tree {
+    flex: 1;
+    background: transparent;
+    padding: 2px 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-size: 13px;
+}
+
+/* Filter input in project panel */
+#projectPanel .filter-input {
+    margin: 0 8px 6px 8px;
+    flex-shrink: 0;
+}
+
+/* Tree item base styles (PhpStorm) */
 .tree-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 4px;
-    border-radius: 6px;
+    gap: 4px;
+    padding: 2px 6px;
+    margin: 0 2px;
+    border-radius: 3px;
     cursor: pointer;
-    transition: all 0.12s ease;
+    transition: background 0.1s ease;
     color: var(--text);
-    white-space: normal;
-    word-break: break-word;
+    white-space: nowrap;
+    min-height: 22px;
+    user-select: none;
 }
-.tree-item.active {
+
+/* PhpStorm selection (single clean highlight) */
+.tree-item.selected {
     background: var(--tree-selected);
-    border-left: 2px solid var(--accent-2);
     color: var(--tree-selected-text);
 }
-.tree-toggle {
-    width: 14px;
-    height: 14px;
+
+.tree-item.active {
+    background: var(--tree-selected);
+    color: var(--tree-selected-text);
+}
+
+/* Hover state (lighter than selection) */
+.tree-item:hover:not(.selected):not(.active) {
+    background: var(--hover-bg);
+}
+
+/* Tree expand/collapse arrow (PhpStorm uses simple triangles) */
+.tree-arrow {
+    width: 16px;
+    height: 16px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 11px;
+    flex-shrink: 0;
     color: var(--muted);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: rgba(255,255,255,0.03);
+    font-size: 10px;
+    transition: transform 0.15s ease;
 }
-.tree-toggle:hover { background: rgba(214,127,60,0.14); color: var(--text); }
-.tree-item .tree-icon { opacity: 0.9; }
-.tree-item.folder { color: var(--muted); }
-.tree-item:hover { background: var(--hover-bg); }
-.tree-item.folder.open { background: rgba(67, 76, 84, 0.3); }
-.tree-item.disabled { opacity: 0.5; cursor: default; }
-.tree-children { margin-left: 16px; display: grid; gap: 4px; }
+
+.tree-arrow.expanded {
+    transform: rotate(90deg);
+}
+
+.tree-arrow.empty {
+    visibility: hidden;
+}
+
+.tree-arrow svg {
+    width: 10px;
+    height: 10px;
+    fill: currentColor;
+}
+
+/* Legacy tree-toggle support */
+.tree-toggle {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--muted);
+    flex-shrink: 0;
+}
+
+.tree-toggle:hover { color: var(--text); }
+
+/* Folder styles */
+.tree-item.folder {
+    color: var(--text);
+}
+
+.tree-item.disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* Tree children indentation (PhpStorm uses consistent 16px) */
+.tree-children {
+    margin-left: 16px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Tree label */
 .tree-label {
     flex: 1;
-    writing-mode: horizontal-tb;
-    text-orientation: mixed;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    display: inline-block;
+}
+
+/* Tree icon container */
+.tree-icon {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.tree-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Legacy icon class */
+.tree-item .icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
 }
 
 /* PhpStorm-style file type icons */
@@ -495,69 +894,145 @@ body {
     background: var(--editor-bg);
 }
 
+/* Legacy .main - now using .editor-area */
 .main {
-    display: grid;
-    grid-template-rows: auto auto 1fr;
-    gap: 10px;
-    min-height: 0;
+    display: none;
+}
+
+/* ============================================
+   PhpStorm-style Editor Tabs
+   ============================================ */
+.tabbar {
+    display: flex;
+    align-items: center;
+    background: var(--panel-strong);
+    border-bottom: 1px solid var(--border);
+    height: 28px;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+/* Scrollable tab container */
+.tab-container {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    gap: 0;
     height: 100%;
 }
 
-.tabbar {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px;
-    backdrop-filter: blur(8px);
+.tab-container::-webkit-scrollbar {
+    height: 3px;
 }
-.menu-actions { margin-left: auto; display: flex; gap: 6px; }
-.tab {
-    padding: 6px 10px;
-    border-radius: 4px;
-    font-weight: 600;
-    background: rgba(255,255,255,0.01);
-    border: 1px solid transparent;
+
+.tab-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tab-container::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+}
+
+.tab-container::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+}
+
+/* Tab actions (dropdown menu for overflow) */
+.tab-actions {
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    border-left: 1px solid var(--border);
+    height: 100%;
+}
+
+.tab-actions-btn {
+    background: transparent;
+    border: none;
     color: var(--muted);
-    transition: all 0.12s ease;
+    padding: 4px 6px;
+    cursor: pointer;
+    border-radius: 3px;
 }
-.tab.active {
-    background: linear-gradient(135deg, rgba(114,147,191,0.25), rgba(114,147,191,0.15));
+
+.tab-actions-btn:hover {
+    background: var(--hover-bg);
     color: var(--text);
-    border-color: rgba(255,255,255,0.08);
-    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
-}
-.tab.ghost { color: var(--muted); }
-
-/* Tab container for dynamic tabs */
-.tab-container {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    flex: 1;
 }
 
-/* Tab elements with close button */
+/* Individual tab (PhpStorm style) */
 .tab {
     position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
-    border-radius: 4px;
+    gap: 6px;
+    padding: 0 8px;
+    height: 100%;
+    min-width: 80px;
+    max-width: 200px;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
     cursor: pointer;
     user-select: none;
+    flex-shrink: 0;
+    transition: background 0.1s ease;
 }
 
+.tab:last-of-type {
+    border-right: none;
+}
+
+.tab:hover {
+    background: var(--hover-bg);
+}
+
+/* Active tab (PhpStorm: lighter background, no bottom border) */
+.tab.active {
+    background: var(--editor-bg);
+    color: var(--text);
+    border-bottom: 2px solid var(--editor-bg);
+    margin-bottom: -1px;
+}
+
+/* Tab icon */
+.tab-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tab-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Tab name */
 .tab-name {
     flex: 1;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    font-weight: 500;
 }
 
+/* Modified indicator (PhpStorm: asterisk or dot) */
+.tab.modified .tab-name::after {
+    content: ' •';
+    color: var(--accent-blue);
+}
+
+/* Close button (PhpStorm: small X on right) */
 .tab-close {
     display: inline-flex;
     align-items: center;
@@ -565,33 +1040,73 @@ body {
     width: 16px;
     height: 16px;
     border-radius: 3px;
-    font-size: 16px;
+    font-size: 14px;
     line-height: 1;
     color: var(--muted);
     opacity: 0;
-    transition: all 0.15s ease;
+    transition: all 0.1s ease;
     cursor: pointer;
+    flex-shrink: 0;
 }
 
-.tab:hover .tab-close {
+.tab:hover .tab-close,
+.tab.active .tab-close {
+    opacity: 0.6;
+}
+
+.tab .tab-close:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text);
+}
+
+/* Modified tab always shows close button (with different indicator) */
+.tab.modified .tab-close {
+    opacity: 0.8;
+}
+
+.tab.modified .tab-close::before {
+    content: '●';
+    font-size: 8px;
+    position: absolute;
+    color: var(--accent-blue);
+}
+
+.tab.modified:hover .tab-close::before {
+    display: none;
+}
+
+.tab.modified:hover .tab-close {
     opacity: 1;
 }
 
-.tab-close:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text);
+/* Ghost tab (New button) */
+.tab.ghost {
+    color: var(--muted);
+    min-width: auto;
+    background: transparent;
+    border: none;
+    padding: 0 12px;
+    font-size: 11px;
 }
+
+.tab.ghost:hover {
+    color: var(--text);
+    background: var(--hover-bg);
+}
+
+/* Menu actions area */
+.menu-actions { margin-left: auto; display: flex; gap: 6px; }
 
 .action-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: rgba(255,255,255,0.02);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 10px 12px;
-    backdrop-filter: blur(8px);
-    overflow: visible;
+    background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+    padding: 4px 8px;
+    height: 32px;
+    flex-shrink: 0;
 }
 
 /* PhpStorm-style breadcrumbs */
@@ -684,63 +1199,76 @@ body {
     top: 60px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(30,30,30,0.95);
-    border: 1px solid #444;
+    background: var(--panel-strong);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 6px;
     display: flex;
     gap: 4px;
     z-index: 3000;
-    box-shadow: 0 12px 30px rgba(0,0,0,0.35);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.15);
 }
 .debug-float.hidden { display: none; }
+.debug-float.inactive { opacity: 0.5; pointer-events: none; }
 .debug-float button {
-    background: #2d2d2d;
-    color: #eee;
-    border: 1px solid #444;
+    background: var(--panel-soft);
+    color: var(--text);
+    border: 1px solid var(--border);
     border-radius: 4px;
     padding: 4px 6px;
     cursor: pointer;
 }
 
 .editor-frame {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    box-shadow: 0 22px 60px rgba(0,0,0,0.45);
-    padding: 8px;
+    flex: 1;
+    background: var(--editor-bg);
+    border: none;
+    border-radius: 0;
     min-height: 0;
-    backdrop-filter: blur(10px);
+    overflow: hidden;
 }
 
 #editor {
-    height: calc(100% - 4px);
+    height: 100%;
     width: 100%;
-    min-height: 320px;
+    min-height: 200px;
     background: var(--editor-bg);
+}
+
+.monaco-editor,
+.monaco-editor .margin {
+    background: var(--editor-bg) !important;
+    color: var(--text);
+}
+
+.monaco-editor .margin {
+    background: var(--gutter-bg) !important;
+}
+
+.monaco-editor .line-numbers,
+.monaco-editor .glyph-margin {
+    color: var(--muted) !important;
+}
+
+.monaco-editor .current-line {
+    background-color: var(--selection-bg) !important;
 }
 
 /* PhpStorm-style bottom panel with tool windows */
 .bottom-stack {
-    display: flex;
-    flex-direction: row;
-    gap: 0;
-    height: 300px;
-    min-height: 200px;
-    max-height: 400px;
-    overflow: hidden;
+    display: none; /* Legacy - using new layout */
 }
 
 body.hide-terminal #terminalPanel { display: none; }
 
 .panel {
     background: var(--panel-2);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 10px 12px;
-    box-shadow: 0 14px 34px rgba(0,0,0,0.35);
+    padding: 0;
     min-height: 0;
-    backdrop-filter: blur(8px);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 
 /* PhpStorm-style terminal panel */
@@ -750,11 +1278,8 @@ body.hide-terminal #terminalPanel { display: none; }
     gap: 0;
     overflow: hidden;
     background: var(--terminal-bg);
-    border: none;
-    border-radius: 0;
     flex: 1;
     position: relative;
-    padding: 0;
 }
 
 .panel.terminal .pane-header {
@@ -762,6 +1287,22 @@ body.hide-terminal #terminalPanel { display: none; }
     border-bottom: 1px solid var(--border);
     padding: 8px 12px;
     flex-shrink: 0;
+}
+.terminal-header .pane-title { font-size: 13px; text-transform: uppercase; letter-spacing: 0.3px; }
+.terminal-tabbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-2);
+    flex-shrink: 0;
+}
+.terminal-tab-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
 .panel.debug-panel {
@@ -771,50 +1312,18 @@ body.hide-terminal #terminalPanel { display: none; }
     overflow: hidden;
     flex: 1;
 }
-/* PhpStorm-style vertical tool window tabs (LEFT side) */
+/* Legacy toolwindows-rail - now using tool-window-bar */
 .toolwindows-rail {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    background: var(--panel-strong);
-    border-right: 1px solid var(--border);
-    padding: 4px 0;
-    width: 40px;
-    align-items: center;
+    display: none;
 }
 
 .toolwindows-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    overflow: hidden;
+    display: none;
 }
 
+/* Legacy toolwindow-btn - now using tool-window-stripe-btn */
 .toolwindow-btn {
-    background: transparent;
-    border: none;
-    border-left: 3px solid transparent;
-    color: var(--muted);
-    padding: 12px 8px;
-    cursor: pointer;
-    text-align: center;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    transition: all 0.15s ease;
-}
-
-.toolwindow-btn svg {
-    width: 18px;
-    height: 18px;
-    opacity: 0.7;
-}
-
-.toolwindow-btn:hover svg,
-.toolwindow-btn.active svg {
-    opacity: 1;
+    display: none;
 }
 .toolwindow-icon-multi {
     position: relative;
@@ -906,6 +1415,7 @@ body.hide-terminal #terminalPanel { display: none; }
     max-width: 100%;
     scrollbar-width: thin;
     min-height: 32px;
+    flex: 1;
 }
 .terminal-tab {
     padding: 6px 8px;
@@ -938,7 +1448,7 @@ body.hide-terminal #terminalPanel { display: none; }
 .panel.terminal .terminal-input-row { flex-shrink: 0; }
 .prompt {
     color: var(--muted);
-    font-family: 'Space Grotesk', monospace;
+    font-family: var(--font-code);
 }
 .terminal-input {
     flex: 1;
@@ -946,7 +1456,7 @@ body.hide-terminal #terminalPanel { display: none; }
     border: none;
     color: var(--text);
     outline: none;
-    font-family: 'Space Grotesk', monospace;
+    font-family: var(--font-code);
     font-size: 13px;
 }
 
@@ -958,10 +1468,10 @@ body.hide-terminal #terminalPanel { display: none; }
     margin-left: 4px;
 }
 .debug-line {
-    background: rgba(214,127,60,0.16) !important;
+    background: var(--accent-soft) !important;
 }
 .debug-glyph {
-    background: #f0c27b;
+    background: var(--accent-2);
     width: 8px;
     height: 8px;
     border-radius: 50%;
@@ -969,19 +1479,19 @@ body.hide-terminal #terminalPanel { display: none; }
 
 .output {
     background: var(--editor-bg);
-    border: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 12px;
     padding-bottom: 12px;
-    font-family: 'Space Grotesk', monospace;
+    font-family: var(--font-code);
     font-size: 13px;
     white-space: pre-wrap;
     overflow-y: auto;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    box-shadow: inset 0 1px 0 rgba(0,0,0,0.02);
     min-height: 0;
     max-height: none;
     flex: 1;
-    color: #e6e6e6;
+    color: var(--text);
     cursor: text;
 }
 
@@ -1000,11 +1510,11 @@ body.hide-terminal #terminalPanel { display: none; }
 .debug-output {
     height: 120px;
     background: var(--editor-bg);
-    border: 1px solid rgba(255,255,255,0.08);
+    border: 1px solid var(--border);
     border-radius: 8px;
     padding: 6px;
     overflow-y: auto;
-    font-family: 'Space Grotesk', monospace;
+    font-family: var(--font-code);
     font-size: 12px;
     white-space: pre-wrap;
     color: var(--text);
@@ -1129,16 +1639,16 @@ body.hide-terminal #terminalPanel { display: none; }
     box-shadow: 0 8px 20px rgba(0,0,0,0.25);
 }
 .search-hit:hover {
-    border-color: rgba(240,194,123,0.6);
-    box-shadow: 0 14px 28px rgba(0,0,0,0.35);
+    border-color: var(--accent-blue);
+    box-shadow: 0 14px 28px rgba(0,0,0,0.15);
     transform: translateY(-1px);
     color: var(--text);
 }
-.search-hit strong { color: #c5d9f5; }
+.search-hit strong { color: var(--accent-blue); }
 .search-hit .hit-path { color: var(--muted); font-size: 11px; }
-.search-hit .hit-snippet { color: var(--text); font-family: 'Space Grotesk', monospace; }
+.search-hit .hit-snippet { color: var(--text); font-family: var(--font-code); }
 .hit-mark {
-    background: rgba(114,147,191,0.35);
+    background: var(--accent-soft);
     color: var(--text);
     padding: 0 2px;
     border-radius: 3px;
@@ -1270,16 +1780,16 @@ body.hide-terminal #terminalPanel { display: none; }
     gap: 6px;
     padding: 6px 10px;
     border-radius: 999px;
-    background: rgba(214,127,60,0.12);
+    background: var(--accent-soft);
     color: var(--accent-2);
-    border: 1px solid rgba(214,127,60,0.26);
+    border: 1px solid var(--accent-soft-border);
     font-size: 12px;
     white-space: nowrap;
 }
 .pill.subtle {
-    background: rgba(255,255,255,0.05);
+    background: var(--panel-soft);
     color: var(--muted);
-    border-color: rgba(255,255,255,0.08);
+    border-color: var(--border);
 }
 
 .flex { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -1507,7 +2017,7 @@ body.hide-terminal #terminalPanel { display: none; }
 }
 .diff-line {
     display: block;
-    font-family: 'Space Grotesk', monospace;
+    font-family: var(--font-code);
     padding: 2px 4px;
 }
 .diff-line span.lineno {
@@ -1523,7 +2033,7 @@ body.hide-terminal #terminalPanel { display: none; }
 .diff-add { background: rgba(52, 168, 83, 0.18); color: #c6f6d5; }
 .diff-del { background: rgba(239, 68, 68, 0.18); color: #fecdd3; }
 .diff-context { color: var(--muted); }
-.diff-line { display: block; font-family: 'Space Grotesk', monospace; padding: 2px 4px; }
+.diff-line { display: block; font-family: var(--font-code); padding: 2px 4px; }
 .diff-add { background: rgba(52, 168, 83, 0.18); color: #c6f6d5; }
 .diff-del { background: rgba(239, 68, 68, 0.18); color: #fecdd3; }
 .diff-context { color: var(--muted); }
@@ -1538,13 +2048,34 @@ body.hide-terminal #terminalPanel { display: none; }
     min-height: 140px;
     max-height: 240px;
     overflow: auto;
-    background: rgba(255,255,255,0.02);
+    background: var(--panel-soft);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 8px;
     font-size: 13px;
     color: var(--text);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
+.git-change-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px;
+    border-radius: 6px;
+    background: var(--panel);
+    border: 1px solid transparent;
+}
+.git-change-row.staged { border-color: var(--accent-soft-border); }
+.git-change-row:hover { border-color: var(--accent-blue); }
+.git-change-status {
+    min-width: 34px;
+    text-align: center;
+    font-weight: 700;
+    color: var(--accent-orange);
+}
+.git-change-path { flex: 1; color: var(--text); font-family: var(--font-ui); }
 .git-commit-input {
     width: 100%;
     min-height: 70px;
@@ -1553,6 +2084,77 @@ body.hide-terminal #terminalPanel { display: none; }
     background: rgba(255,255,255,0.03);
     color: var(--text);
     padding: 8px;
-    font-family: 'Space Grotesk', sans-serif;
+    font-family: var(--font-ui);
 }
 .git-actions { gap: 8px; flex-wrap: wrap; }
+.git-history-list {
+    min-height: 140px;
+    max-height: 220px;
+    background: var(--panel-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    font-family: var(--font-code);
+    font-size: 12px;
+    overflow: auto;
+    color: var(--text);
+}
+.extensions-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 12px;
+    height: 100%;
+}
+.extensions-list {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel-soft);
+    padding: 8px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.extension-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 8px;
+    background: var(--panel);
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+.extension-row:hover { border-color: var(--accent-blue); }
+.extension-row.active { border-color: var(--accent-blue); background: var(--accent-soft); }
+.extension-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: var(--accent-soft);
+    color: var(--accent-blue);
+    font-weight: 700;
+}
+.extension-meta { flex: 1; }
+.extension-name { font-weight: 700; }
+.extension-desc { font-size: 12px; color: var(--muted); }
+.extension-toggle { margin-left: auto; }
+.extensions-detail {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel-strong);
+    padding: 12px;
+    overflow: auto;
+}
+.extensions-detail .detail-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+.extensions-detail .detail-desc { color: var(--muted); margin-bottom: 12px; }
+.extensions-detail .detail-status { margin-bottom: 12px; }
+
+/* Ctrl+Click hover underline for tags and routines */
+.ctrl-hover-underline {
+    text-decoration: underline;
+    text-decoration-color: var(--accent-blue);
+    text-underline-offset: 2px;
+}

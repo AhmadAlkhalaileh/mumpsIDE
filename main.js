@@ -73,6 +73,18 @@ ipcMain.handle('lint:run', async (_event, payload) => {
     return bridge.lint(payload?.code || '');
 });
 
+ipcMain.handle('lint:analyze', async (_event, payload) => {
+  return bridge.lintCode(payload?.code || '');
+});
+
+ipcMain.handle('parse:code', async (_event, payload) => {
+  return bridge.parseCode(payload?.code || '');
+});
+
+ipcMain.handle('parse:labels', async (_event, payload) => {
+  return bridge.getLabels(payload?.code || '');
+});
+
 ipcMain.handle('exec:run', async (_event, payload) => {
   return bridge.execute(payload?.code || '');
 });
@@ -82,7 +94,7 @@ ipcMain.handle('connection:set', async (_event, payload) => {
 });
 
 ipcMain.handle('debug:start', async (_event, payload) => {
-  return bridge.debugStart(payload?.code || '', payload?.breakpoints || []);
+  return bridge.debugStart(payload?.code || '', payload?.breakpoints || [], payload?.startLine || null);
 });
 
 ipcMain.handle('debug:step', async (_event, payload) => {
@@ -179,6 +191,19 @@ ipcMain.handle('devtools:toggle', async (event) => {
         }
     }
     return { ok: true };
+});
+
+// Reveal file/folder in native file explorer
+ipcMain.handle('shell:reveal', async (event, { path }) => {
+    const { shell } = require('electron');
+    try {
+        if (path) {
+            shell.showItemInFolder(path);
+        }
+        return { ok: true };
+    } catch (err) {
+        return { ok: false, error: err.message };
+    }
 });
 
 function createTerminalSession(sender) {

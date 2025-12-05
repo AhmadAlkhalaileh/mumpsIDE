@@ -83,6 +83,9 @@ const connectionConfig = {
 
 const debugSessions = {};
 const sshSessions = {};
+// Default to the richer zstep engine unless explicitly disabled
+const USE_ZSTEP_ENGINE = process.env.AHMAD_IDE_DEBUG_ENGINE !== 'legacy';
+const sourceMapCache = {};
 
 function run(cmd, args = [], opts = {}) {
   return new Promise((resolve) => {
@@ -111,6 +114,27 @@ function wrapDockerCmd(cmd) {
     return `sg docker -c "${cmd.replace(/"/g, '\\"')}"`;
   }
   return cmd;
+}
+
+function buildYdbEnv(cfg = {}, opts = {}) {
+  const ydbPath = cfg.ydbPath || '';
+  const gldPath = cfg.gldPath || '';
+  const routines = (cfg.rpcRoutinesPath || cfg.routinesPath || '').trim();
+  const tmpDebugDir = (opts.tmpDebugDir || '').trim();
+  const extra = Array.isArray(opts.extraRoutines) ? opts.extraRoutines.filter(Boolean) : [];
+  const routineParts = [];
+  if (tmpDebugDir) routineParts.push(`${tmpDebugDir}(${tmpDebugDir})`);
+  if (extra.length) extra.forEach(p => routineParts.push(`${p}(${p})`));
+  if (routines) routineParts.push(`${routines}(${routines})`);
+  routineParts.push(`${ydbPath}/libgtmutil.so ${ydbPath}`);
+  const gtmroutines = routineParts.filter(Boolean).join(' ').trim();
+  return [
+    `export gtm_dist=${ydbPath}`,
+    `export gtmgbldir=${gldPath}`,
+    `export gtmroutines='${gtmroutines}'`,
+    `export gtm_etrap=''`,
+    `export gtm_ztrap=''`
+  ].join(' && ');
 }
 
 function runHostCommand(cmd) {
@@ -144,6 +168,711 @@ function runLocalGitCommand(cmd) {
       resolve({ ok: true, stdout, stderr });
     });
   });
+}
+
+// --- Legacy stepping helpers (comment skipping) ---
+function isSkippableDebugLine(line) {
+  const trimmed = (line || '').replace(/^[\t ]+/, '');
+  return trimmed === '' || trimmed.startsWith(';');
+}
+
+function advanceToNextExecutableLine(session) {
+  if (!session || !Array.isArray(session.lines)) return;
+  while (session.currentLine <= session.lines.length) {
+    const line = session.lines[session.currentLine - 1] || '';
+    if (!isSkippableDebugLine(line)) return;
+    session.currentLine += 1;
+  }
+}
+
+// ---------------------- Source map helpers (zstep) ----------------------
+
+function buildSourceMapFromCode(routineName, code = '') {
+  const lines = (code || '').split('\n').map(l => l.replace(/\r/g, ''));
+  let currentTag = '';
+  const map = lines.map((raw, idx) => {
+    const trimmed = raw.trim();
+    const startsAtColumn1 = raw && !/^[\t ]/.test(raw);
+    const tagMatch = startsAtColumn1 ? trimmed.match(/^([A-Za-z%][A-Za-z0-9]*)/) : null;
+    if (tagMatch) currentTag = tagMatch[1];
+    const isComment = trimmed.startsWith(';') || trimmed === '';
+    return {
+      routine: routineName.toUpperCase(),
+      line: idx + 1,
+      isComment,
+      tag: currentTag,
+      isLabel: !!tagMatch && startsAtColumn1
+    };
+  });
+  return { lines, map };
+}
+
+function nextExecutableLine(sourceMap, fromLine) {
+  if (!sourceMap || !Array.isArray(sourceMap.map)) return fromLine;
+  const total = sourceMap.map.length;
+  let i = Math.max(0, fromLine - 1);
+  while (i < total) {
+    const entry = sourceMap.map[i];
+    if (!entry.isComment) return entry.line;
+    i += 1;
+  }
+  return fromLine;
+}
+
+async function loadRoutineSourceMap(routine, inlineSourceMap = null) {
+  if (!routine) return null;
+  const key = routine.toUpperCase();
+  if (sourceMapCache[key]) return sourceMapCache[key];
+  if (inlineSourceMap) {
+    sourceMapCache[key] = inlineSourceMap;
+    return inlineSourceMap;
+  }
+  const routineDirs = getRoutineDirs();
+  for (const dir of routineDirs) {
+    const cmd = `cat ${dir}/${key}.m 2>/dev/null`;
+    const res = await runHostCommand(cmd);
+    if (res.ok && res.stdout) {
+      const smap = buildSourceMapFromCode(key, res.stdout);
+      sourceMapCache[key] = smap;
+      return smap;
+    }
+  }
+  return null;
+}
+
+function parseZPos(zpos) {
+  if (!zpos || typeof zpos !== 'string') return {};
+  const m = zpos.match(/^(?:([A-Za-z%][A-Za-z0-9]*))?(?:\+(\d+))?\^([A-Za-z%][A-Za-z0-9]+)/);
+  if (!m) return {};
+  return {
+    tag: m[1] || '',
+    offset: parseInt(m[2] || '0', 10),
+    routine: m[3] ? m[3].toUpperCase() : ''
+  };
+}
+
+function formatCallStackForClient(callStack = []) {
+  return (callStack || []).map((frame) => {
+    if (typeof frame === 'string') return frame;
+    const routine = (frame?.routine || '').toUpperCase() || 'TMPDBG';
+    const line = frame?.line || frame?.returnLine || 1;
+    const tag = frame?.tag || frame?.returnTag;
+    return tag ? `${routine}:${line} (${tag})` : `${routine}:${line}`;
+  });
+}
+
+function payloadLineToUserLine(session, payloadLine) {
+  if (!session || !payloadLine) return payloadLine;
+  const map = Array.isArray(session.payloadToUser) ? session.payloadToUser : [];
+  const idx = payloadLine - 1;
+  if (idx >= 0 && idx < map.length && map[idx]) return map[idx];
+  const header = session.headerLines || 0;
+  return payloadLine > header ? payloadLine - header : payloadLine;
+}
+
+// ---------------------- ZSTEP (external harness) ----------------------
+
+function writeRemoteFile(remotePath, content) {
+  const b64 = Buffer.from(content, 'utf8').toString('base64');
+  const cmd = `mkdir -p $(dirname ${remotePath}) && printf '%s' ${shellQuote(b64)} | base64 -d > ${remotePath}`;
+  return runHostCommand(cmd);
+}
+
+async function ensureHarness() {
+  const harnessPath = path.join(__dirname, 'AHMDBG.m');
+  const dest = '/tmp/ahmad_dbg/AHMDBG.m';
+  let content = '';
+  try {
+    content = fs.readFileSync(harnessPath, 'utf8');
+  } catch (e) {
+    return { ok: false, error: 'Cannot read AHMDBG.m harness' };
+  }
+  return writeRemoteFile(dest, content);
+}
+
+function spawnZStepProcess(entryRoutine, entryTag = '') {
+  const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
+  const tagArg = entryTag ? ` ${entryTag}` : '';
+  const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
+  const envExports = buildYdbEnv(cfg, { tmpDebugDir: '/tmp/ahmad_dbg' });
+  const cdCmd = 'cd /tmp/ahmad_dbg';
+  // Run the AHMDBGJSON entry point in the AHMDBG routine (tag^routine)
+  const runCmd = `${envExports} && ${cdCmd} && ${cfg.ydbPath}/mumps -run AHMDBGJSON^AHMDBG ${entryRoutine}${tagArg}`;
+
+  console.log('[DEBUG] spawnZStepProcess environment:');
+  console.log('[DEBUG] envExports:', envExports);
+  console.log('[DEBUG] runCmd:', runCmd);
+
+  if (useDocker) {
+    const cmd = wrapDockerCmd(
+      `docker exec -i ${cfg.containerId} bash -c "${runCmd.replace(/"/g, '\\"')}"`
+    );
+    console.log('[DEBUG] Final spawn command:', cmd);
+    return spawn('bash', ['-lc', cmd], { stdio: ['pipe', 'pipe', 'pipe'] });
+  }
+  const sshPass = cfg.password ? `sshpass -p '${cfg.password}'` : '';
+  const cmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "${runCmd.replace(/"/g, '\\"')}"`;
+  console.log('[DEBUG] Final spawn command:', cmd);
+  return spawn('bash', ['-lc', cmd], { stdio: ['pipe', 'pipe', 'pipe'] });
+}
+
+function resolvePending(session, evt) {
+  while (session.pending && session.pending.length) {
+    const resolver = session.pending.shift();
+    resolver(evt);
+  }
+}
+
+function waitForZStepEvent(session) {
+  return new Promise((resolve) => {
+    session.pending.push(resolve);
+  });
+}
+
+async function applyZStepEvent(session, evt) {
+  const depth = evt.depth || session.callStack.length;
+  const currentDepth = session.callStack.length;
+  const posInfo = parseZPos(evt.pos || '');
+  const routine = (evt.routine || posInfo.routine || (session.callStack[currentDepth - 1] || {}).routine || '').toUpperCase();
+  const tag = (evt.tag || posInfo.tag || '').toUpperCase();
+  const offset = Number.isInteger(evt.offset) ? evt.offset : posInfo.offset;
+
+  if (depth > currentDepth) {
+    const caller = session.callStack[currentDepth - 1] || {};
+    const retLine = nextExecutableLine(session.sourceMap || sourceMapCache[caller.routine], caller.line + 1);
+    session.callStack.push({
+      routine,
+      line: evt.line || 1,
+      tag,
+      returnRoutine: caller.routine,
+      returnLine: retLine,
+      returnTag: caller.tag || ''
+    });
+  } else if (depth < currentDepth) {
+    while (session.callStack.length > depth) session.callStack.pop();
+  } else if (session.callStack.length && session.callStack[session.callStack.length - 1].routine !== routine) {
+    const caller = session.callStack[currentDepth - 1] || {};
+    const retLine = nextExecutableLine(session.sourceMap || sourceMapCache[caller.routine], caller.line + 1);
+    session.callStack.push({
+      routine,
+      line: evt.line || 1,
+      tag,
+      returnRoutine: caller.routine,
+      returnLine: retLine,
+      returnTag: caller.tag || ''
+    });
+  }
+
+  const top = session.callStack[session.callStack.length - 1] || {};
+  top.routine = routine || top.routine;
+  top.tag = tag || top.tag;
+
+  let smap = sourceMapCache[top.routine];
+  if (!smap) {
+    smap = await loadRoutineSourceMap(top.routine, top.routine === 'TMPDBG' ? session.sourceMap : null);
+    if (smap) sourceMapCache[top.routine] = smap;
+  }
+
+  let targetLine = evt.line || 0;
+  if (smap) {
+    // Always map to an executable line using source map to skip comment-only lines
+    if (targetLine <= 0) {
+      // Compute from tag/offset when line not provided
+      if (tag || Number.isInteger(offset)) {
+        let tagLine = 1;
+        if (tag) {
+          for (const entry of smap.map) {
+            if (entry.tag && entry.tag.toUpperCase() === tag) {
+              tagLine = entry.line;
+              break;
+            }
+          }
+        }
+        targetLine = tagLine + (Number.isInteger(offset) ? offset : 0);
+      }
+    }
+    targetLine = nextExecutableLine(smap, targetLine || 1);
+  }
+  if (!targetLine) targetLine = top.line || 1;
+
+  top.line = targetLine;
+  session.currentRoutine = top.routine;
+  session.currentLine = targetLine;
+  session.currentTag = top.tag || '';
+}
+
+function handleZStepStdout(session) {
+  return (chunk) => {
+    session.buffer += chunk.toString();
+    let idx;
+    while ((idx = session.buffer.indexOf('\n')) >= 0) {
+      const line = session.buffer.slice(0, idx).trim();
+      session.buffer = session.buffer.slice(idx + 1);
+      if (!line) continue;
+      try {
+        const evt = JSON.parse(line);
+        resolvePending(session, evt);
+      } catch (e) {
+        session.output.push(line);
+      }
+    }
+  };
+}
+
+async function startZStepSession(code, breakpoints = [], startLine = null) {
+  const sanitizeDebugCode = (src = '') => {
+    // Heuristic: keep label definitions flush left; indent known M commands.
+    const mCommands = new Set([
+      'B', 'BREAK', 'C', 'CLOSE', 'D', 'DO', 'E', 'ELSE', 'F', 'FOR', 'G', 'GOTO',
+      'H', 'HALT', 'HANG', 'I', 'IF', 'J', 'JOB', 'K', 'KILL', 'L', 'LOCK',
+      'M', 'MERGE', 'N', 'NEW', 'O', 'OPEN', 'Q', 'QUIT', 'R', 'READ',
+      'S', 'SET', 'TCOMMIT', 'TROLLBACK', 'TSTART', 'U', 'USE', 'V', 'VIEW',
+      'W', 'WRITE', 'X', 'XECUTE', 'ZBREAK', 'ZCONTINUE', 'ZSTEP', 'ZWRITE'
+    ]);
+
+    return (src || '').split('\n').map((line) => {
+      const raw = line.replace(/\r/g, '');
+      const trimmed = raw.trim();
+      if (trimmed === '') return '';
+      if (/^[\t ]/.test(raw)) return raw;
+      if (/^;/.test(trimmed)) return raw;
+
+      const firstToken = trimmed.split(/\s+/)[0];
+      const tokenName = firstToken.replace(/\(.*/, '').toUpperCase();
+      const isLabel = /^[A-Za-z%][A-Za-z0-9]*/.test(firstToken) && !mCommands.has(tokenName);
+      if (isLabel) return raw;
+
+      return `\t${trimmed}`;
+    }).join('\n');
+  };
+
+  // Prevent fall-through into parameterized labels by inserting a QUIT ahead of them when needed.
+  const addGuardQuits = (src = '') => {
+    const lines = (src || '').split('\n');
+    const out = [];
+    const transformedToUser = [];
+    const userToTransformed = new Map();
+    let lastExecIdx = -1;
+    const stopTokens = ['QUIT', 'HALT', 'HANG', 'GOTO', 'G'];
+
+    lines.forEach((raw, idx) => {
+      const userLine = idx + 1;
+      const trimmed = raw.trim();
+      const isComment = trimmed === '' || trimmed.startsWith(';');
+      const isParamLabel = !/^[\t ]/.test(raw) && /^([A-Za-z%][A-Za-z0-9]*)\(/.test(trimmed);
+
+      if (isParamLabel && out.length > 0) {
+        const prevExec = out[lastExecIdx] || '';
+        const prevTrim = prevExec.trim().toUpperCase();
+        const endsWithStop = stopTokens.some(tok => prevTrim.startsWith(tok));
+        if (!endsWithStop) {
+          out.push('\tQUIT');
+          transformedToUser.push(userLine);
+          lastExecIdx = out.length - 1;
+        }
+      }
+
+      out.push(raw);
+      transformedToUser.push(userLine);
+      if (!isComment) lastExecIdx = out.length - 1;
+      userToTransformed.set(userLine, out.length); // 1-based line in transformed user code
+    });
+
+    return { code: out.join('\n'), transformedToUser, userToTransformed };
+  };
+
+  const safeUserCode = sanitizeDebugCode(code);
+  const { code: guardedUserCode, transformedToUser, userToTransformed } = addGuardQuits(safeUserCode);
+
+  const id = `dbg_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+  const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
+
+  // Parse the first user tag to check if it has parameters
+  const firstTagMatch = safeUserCode.match(/^([A-Za-z%][A-Za-z0-9]*)(\([^)]*\))?/);
+  const firstTag = firstTagMatch ? firstTagMatch[1] : '';
+  const hasParams = firstTagMatch && firstTagMatch[2];
+
+  // Build the full code payload with TMPDBG tag, QUIT, and optionally a START tag
+  let codePayload;
+  let headerLines;
+
+  if (hasParams && firstTag) {
+    // If first tag has parameters, create a START tag that calls it with dummy values
+    // Extract parameter count
+    const paramList = firstTagMatch[2].slice(1, -1).split(',').map(p => p.trim()).filter(Boolean);
+    const dummyArgs = paramList.map(() => '0').join(',');
+
+    codePayload = `TMPDBG ; Debug temp routine\n QUIT\nSTART ; Entry point for debugging\n DO ${firstTag}(${dummyArgs})\n QUIT\n${guardedUserCode}`;
+    headerLines = 5; // TMPDBG, QUIT, START, DO line, QUIT
+  } else {
+    // No parameters or no first tag, use simple structure
+    codePayload = `TMPDBG ; Debug temp routine\n QUIT\n${guardedUserCode}`;
+    headerLines = 2; // TMPDBG, QUIT
+  }
+
+  // Build source map from the full payload (not just user code) so line numbers match
+  const { map, lines } = buildSourceMapFromCode('TMPDBG', codePayload);
+  sourceMapCache['TMPDBG'] = { map, lines };
+
+  // Map payload lines back to user lines (header lines map to 0)
+  const payloadToUser = [];
+  for (let i = 0; i < headerLines; i += 1) payloadToUser.push(0);
+  transformedToUser.forEach((uLine) => payloadToUser.push(uLine));
+
+  let entryTag = '';
+  // If caller provided a starting line, adjust for the header and any inserted guard lines
+  if (Number.isInteger(startLine) && startLine > 0) {
+    const mappedStart = (userToTransformed.get(startLine) || startLine) + headerLines;
+    const adjustedLine = mappedStart;
+    const targetLine = nextExecutableLine({ map, lines }, adjustedLine);
+    const entry = map[targetLine - 1];
+    entryTag = (entry?.tag || '').toUpperCase();
+  } else if (hasParams && firstTag) {
+    // If no explicit start line and first tag has parameters, use START tag
+    entryTag = 'START';
+  } else if (firstTag) {
+    // If first tag has no parameters, we can call it directly
+    entryTag = firstTag.toUpperCase();
+  } else {
+    // No tags found, start at routine entry
+    entryTag = '';
+  }
+
+  console.log('[DEBUG] TMPDBG structure created:');
+  console.log('[DEBUG] - Header lines:', headerLines);
+  console.log('[DEBUG] - Entry tag:', entryTag || '(none - routine entry)');
+  console.log('[DEBUG] - First tag:', firstTag || '(none)');
+  console.log('[DEBUG] - Has params:', hasParams ? 'yes' : 'no');
+  if (hasParams) {
+    console.log('[DEBUG] - Code preview (first 10 lines):');
+    codePayload.split('\n').slice(0, 10).forEach((line, i) => {
+      console.log(`[DEBUG]   ${i + 1}: ${line}`);
+    });
+  }
+
+  console.log('[DEBUG] Ensuring AHMDBG.m harness...');
+  const harnessRes = await ensureHarness();
+  if (!harnessRes.ok) {
+    console.log(`[DEBUG] Harness installation failed: ${harnessRes.error || harnessRes.stderr}`);
+    return { ok: false, error: harnessRes.error || harnessRes.stderr || 'Failed to install harness' };
+  }
+  console.log('[DEBUG] AHMDBG.m harness installed successfully');
+
+  // Compile AHMDBG.m to ensure it's available
+  const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
+  const envExports = buildYdbEnv(cfg, { tmpDebugDir: '/tmp/ahmad_dbg' });
+
+  let compileCmd;
+  if (useDocker) {
+    compileCmd = wrapDockerCmd(
+      `docker exec ${cfg.containerId} bash -c "${envExports} && cd /tmp/ahmad_dbg && ${cfg.ydbPath}/mumps AHMDBG.m"`
+    );
+  } else {
+    const sshPass = cfg.password ? `sshpass -p '${cfg.password}'` : '';
+    compileCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "${envExports} && cd /tmp/ahmad_dbg && ${cfg.ydbPath}/mumps AHMDBG.m"`;
+  }
+
+  console.log('[DEBUG] Compiling AHMDBG.m...');
+  console.log('[DEBUG] Compile command:', compileCmd);
+
+  const compileRes = await new Promise((resolve) => {
+    exec(compileCmd, { timeout: 10000, maxBuffer: 5 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) {
+        console.log(`[DEBUG] Compilation error: ${err.message}`);
+        console.log(`[DEBUG] stderr: ${stderr}`);
+        console.log(`[DEBUG] stdout: ${stdout}`);
+        return resolve({ ok: false, error: err.message, stdout, stderr });
+      }
+      resolve({ ok: true, stdout, stderr });
+    });
+  });
+
+  if (!compileRes.ok) {
+    console.log(`[DEBUG] Compilation failed: ${compileRes.error || compileRes.stderr}`);
+    return { ok: false, error: `AHMDBG compilation failed: ${compileRes.error || compileRes.stderr}` };
+  } else {
+    console.log('[DEBUG] AHMDBG.m compiled successfully');
+    if (compileRes.stdout) console.log('[DEBUG] Compile output:', compileRes.stdout);
+    if (compileRes.stderr) console.log('[DEBUG] Compile stderr:', compileRes.stderr);
+  }
+
+  // Verify AHMDBG.o exists
+  // Use runHostCommand so the docker/ssh wrapper is applied exactly once
+  const verifyCmd = `test -f /tmp/ahmad_dbg/AHMDBG.o && echo OK || echo MISSING`;
+
+  const verifyRes = await runHostCommand(verifyCmd);
+  console.log('[DEBUG] AHMDBG.o verification:', verifyRes.ok ? verifyRes.stdout.trim() : verifyRes.error);
+
+  if (!verifyRes.ok || verifyRes.stdout.trim() !== 'OK') {
+    console.log('[ERROR] AHMDBG.o file not found after compilation!');
+
+    // List directory contents for debugging
+    const lsCmd = `ls -la /tmp/ahmad_dbg/`;
+    const lsRes = await runHostCommand(lsCmd);
+    console.log('[DEBUG] Directory contents:', lsRes.ok ? lsRes.stdout : lsRes.error);
+
+    return { ok: false, error: 'AHMDBG.o file not found after compilation' };
+  }
+
+  // Test if MUMPS can actually access files in /tmp/ahmad_dbg
+  console.log('[DEBUG] Testing MUMPS access to /tmp/ahmad_dbg...');
+
+  // First, verify we can list the directory and see both .m and .o files
+  const listCmd = `ls -lh /tmp/ahmad_dbg/AHMDBG.*`;
+  const listRes = await runHostCommand(listCmd);
+  console.log('[DEBUG] AHMDBG files:', listRes.ok ? listRes.stdout : listRes.error);
+
+  // Check file permissions and ownership
+  const statCmd = `stat -c '%a %U:%G %s %n' /tmp/ahmad_dbg/AHMDBG.* 2>&1 || ls -l /tmp/ahmad_dbg/AHMDBG.*`;
+  const statRes = await runHostCommand(statCmd);
+  console.log('[DEBUG] File permissions:', statRes.ok ? statRes.stdout : statRes.error);
+
+  // Try to read the compiled object file to see if it's readable
+  const readTestCmd = `test -r /tmp/ahmad_dbg/AHMDBG.o && echo 'READABLE' || echo 'NOT READABLE'`;
+  const readRes = await runHostCommand(readTestCmd);
+  console.log('[DEBUG] AHMDBG.o readable:', readRes.ok ? readRes.stdout.trim() : readRes.error);
+
+  if (!readRes.ok || readRes.stdout.trim() !== 'READABLE') {
+    console.log('[ERROR] AHMDBG.o is not readable!');
+    return { ok: false, error: 'AHMDBG.o file exists but is not readable - check permissions' };
+  }
+
+  // Check what user we're running as vs file ownership
+  const whoamiCmd = `whoami`;
+  const whoamiRes = await runHostCommand(whoamiCmd);
+  console.log('[DEBUG] Running as user:', whoamiRes.ok ? whoamiRes.stdout.trim() : whoamiRes.error);
+
+  // Try to dump the first few bytes of AHMDBG.o to verify it's a valid object file
+  const hexdumpCmd = `hexdump -C /tmp/ahmad_dbg/AHMDBG.o | head -3`;
+  const hexRes = await runHostCommand(hexdumpCmd);
+  console.log('[DEBUG] AHMDBG.o header:', hexRes.ok ? hexRes.stdout.split('\n')[0] : hexRes.error);
+
+  const destDir = '/tmp/ahmad_dbg';
+  const destFile = `${destDir}/TMPDBG.m`;
+
+  // Debug: Log the exact payload being written
+  console.log('[DEBUG] TMPDBG.m payload:');
+  console.log('--- START ---');
+  console.log(codePayload);
+  console.log('--- END ---');
+
+  const writeRes = await writeRemoteFile(destFile, codePayload);
+  if (!writeRes.ok) return { ok: false, error: writeRes.error || writeRes.stderr || 'Failed to write debug code' };
+
+  // Compile TMPDBG.m to ensure it can be loaded
+  console.log('[DEBUG] Compiling TMPDBG.m...');
+  let compileTmpCmd;
+  if (useDocker) {
+    compileTmpCmd = wrapDockerCmd(
+      `docker exec ${cfg.containerId} bash -c "${envExports} && cd /tmp/ahmad_dbg && ${cfg.ydbPath}/mumps TMPDBG.m"`
+    );
+  } else {
+    const sshPass = cfg.password ? `sshpass -p '${cfg.password}'` : '';
+    compileTmpCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "${envExports} && cd /tmp/ahmad_dbg && ${cfg.ydbPath}/mumps TMPDBG.m"`;
+  }
+
+  const compileTmpRes = await new Promise((resolve) => {
+    exec(compileTmpCmd, { timeout: 10000, maxBuffer: 5 * 1024 * 1024 }, (err, stdout, stderr) => {
+      if (err) {
+        console.log(`[DEBUG] TMPDBG compilation error: ${err.message}`);
+        console.log(`[DEBUG] stderr: ${stderr}`);
+        console.log(`[DEBUG] stdout: ${stdout}`);
+        return resolve({ ok: false, error: err.message, stdout, stderr });
+      }
+      resolve({ ok: true, stdout, stderr });
+    });
+  });
+
+  if (!compileTmpRes.ok) {
+    console.log(`[DEBUG] TMPDBG compilation failed: ${compileTmpRes.error}`);
+    return { ok: false, error: `TMPDBG compilation failed: ${compileTmpRes.stderr || compileTmpRes.error}` };
+  }
+  console.log('[DEBUG] TMPDBG.m compiled successfully');
+
+  const proc = spawnZStepProcess('TMPDBG', entryTag);
+  const session = {
+    engine: 'zstep',
+    proc,
+    buffer: '',
+    pending: [],
+    callStack: [{ routine: 'TMPDBG', line: 1, tag: '', returnRoutine: null, returnLine: null, returnTag: null }],
+    currentRoutine: 'TMPDBG',
+    currentLine: 1,
+    currentTag: '',
+    sourceMap: { map, lines },
+    breakpoints: breakpoints || [],
+    output: [],
+    procExited: false,
+    headerLines: headerLines,  // Track header lines for this session (2 or 5 depending on whether first tag has params)
+    payloadToUser,
+    userToTransformed
+  };
+
+  proc.stdout.on('data', handleZStepStdout(session));
+  proc.stderr.on('data', (chunk) => {
+    const errMsg = chunk.toString();
+    session.output.push(errMsg);
+    console.log('[DEBUG] ZSTEP stderr:', errMsg);
+  });
+  proc.stdin.on('error', (err) => {
+    console.log('[DEBUG] ZSTEP stdin error:', err.message);
+  });
+  proc.on('error', (err) => {
+    console.log('[DEBUG] ZSTEP process error:', err.message);
+  });
+  proc.on('exit', (code, signal) => {
+    console.log('[DEBUG] ZSTEP process exited with code:', code, 'signal:', signal);
+    if (session.output && session.output.length > 0) {
+      console.log('[DEBUG] Full ZSTEP error output:');
+      console.log(session.output.join(''));
+    }
+    session.procExited = true;
+    resolvePending(session, { event: 'exit' });
+  });
+
+  // Check if stdin is writable
+  if (!proc.stdin.writable) {
+    console.log('[ERROR] ZSTEP stdin is not writable!');
+    proc.kill();
+    return { ok: false, error: 'Failed to create writable stdin for debug process' };
+  }
+  console.log('[DEBUG] ZSTEP process spawned, stdin is writable');
+
+  debugSessions[id] = session;
+
+  // Send breakpoints to the runtime
+  console.log('[DEBUG] Setting', breakpoints?.length || 0, 'breakpoints...');
+  (breakpoints || []).forEach((ln) => {
+    const n = parseInt(ln, 10);
+    if (!Number.isInteger(n) || n <= 0) return;
+    const mappedUserLine = (userToTransformed.get(n) || n) + headerLines;
+    const adjustedLine = nextExecutableLine({ map, lines }, mappedUserLine);
+    const bpCmd = `SETBP;TMPDBG;${adjustedLine}\n`;
+    console.log('[DEBUG] Writing breakpoint command:', bpCmd.trim());
+    session.proc.stdin.write(bpCmd);
+  });
+
+  // Store breakpoints for later checking during stepping
+  // Note: ZBREAK has issues with TAG+offset format, so we'll check breakpoints manually during ZSTEP
+  const bpLines = new Set();
+  console.log('[DEBUG] Storing', breakpoints?.length || 0, 'breakpoints for manual checking...');
+  (breakpoints || []).forEach((ln) => {
+    const n = parseInt(ln, 10);
+    if (!Number.isInteger(n) || n <= 0) return;
+    const mappedUserLine = (userToTransformed.get(n) || n) + headerLines;
+    const adjustedLine = nextExecutableLine({ map, lines }, mappedUserLine);
+    bpLines.add(adjustedLine);
+    console.log('[DEBUG] Breakpoint at user line', n, '-> file line', adjustedLine);
+  });
+  session.manualBreakpoints = bpLines;
+
+  // Track user-set breakpoints for TMPDBG so we don't clear them when using temp BPs
+  session.zstepUserBps = new Set((breakpoints || []).map(n => `TMPDBG#${parseInt(n, 10)}`));
+  session.autoBps = new Set();
+
+  console.log('[DEBUG] Waiting for initial stopped event...');
+
+  // Wait for initial stopped event (runtime is paused waiting for command)
+  const firstEvt = await waitForZStepEvent(session);
+  console.log('[DEBUG] Received first event:', JSON.stringify(firstEvt));
+
+  if (firstEvt) {
+    if (firstEvt.event === 'stopped') {
+      console.log('[DEBUG] Processing stopped event...');
+      await applyZStepEvent(session, firstEvt);
+      console.log('[DEBUG] Stopped event processed successfully');
+
+      // DISABLED: Auto-continue to breakpoint can fail if code has runtime errors
+      // Instead, user will manually step through the code
+      // TODO: Re-enable this once we have better error handling
+      /*
+      if (session.manualBreakpoints && session.manualBreakpoints.size > 0) {
+        const atBreakpoint = session.manualBreakpoints.has(session.currentLine);
+        if (!atBreakpoint) {
+          console.log('[DEBUG] Not at breakpoint (line', session.currentLine, '), continuing...');
+          while (!session.procExited && !session.manualBreakpoints.has(session.currentLine)) {
+            session.proc.stdin.write('INTO\n');
+            const evt = await waitForZStepEvent(session);
+            if (evt.event === 'stopped') {
+              await applyZStepEvent(session, evt);
+            } else if (evt.event === 'exit') {
+              session.procExited = true;
+              delete debugSessions[id];
+              return { ok: false, error: 'Program finished without hitting breakpoint', output: (session.output || []).join('\n') };
+            } else if (evt.event === 'error') {
+              session.procExited = true;
+              delete debugSessions[id];
+              return { ok: false, error: evt.message || 'Runtime error', output: (session.output || []).join('\n') };
+            }
+          }
+          console.log('[DEBUG] Hit breakpoint at line', session.currentLine);
+        } else {
+          console.log('[DEBUG] Already at breakpoint, line', session.currentLine);
+        }
+      }
+      */
+      console.log('[DEBUG] Debugger started and paused at line', session.currentLine);
+    } else if (firstEvt.event === 'error') {
+      console.log('[DEBUG] Error event received:', firstEvt.message);
+      session.procExited = true;
+      delete debugSessions[id];
+      return { ok: false, error: firstEvt.message || 'Debug process error', output: (session.output || []).join('\n') };
+    } else if (firstEvt.event === 'exit') {
+      console.log('[DEBUG] Exit event received before debugger paused');
+      session.procExited = true;
+      delete debugSessions[id];
+      return { ok: false, error: 'Program finished before debugger paused', output: (session.output || []).join('\n') };
+    }
+  }
+
+  // Map TMPDBG payload line back to user's editor coordinates
+  const userLine = payloadLineToUserLine(session, session.currentLine);
+
+  return {
+    ok: true,
+    sessionId: id,
+    currentLine: userLine,
+    currentRoutine: session.currentRoutine,
+    callStack: session.callStack,
+    stack: formatCallStackForClient(session.callStack),
+    engine: 'zstep'
+  };
+}
+
+async function sendZStepCommand(sessionId, command) {
+  const session = debugSessions[sessionId];
+  if (!session || session.engine !== 'zstep') return { ok: false, error: 'Session not found' };
+  if (session.procExited) {
+    return { ok: false, error: 'Program finished', output: (session.output || []).join('\n') };
+  }
+  console.log('[DEBUG] Sending step command:', command);
+  session.proc.stdin.write(`${command}\n`);
+  console.log('[DEBUG] Waiting for response to:', command);
+  const evt = await waitForZStepEvent(session);
+  console.log('[DEBUG] Received event for', command, ':', JSON.stringify(evt));
+  if (evt.event === 'error') {
+    return { ok: false, error: evt.message || 'Runtime error' };
+  }
+  if (evt.event === 'exit') {
+    session.procExited = true;
+    return { ok: false, error: 'Program finished', output: (session.output || []).join('\n') };
+  }
+  if (evt.event === 'stopped') {
+    await applyZStepEvent(session, evt);
+  }
+
+  // Map TMPDBG payload line back to user's editor coordinates
+  const userLine = payloadLineToUserLine(session, session.currentLine);
+
+  return {
+    ok: true,
+    currentLine: userLine,
+    currentRoutine: session.currentRoutine,
+    currentTag: session.currentTag,
+    callStack: session.callStack,
+    stack: formatCallStackForClient(session.callStack),
+    output: (session.output || []).join('\n')
+  };
 }
 
 function readGitConfig(projectPath) {
@@ -328,28 +1057,59 @@ async function executeYDB(command) {
   if (!routinesPath) return { ok: false, error: 'No routines path configured' };
   const routineFile = `${routinesPath}/${routineName}.m`;
 
-  const lines = (command || '').split('\n');
-  let routineSource = `${routineName} ; temp routine\nMAIN ; entry\n`;
-  lines.forEach(l => {
-    const trimmed = l.replace(/^\s+/, '');
-    if (trimmed.length === 0) {
-      routineSource += '\t;\n';
-    } else if (/^\S/.test(l)) {
-      // Line had no leading whitespace; treat as comment to avoid label/command errors inside MAIN
-      routineSource += `\t; ${trimmed}\n`;
-    } else if (trimmed.startsWith(';')) {
-      routineSource += `\t${trimmed}\n`;
-    } else {
-      routineSource += `\t${trimmed}\n`;
-    }
+  const lines = (command || '').split('\n').map(l => l.replace(/\r/g, ''));
+
+  // Detect whether user provided their own labels (full routine) vs a bare snippet
+  const commandTokens = new Set([
+    'B', 'BREAK', 'C', 'CLOSE', 'D', 'DO', 'E', 'ELSE', 'F', 'FOR', 'G', 'GOTO',
+    'H', 'HALT', 'HANG', 'I', 'IF', 'J', 'JOB', 'K', 'KILL', 'L', 'LOCK', 'M', 'MERGE',
+    'N', 'NEW', 'O', 'OPEN', 'Q', 'QUIT', 'R', 'READ', 'S', 'SET', 'T', 'THEN', 'U', 'USE',
+    'V', 'VIEW', 'W', 'WRITE', 'X', 'XECUTE', 'ZBREAK', 'ZB', 'ZGOTO', 'ZHALT', 'ZKILL', 'ZWRITE', 'ZW'
+  ]);
+  const hasUserLabels = lines.some(raw => {
+    const trimmed = raw.replace(/^\s+/, '');
+    if (!trimmed || trimmed.startsWith(';')) return false;
+    if (/^[\t ]/.test(raw)) return false; // commands are usually indented
+    const token = trimmed.split(/[\s;(]/)[0] || '';
+    return token && !commandTokens.has(token.toUpperCase());
   });
-  if (!/^\s*QUIT\b/i.test((lines[lines.length - 1] || '').trim())) {
+
+  let routineSource = `${routineName} ; temp routine\n`;
+  let entryCall = `D MAIN^${routineName}`;
+
+  if (hasUserLabels) {
+    // Preserve the user's labels and indentation; just prepend our temp routine name
+    routineSource += lines.join('\n');
+    entryCall = `D ^${routineName}`;
+  } else {
+    // Treat as a bare snippet: wrap in MAIN and ensure commands are indented
+    routineSource += 'MAIN ; entry\n';
+    lines.forEach(l => {
+      if (!l.trim()) {
+        routineSource += '\t;\n';
+        return;
+      }
+      const trimmed = l.trimStart();
+      if (trimmed.startsWith(';')) {
+        routineSource += `\t${trimmed}\n`;
+        return;
+      }
+      // Ensure at least one leading tab/space so commands are valid under MAIN
+      routineSource += /^\s/.test(l) ? `${l}\n` : `\t${trimmed}\n`;
+    });
+  }
+
+  // Add a safe QUIT to guarantee clean exit
+  const contentLines = routineSource.split('\n').filter(line => line.trim() && !/^\s*;/.test(line.trim()));
+  const lastContent = (contentLines[contentLines.length - 1] || '').trim();
+  if (!/^Q(UIT)?(\s|;|$)/i.test(lastContent)) {
+    if (!routineSource.endsWith('\n')) routineSource += '\n';
     routineSource += '\tQUIT\n';
   }
 
   const codeB64 = Buffer.from(routineSource, 'utf8').toString('base64');
   const cmdFile = '/tmp/ahmad_cmd.txt';
-  const runCmdB64 = Buffer.from(`D MAIN^${routineName}\n`, 'utf8').toString('base64');
+  const runCmdB64 = Buffer.from(`${entryCall}\n`, 'utf8').toString('base64');
 
   const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
   if (useDocker) {
@@ -664,31 +1424,67 @@ module.exports = {
   },
 
   // Line-by-line debug execution with real variable capture
-  async debugStart(code, breakpoints = []) {
+  async debugStart(code, breakpoints = [], startLine = null) {
+    console.log(`[DEBUG] debugStart called. USE_ZSTEP_ENGINE=${USE_ZSTEP_ENGINE}, startLine=${startLine}`);
+
+    if (USE_ZSTEP_ENGINE) {
+      console.log('[DEBUG] Starting ZSTEP engine...');
+      const zres = await startZStepSession(code, breakpoints, startLine);
+      if (!zres.ok) {
+        console.log(`[DEBUG] ZSTEP engine failed: ${zres.error}`);
+        return { ok: false, error: zres.error || 'zstep engine unavailable', output: zres.output || '' };
+      }
+      console.log('[DEBUG] ZSTEP engine started successfully');
+      return {
+        ok: true,
+        sessionId: zres.sessionId,
+        currentLine: zres.currentLine,
+        currentRoutine: zres.currentRoutine || 'TMPDBG',
+        locals: {},
+        callStack: zres.callStack,
+        stack: zres.stack || formatCallStackForClient(zres.callStack),
+        output: '',
+        engine: 'zstep'
+      };
+    }
+
     const id = `dbg_${Date.now()}_${Math.random().toString(16).slice(2)}`;
-    // Preserve leading whitespace so M commands keep their indentation (needed for execution)
-    // but still drop empty/comment-only lines.
     const lines = code
       .split('\n')
-      .map(l => l.replace(/\r/g, ''))
-      .filter(l => l.trim() && !l.trimStart().startsWith(';'));
+      .map(l => l.replace(/\r/g, ''));
+    const startAt = (Number.isInteger(startLine) && startLine > 0) ? startLine : 1;
 
     debugSessions[id] = {
       code,
       lines,
-      currentLine: 1,
+      currentLine: startAt,
+      currentRoutine: 'TMPDBG',
       breakpoints,
       locals: {},
-      stack: ['MAIN^TMP'],
+      callStack: [{
+        routine: 'TMPDBG',
+        line: startAt,
+        returnLine: null,
+        locals: {}
+      }],
+      stack: [],
       output: []
     };
+    const session = debugSessions[id];
+    advanceToNextExecutableLine(session);
+    if (session.callStack[0]) {
+      session.callStack[0].line = session.currentLine;
+    }
+    session.currentRoutine = (session.callStack[session.callStack.length - 1] || {}).routine || session.currentRoutine || 'TMPDBG';
+    session.stack = session.callStack.map(f => `${f.routine}:${f.line}`);
 
     return {
       ok: true,
       sessionId: id,
-      currentLine: 1,
+      currentLine: session.currentLine,
+      currentRoutine: session.currentRoutine,
       locals: {},
-      stack: ['MAIN^TMP'],
+      stack: session.stack,
       output: ''
     };
   },
@@ -697,114 +1493,220 @@ module.exports = {
     const session = debugSessions[sessionId];
     if (!session) return { ok: false, error: 'Session not found' };
 
-    // Check if we've reached the end
+    if (session.engine === 'zstep') {
+      const cmdMap = { into: 'INTO', over: 'OVER', out: 'OUTOF' };
+      // If stepping into an external routine, add a temporary breakpoint at target entry
+      if (stepType === 'into') {
+        try {
+          const smap = await loadRoutineSourceMap(session.currentRoutine, session.currentRoutine === 'TMPDBG' ? session.sourceMap : null);
+          const lineText = smap?.lines?.[session.currentLine - 1] || '';
+          const trimmed = lineText.replace(/^[\t ]+/, '');
+          const extMatch =
+            trimmed.match(/^(?:D|DO)\s+(?:([A-Za-z%][A-Za-z0-9]*)\s*)?\^([A-Za-z%][A-Za-z0-9]+)/i) ||
+            trimmed.match(/^SET\s+\w+\s*=\s*\$\$([A-Za-z%][A-Za-z0-9]*)\s*\^([A-Za-z%][A-Za-z0-9]+)/i);
+          if (extMatch) {
+            const tag = (extMatch[1] || extMatch[3] || '').trim();
+            const routine = (extMatch[2] || extMatch[4] || '').toUpperCase();
+            const targetMap = await loadRoutineSourceMap(routine);
+            if (targetMap) {
+              let tagLine = 1;
+              if (tag) {
+                for (const entry of targetMap.map) {
+                  if (entry.tag && entry.tag.toUpperCase() === tag.toUpperCase()) {
+                    tagLine = entry.line;
+                    break;
+                  }
+                }
+              } else {
+                // default to first executable line
+                tagLine = nextExecutableLine(targetMap, 1);
+              }
+              const targetLine = nextExecutableLine(targetMap, tagLine);
+              const key = `${routine}#${targetLine}`;
+              const already = (session.zstepUserBps && session.zstepUserBps.has(key)) || (session.autoBps && session.autoBps.has(key));
+              if (!already) {
+                session.autoBps = session.autoBps || new Set();
+                session.autoBps.add(key);
+                session.proc.stdin.write(`SETBP;${routine};${targetLine}\n`);
+              }
+            }
+          }
+        } catch (e) {
+          // fall through; stepping will still work without temp breakpoint
+        }
+      }
+      return sendZStepCommand(sessionId, cmdMap[stepType] || 'INTO');
+    }
+
+    // Ensure call stack exists
+    if (!Array.isArray(session.callStack) || !session.callStack.length) {
+      session.callStack = [{
+        routine: session.currentRoutine || 'TMPDBG',
+        line: session.currentLine || 1,
+        returnLine: null,
+        locals: session.locals || {}
+      }];
+    }
+
+    // Align to executable line
+    advanceToNextExecutableLine(session);
+    const topFrame = session.callStack[session.callStack.length - 1];
+    if (topFrame) topFrame.line = session.currentLine;
     if (session.currentLine > session.lines.length) {
       return { ok: false, error: 'End of code reached' };
     }
 
-    // IMPORTANT: Execute ALL lines from start to current line to preserve variables
-    // This way variables persist across steps
-    const linesToExecute = session.lines.slice(0, session.currentLine);
+    const currentLineText = session.lines[session.currentLine - 1] || '';
+    const trimmed = currentLineText.replace(/^[\t ]+/, '');
 
-    // Build execution code: all lines up to current + capture variables
-    // Strip labels while keeping inline commands so direct mode can run them.
-    const normalizedLines = linesToExecute
-      .map((line) => {
-        if (!line) return '';
-        // If the line starts with a label (no leading whitespace), preserve the command part
-        if (/^\S/.test(line)) {
-          const parts = line.split(/\s+/);
-          if (parts.length > 1) {
-            // Drop the label and keep the rest of the commands
-            return parts.slice(1).join(' ');
+    // External routine call, step into: return target without executing
+    if (stepType === 'into') {
+      const externalCallMatch =
+        trimmed.match(/^(?:D|DO)\s+(?:([A-Za-z%][A-Za-z0-9]*)\s*)?\^([A-Za-z%][A-Za-z0-9]+)/i) ||
+        trimmed.match(/^SET\s+\w+\s*=\s*\$\$([A-Za-z%][A-Za-z0-9]*)\s*\^([A-Za-z%][A-Za-z0-9]+)/i);
+      if (externalCallMatch) {
+        const tag = (externalCallMatch[1] || externalCallMatch[3] || '').trim();
+        const routine = externalCallMatch[2] || externalCallMatch[4];
+        return {
+          ok: true,
+          isExternalCall: true,
+          callTarget: { routine, tag: tag || '' },
+          currentLine: session.currentLine,
+          locals: session.locals,
+          stack: session.callStack.map(f => `${f.routine}:${f.line}`)
+        };
+      }
+
+      // Local tag call (same routine)
+      const localTagMatch = trimmed.match(/^(?:D|DO)\s+([A-Za-z%][A-Za-z0-9]*)\b(?!\s*\^)/i);
+      if (localTagMatch) {
+        const tag = localTagMatch[1];
+        let tagLine = null;
+        const tagDefRe = new RegExp(`^${tag}(\\s|;|\\(|$)`, 'i');
+        for (let i = 0; i < session.lines.length; i++) {
+          const tline = (session.lines[i] || '').replace(/^[\t ]+/, '');
+          if (tagDefRe.test(tline)) {
+            tagLine = i + 1;
+            break;
           }
-          // Label-only line – skip
+        }
+        if (tagLine) {
+          const returnLine = session.currentLine + 1;
+          session.callStack.push({
+            routine: session.callStack[session.callStack.length - 1].routine,
+            line: tagLine,
+            tag,
+            returnLine,
+            locals: { ...session.locals }
+          });
+          session.currentLine = tagLine;
+          advanceToNextExecutableLine(session);
+          return {
+            ok: true,
+            isLocalTagCall: true,
+            tagLine: session.currentLine,
+            tagName: tag,
+            currentLine: session.currentLine,
+            locals: session.locals,
+            stack: session.callStack.map(f => `${f.routine}:${f.line}`)
+          };
+        }
+      }
+    }
+
+    // Build execution code up to current line, skipping comment-only lines
+    const linesToExecute = (session.lines || [])
+      .slice(0, session.currentLine)
+      .map((line) => {
+        if (isSkippableDebugLine(line)) return '';
+        const raw = line.replace(/\r/g, '');
+        const trimmedLine = raw.replace(/^[\t ]+/, '');
+        if (/^\S/.test(raw)) {
+          const parts = raw.split(/\s+/);
+          if (parts.length > 1) return parts.slice(1).join(' ');
           return '';
         }
-        return line.trimStart();
+        return trimmedLine;
       })
       .filter(Boolean);
 
-    let codeToExecute = normalizedLines.join('\n');
+    let codeToExecute = linesToExecute.join('\n');
+    codeToExecute += '\nWRITE "<<<DEBUG_VARS_START>>>",!\nZWRITE\nWRITE "<<<DEBUG_VARS_END>>>",!\n';
 
-    // Add debug output markers
-    codeToExecute += '\nWRITE "<<<DEBUG_VARS_START>>>",!\n';
-    codeToExecute += 'ZWRITE\n';  // This will output all variables
-    codeToExecute += 'WRITE "<<<DEBUG_VARS_END>>>",!\n';
-
-    // Execute using Docker/SSH direct mode to keep locals accurate
     const result = await executeYDBDirect(codeToExecute);
-
     if (!result.ok) {
       return { ok: false, error: result.error || 'Execution failed' };
     }
 
-    // Parse output to get variables and execution output
     const output = result.stdout || result.output || '';
     const lines = output.split('\n');
     const locals = {};
     const execOutput = [];
 
     for (const line of lines) {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) continue;
-
-      // Parse ZWRITE output - handles both simple vars (X=10) and arrays (ARRAY(1,2)=10)
-      // Match: VARNAME=value or VARNAME(subscripts)=value
-      // More flexible regex to handle various MUMPS output formats
-      const match = trimmedLine.match(/^([A-Za-z%][A-Za-z0-9]*)(\([^)]+\))?\s*=\s*(.*)$/);
+      const t = line.trim();
+      if (!t) continue;
+      const match = t.match(/^([A-Za-z%][A-Za-z0-9]*)(\([^)]+\))?\s*=\s*(.*)$/);
       if (match) {
-        const varName = match[1].toUpperCase();  // MUMPS vars are case-insensitive, store uppercase
-        const subscript = match[2]; // Subscript if present (e.g., "(1,2)")
+        const varName = match[1].toUpperCase();
+        const subscript = match[2];
         let value = match[3].trim();
-
-        // Remove surrounding quotes if present
         if ((value.startsWith('"') && value.endsWith('"')) ||
             (value.startsWith("'") && value.endsWith("'"))) {
           value = value.slice(1, -1);
         }
-
         if (subscript) {
-          // Array element - group by array name
-          if (!locals[varName]) {
-            locals[varName] = { _isArray: true, _elements: {} };
-          }
+          if (!locals[varName]) locals[varName] = { _isArray: true, _elements: {} };
           locals[varName]._elements[subscript] = value;
         } else {
-          // Simple variable
           locals[varName] = value;
         }
       } else if (
-        !trimmedLine.includes('ZWRITE') &&
-        !trimmedLine.includes('<<<DEBUG_VARS_START>>>') &&
-        !trimmedLine.includes('<<<DEBUG_VARS_END>>>') &&
-        !trimmedLine.includes('QUIT') &&
-        !trimmedLine.startsWith('>')
+        !t.includes('ZWRITE') &&
+        !t.includes('<<<DEBUG_VARS_START>>>') &&
+        !t.includes('<<<DEBUG_VARS_END>>>') &&
+        !t.includes('QUIT') &&
+        !t.startsWith('>')
       ) {
-        // Don't include ZWRITE command, QUIT command, or MUMPS prompt in output
         execOutput.push(line);
       }
     }
 
-    // Move to next line
-    session.currentLine += 1;
-    session.locals = locals;
-    session.output.push(...execOutput);
+    const executedLineText = trimmed;
+    const isQuit = /^\s*Q(?:UIT)?(?:\s|;|$)/i.test(executedLineText);
 
-    const returnValue = {
+    if (isQuit && session.callStack.length > 1) {
+      const frame = session.callStack.pop();
+      session.currentLine = frame.returnLine || session.currentLine + 1;
+    } else {
+      session.currentLine += 1;
+    }
+
+    session.locals = locals;
+    session.stack = session.callStack.map(f => `${f.routine}:${f.line}`);
+    session.output = (session.output || []).concat(execOutput);
+
+    // Skip comment-only lines after moving
+    advanceToNextExecutableLine(session);
+
+    return {
       ok: true,
       currentLine: session.currentLine,
-      locals: locals,  // Return the newly parsed locals, not session.locals
+      currentRoutine: (session.callStack[session.callStack.length - 1] || {}).routine || session.currentRoutine || 'TMPDBG',
+      locals,
       stack: session.stack,
-      output: execOutput.join('\n')
+      output: execOutput.join('\n'),
+      isReturn: isQuit && session.callStack.length >= 1
     };
-
-    return returnValue;
   },
 
   async debugContinue(sessionId) {
     const session = debugSessions[sessionId];
     if (!session) return { ok: false, error: 'Session not found' };
+
+    if (session.engine === 'zstep') {
+      return sendZStepCommand(sessionId, 'CONTINUE');
+    }
 
     // Execute all lines until next breakpoint or end
     while (session.currentLine <= session.lines.length) {
@@ -821,6 +1723,7 @@ module.exports = {
     return {
       ok: true,
       currentLine: session.currentLine,
+      currentRoutine: session.currentRoutine,
       locals: session.locals,
       stack: session.stack,
       output: session.output.join('\n')
@@ -828,6 +1731,14 @@ module.exports = {
   },
 
   async debugStop(sessionId) {
+    const session = debugSessions[sessionId];
+    if (session && session.engine === 'zstep') {
+      try {
+        session.proc?.kill('SIGTERM');
+      } catch (e) {
+        // ignore
+      }
+    }
     delete debugSessions[sessionId];
     return { ok: true };
   },
