@@ -67,7 +67,7 @@ button, input, select, textarea {
 .app-shell {
     position: relative;
     display: grid;
-    grid-template-rows: 40px 1fr 24px;
+    grid-template-rows: 40px 48px 1fr 24px;
     height: 100vh;
 }
 
@@ -86,8 +86,9 @@ button, input, select, textarea {
 .menu-bar {
     display: flex;
     align-items: center;
+    gap: 16px;
     justify-content: space-between;
-    padding: 0 10px;
+    padding: 0 14px;
     height: 40px;
     border-bottom: 1px solid var(--border);
     background: var(--panel-strong);
@@ -95,7 +96,8 @@ button, input, select, textarea {
     z-index: 100;
 }
 .menu-left, .menu-right { display: flex; align-items: center; gap: 12px; }
-.menu-cluster { display: flex; align-items: center; gap: 10px; }
+.menu-right { min-width: 24px; }
+.menu-cluster { display: flex; align-items: center; gap: 8px; }
 .menu-item {
     position: relative;
     padding: 4px 8px;
@@ -124,7 +126,6 @@ button, input, select, textarea {
     transition: all 0.12s ease;
     z-index: 200;
 }
-.menu-item:hover .menu-dropdown,
 .menu-item.open .menu-dropdown {
     opacity: 1;
     pointer-events: auto;
@@ -392,6 +393,172 @@ button, input, select, textarea {
 .brand-name { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; }
 .brand-sub { font-size: 10px; color: var(--muted); letter-spacing: 0.03em; }
 .topbar-actions { display: flex; align-items: center; gap: 10px; }
+
+.header-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 14px;
+    background: var(--panel-strong);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 90;
+}
+
+.toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toolbar-section.toolbar-right {
+    margin-left: auto;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.run-debug-widget {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+.run-config-control {
+    position: relative;
+}
+
+.run-config-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    min-width: 220px;
+    background: var(--panel-strong);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.14);
+    padding: 8px;
+    display: grid;
+    gap: 6px;
+    z-index: 200;
+}
+
+.run-config-header {
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--text);
+}
+
+.run-config-item {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: left;
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+    transition: all 0.12s ease;
+}
+
+.run-config-item:hover {
+    background: var(--hover-bg);
+    border-color: var(--border);
+}
+
+.run-config-item.active {
+    background: var(--selection-bg);
+    border-color: var(--border);
+}
+
+.run-config-item.disabled {
+    opacity: 0.6;
+    cursor: default;
+    border-color: transparent;
+    background: transparent;
+    pointer-events: none;
+}
+
+.run-config-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 2px 0;
+}
+
+.toolbar-btn .btn-label {
+    margin-left: 6px;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.dropdown-btn {
+    min-width: 28px;
+    padding: 6px;
+}
+
+.header-toolbar .toolbar-btn {
+    height: 32px;
+}
+
+.vcs-widget {
+    position: relative;
+}
+
+.vcs-widget .vcs-toggle {
+    padding-right: 8px;
+}
+
+.vcs-widget .chevron-icon {
+    opacity: 0.6;
+}
+
+.vcs-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    min-width: 200px;
+    background: var(--panel-strong);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.14);
+    padding: 6px;
+    display: grid;
+    gap: 4px;
+    z-index: 200;
+}
+
+.vcs-menu-item {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: left;
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+    transition: all 0.12s ease;
+}
+
+.vcs-menu-item:hover {
+    background: var(--hover-bg);
+    border-color: var(--border);
+}
+
+.vcs-menu-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
 
 /* ============================================
    PhpStorm-style IDE Layout (CSS Grid)
@@ -1121,7 +1288,8 @@ button, input, select, textarea {
 .action-bar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 12px;
     background: var(--panel-2);
     border-bottom: 1px solid var(--border);
     padding: 4px 8px;
@@ -1166,7 +1334,7 @@ button, input, select, textarea {
     font-size: 12px;
     user-select: none;
 }
-.actions { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.actions { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin-left: auto; }
 
 /* PhpStorm-style toolbar buttons */
 .toolbar-btn {
@@ -2018,6 +2186,9 @@ body.hide-terminal #terminalPanel { display: none; }
     gap: 0;
     height: 100%;
 }
+.status-item.status-pill { cursor: default; }
+.status-item.status-pill:hover { background: transparent; }
+.status-item.status-pill .pill { padding: 4px 8px; font-weight: 700; }
 .status-item {
     display: inline-flex;
     align-items: center;

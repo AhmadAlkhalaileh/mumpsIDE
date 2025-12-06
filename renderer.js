@@ -1,6 +1,30 @@
 (() => {
     // jQuery helper
     const $ = window.$ || window.jQuery || null;
+    const logger = (typeof window !== 'undefined' && window.MIDELogger) ? window.MIDELogger : {
+        debug: () => { },
+        info: () => { },
+        warn: () => { },
+        error: () => { },
+        isEnabled: () => false
+    };
+
+    // Debug logging utility for tracing debugger operations
+    const dbgLog = (typeof window !== 'undefined' && window.MIDEDebugLog) ? window.MIDEDebugLog : (...args) => {
+        // Fallback if debug-log.js not loaded
+        if (typeof process !== 'undefined' && process.env?.MIDE_DEBUG_TRACE === '1') {
+            console.debug('[DBG]', ...args);
+        }
+    };
+
+    if (typeof window !== 'undefined') {
+        window.onerror = (msg, src, line, col, err) => {
+            logger.error('GLOBAL_WINDOW_ERROR', { message: msg, src, line, col, stack: err?.stack });
+        };
+        window.onunhandledrejection = (event) => {
+            logger.error('GLOBAL_UNHANDLED_REJECTION', { reason: event?.reason?.message || event?.reason, stack: event?.reason?.stack });
+        };
+    }
 
     // Theme presets (IDE shell + Monaco code themes)
     const ideThemes = {
@@ -151,6 +175,59 @@
     let routineState = null; // shared routine state for search/navigation helpers
     let routineStateRef = null; // shared ref for project search
     let dbgStateRef = null; // shared debug state reference for helpers outside init scope
+
+    // ========== MUMPS Reference Parser (shared utility) ==========
+    // Parse routine/tag reference at cursor position (supports TAG^RTN, ^RTN, DO TAG)
+    // MOVED TOP for visibility
+    function parseRoutineReferenceAtPosition(model, position) {
+        if (!model || !position) return null;
+        const lineContent = model.getLineContent(position.lineNumber) || '';
+        const column = position.column;
+
+        try {
+            // Pattern 1: TAG^ROUTINE (e.g., MAIN^ROUTINE, $$FUNC^ROUTINE)
+            const tagRoutineMatch = lineContent.match(/([A-Z%][A-Z0-9]*)\^([A-Z%][A-Z0-9]+)/gi);
+            if (tagRoutineMatch) {
+                for (const match of tagRoutineMatch) {
+                    const idx = lineContent.indexOf(match);
+                    const endIdx = idx + match.length;
+                    if (column >= idx + 1 && column <= endIdx + 1) {
+                        const [tag, routine] = match.split('^');
+                        return { type: 'external', routine, tag };
+                    }
+                }
+            }
+
+            // Pattern 2: ^ROUTINE (standalone)
+            const routineMatch = lineContent.match(/\^([A-Z%][A-Z0-9]+)/gi);
+            if (routineMatch) {
+                for (const match of routineMatch) {
+                    const idx = lineContent.indexOf(match);
+                    const endIdx = idx + match.length;
+                    if (column >= idx + 1 && column <= endIdx + 1) {
+                        const routine = match.substring(1); // Remove ^
+                        return { type: 'external', routine, tag: '' };
+                    }
+                }
+            }
+
+            // Pattern 3: D TAG, DO TAG (local tag call)
+            const localTagMatch = lineContent.match(/(?:^|\s)(?:D(?:O)?)\s+([A-Z%][A-Z0-9]+)(?:\s|$|,|\()/i);
+            if (localTagMatch) {
+                const tagName = localTagMatch[1];
+                const idx = lineContent.indexOf(tagName);
+                const endIdx = idx + tagName.length;
+                if (column >= idx + 1 && column <= endIdx + 1) {
+                    return { type: 'local', tag: tagName };
+                }
+            }
+        } catch (err) {
+            // logger not defined this early? use console
+            console.warn('GOTO_DECLARATION_PARSE_ERROR', { line: position.lineNumber, column, message: err?.message });
+        }
+
+        return null;
+    }
     const menuConfig = [
         {
             id: 'file',
@@ -163,7 +240,7 @@
                 { label: 'Save All', action: 'save-all' },
                 { separator: true },
                 { label: 'Settings', action: 'settings' },
-                { label: 'Exit', action: 'exit-app', implemented: false }
+                { label: 'Exit', action: 'exit-app' }
             ]
         },
         {
@@ -232,6 +309,7 @@
             label: 'Tools',
             items: [
                 { label: 'Terminal', action: 'terminal' },
+                { label: 'Connections', action: 'connections' },
                 { label: 'Lint', action: 'lint' },
                 { label: 'Shortcuts', action: 'shortcuts' },
                 { label: 'Extensions', action: 'extensions' }
@@ -239,7 +317,7 @@
         },
         {
             id: 'vcs',
-            label: 'VCS',
+            label: 'Git',
             items: [
                 { label: 'Git', action: 'git' },
                 { label: 'Git Status', action: 'git-status' },
@@ -294,7 +372,7 @@
     let shortcutDefaults = {};
     let routineFilterTerm = '';
     let activeDebugTab = 'tab-breakpoints';
-    const maxLintTextLength = 120000;
+    const maxLintTextLength = 60000;
     const maxProblemItems = 300;
     let lintSkipNotified = false;
     const extensionsState = {
@@ -529,7 +607,7 @@
                             'cursor': 'pointer'
                         })
                         .text('  [M] ' + routineName)
-                        .on('click', async function() {
+                        .on('click', async function () {
                             const fullPath = `${folderName}/${routineName}`;
                             try {
                                 const result = await window.ahmadIDE.readRoutine(fullPath);
@@ -562,7 +640,7 @@
                 );
             }
 
-            folder.on('click', function() {
+            folder.on('click', function () {
                 const expanded = $(this).data('expanded');
                 if (expanded) {
                     $(this).find('.folder-icon').text('[+]');
@@ -617,7 +695,8 @@
             folder = parts[0] || folder;
             base = parts.slice(1).join('/') || parts[1] || '';
         }
-        const normalizedBase = base.toUpperCase();
+        const baseNoExt = base.replace(/\.m$/i, '');
+        const normalizedBase = baseNoExt.toUpperCase();
         const path = folder ? `${folder}/${normalizedBase}` : normalizedBase;
         return { base: normalizedBase, folder, path };
     }
@@ -683,6 +762,7 @@
 
         renderTabs();
         switchTab(id);
+        logger.info('TAB_OPEN', { id, path: tabPath, name: normalized.base, folder: normalized.folder });
         return tab;
     }
 
@@ -722,6 +802,7 @@
         }
 
         setCurrentRoutine(normalizedTarget.path || normalizedTarget.base);
+        logger.info('TAB_SWITCH', { tabId, path: normalizedTarget.path || normalizedTarget.base });
         if (dbgStateRef) {
             decorateBreakpoints(activeEditor, dbgStateRef);
             renderBreakpoints(dbgStateRef);
@@ -735,6 +816,7 @@
     function closeTab(tabId, force = false) {
         const tab = openTabs.find(t => t.id === tabId);
         if (!tab) return;
+        logger.info('TAB_CLOSE_REQUEST', { tabId, path: tab?.path });
 
         if (!force && tab.isDirty) {
             showConfirmDialog(
@@ -750,6 +832,7 @@
     function performCloseTab(tabId) {
         const index = openTabs.findIndex(t => t.id === tabId);
         if (index === -1) return;
+        const closing = openTabs[index];
 
         // Dispose Monaco model
         const model = tabModels.get(tabId);
@@ -773,6 +856,7 @@
             setCurrentRoutine('');
             renderTabs();
         }
+        logger.info('TAB_CLOSED', { tabId, path: closing?.path });
     }
 
     function markTabDirty(tabId, isDirty = true) {
@@ -1340,24 +1424,36 @@
 
     let projectTreeRenderPending = null;
     let projectTreeRenderArgs = null;
+    let projectTreeRenderToken = 0;
+    let lastSelectedTreeItem = null;
+
+    function renderProjectTreeLoading(message = 'Loading routines…') {
+        const host = document.getElementById('projectTree');
+        if (!host) return;
+        host.innerHTML = `<div class="tree-item disabled">${message}</div>`;
+    }
 
     function renderProjectTree(routines = [], routineStateRef = null, editorRef = null) {
-        projectTreeRenderArgs = { routines, routineStateRef, editorRef };
+        const token = ++projectTreeRenderToken;
+        projectTreeRenderArgs = { routines, routineStateRef, editorRef, token };
         if (projectTreeRenderPending) return;
         projectTreeRenderPending = window.requestAnimationFrame(() => {
             projectTreeRenderPending = null;
-            const args = projectTreeRenderArgs || { routines: [], routineStateRef: null, editorRef: null };
+            const args = projectTreeRenderArgs || { routines: [], routineStateRef: null, editorRef: null, token: projectTreeRenderToken };
             projectTreeRenderArgs = null;
-            renderProjectTreeImmediate(args.routines, args.routineStateRef, args.editorRef);
+            renderProjectTreeImmediate(args.routines, args.routineStateRef, args.editorRef, args.token);
         });
     }
 
-    function renderProjectTreeImmediate(routines = [], routineStateRef = null, editorRef = null) {
+    function renderProjectTreeImmediate(routines = [], routineStateRef = null, editorRef = null, token = projectTreeRenderToken) {
+        if (token !== projectTreeRenderToken) return;
         const host = $('#projectTree');
         if (!host.length) return;
         const hostEl = host[0];
         hostEl.innerHTML = '';
         const frag = document.createDocumentFragment();
+        const normalizedCurrent = normalizeRoutineTarget(routineStateRef?.current || '').path;
+        lastSelectedTreeItem = null;
 
         // PhpStorm-style tree item builder
         const createTreeItem = (label, options = {}) => {
@@ -1421,6 +1517,59 @@
             }
 
             return item;
+        };
+
+        const scheduleIdle = (cb) => {
+            if (window.requestIdleCallback) return window.requestIdleCallback(cb, { timeout: 50 });
+            if (window.requestAnimationFrame) return window.requestAnimationFrame(cb);
+            return setTimeout(cb, 16);
+        };
+
+        const renderRoutineItemsChunked = (list, childrenContainer, opts = {}) => {
+            const { folderName, depth, routinesSource } = opts;
+            const batchSize = 200;
+            const maxMs = 10;
+            let idx = 0;
+
+            const renderBatch = () => {
+                if (token !== projectTreeRenderToken) return;
+                const start = performance.now();
+                let added = 0;
+                while (idx < list.length && added < batchSize && (performance.now() - start) < maxMs) {
+                    const routinePath = list[idx++];
+                    const displayName = routinePath.replace(/^(localr|routines)\//, '');
+                    const isCurrentRoutine = normalizeRoutineTarget(routinePath).path === normalizedCurrent;
+
+                    const fileItem = createTreeItem(displayName, {
+                        icon: treeIcons.mumps,
+                        depth: depth + 1,
+                        isActive: isCurrentRoutine,
+                        onClick: async () => {
+                            if (lastSelectedTreeItem) {
+                                lastSelectedTreeItem.removeClass('selected active');
+                            }
+                            fileItem.addClass('selected active');
+                            lastSelectedTreeItem = fileItem;
+                            await loadRoutineByName(routinePath, routineStateRef, editorRef || activeEditor, routinesSource);
+                        },
+                        onContext: (e) => showProjectContextMenu(e.clientX, e.clientY, {
+                            type: 'file',
+                            path: routinePath,
+                            name: displayName,
+                            folderName: folderName,
+                            routineStateRef,
+                            editorRef
+                        })
+                    });
+                    childrenContainer.append(fileItem);
+                    added += 1;
+                }
+                if (idx < list.length) {
+                    scheduleIdle(renderBatch);
+                }
+            };
+
+            renderBatch();
         };
 
         // Project root
@@ -1498,33 +1647,42 @@
                     });
                     children.append(emptyItem);
                 } else {
-                    filteredRoutines.forEach(routinePath => {
-                        const displayName = routinePath.replace(/^(localr|routines)\//, '');
-                        const isCurrentRoutine = routineStateRef && routineStateRef.current === routinePath;
-
-                        const fileItem = createTreeItem(displayName, {
-                            icon: treeIcons.mumps,
-                            depth: depth + 1,
-                            isActive: isCurrentRoutine,
-                            onClick: async () => {
-                                // Remove selection from all items
-                                host.find('.tree-item').removeClass('selected active');
-                                // Mark this item as selected
-                                fileItem.addClass('selected active');
-                                // Load the routine
-                                await loadRoutineByName(routinePath, routineStateRef, editorRef || activeEditor, routines);
-                            },
-                            onContext: (e) => showProjectContextMenu(e.clientX, e.clientY, {
-                                type: 'file',
-                                path: routinePath,
-                                name: displayName,
-                                folderName: folderName,
-                                routineStateRef,
-                                editorRef
-                            })
+                    const routinesSource = routines;
+                    if (filteredRoutines.length > 400) {
+                        renderRoutineItemsChunked(filteredRoutines, children, {
+                            folderName,
+                            depth,
+                            routinesSource
                         });
-                        children.append(fileItem);
-                    });
+                    } else {
+                        filteredRoutines.forEach(routinePath => {
+                            const displayName = routinePath.replace(/^(localr|routines)\//, '');
+                            const isCurrentRoutine = normalizeRoutineTarget(routinePath).path === normalizedCurrent;
+
+                            const fileItem = createTreeItem(displayName, {
+                                icon: treeIcons.mumps,
+                                depth: depth + 1,
+                                isActive: isCurrentRoutine,
+                                onClick: async () => {
+                                    if (lastSelectedTreeItem) {
+                                        lastSelectedTreeItem.removeClass('selected active');
+                                    }
+                                    fileItem.addClass('selected active');
+                                    lastSelectedTreeItem = fileItem;
+                                    await loadRoutineByName(routinePath, routineStateRef, editorRef || activeEditor, routinesSource);
+                                },
+                                onContext: (e) => showProjectContextMenu(e.clientX, e.clientY, {
+                                    type: 'file',
+                                    path: routinePath,
+                                    name: displayName,
+                                    folderName: folderName,
+                                    routineStateRef,
+                                    editorRef
+                                })
+                            });
+                            children.append(fileItem);
+                        });
+                    }
                 }
                 container.append(children);
             }
@@ -1589,6 +1747,11 @@
             // ignore sort errors
         }
     }
+
+    // ========== MUMPS Reference Parser (shared utility) ==========
+    // Parse routine/tag reference at cursor position (supports TAG^RTN, ^RTN, DO TAG)
+    // MUST be defined BEFORE any code that references it (hoisting doesn't work for nested scopes)
+
 
     function bindEditorContextMenu(editor) {
         const menu = $('#editorContextMenu');
@@ -1690,11 +1853,9 @@
             const ed = getEditor();
             const model = ed?.getModel();
             const position = ed?.getPosition();
-            const refParser = typeof parseRoutineReferenceAtPosition === 'function'
-                ? parseRoutineReferenceAtPosition
-                : null;
-            const ref = (model && position && refParser)
-                ? refParser(model, position)
+            // parseRoutineReferenceAtPosition is now defined above, no typeof check needed
+            const ref = (model && position)
+                ? parseRoutineReferenceAtPosition(model, position)
                 : null;
             toggleDisabled('ctx-declare', !ref);
             const activePath = getActiveRoutine();
@@ -1732,8 +1893,16 @@
         const pos = position || ed.getPosition();
         if (!model || !pos) return false;
 
+        // CRITICAL: DO NOT modify debug state during navigation
+        // This function is for editor-only code navigation
+        // If a debug session is active, it should NOT be paused/resumed/altered
+        // by user clicking on routine references
+        dbgLog('[editor] goToDeclaration (NAV ONLY)', { line: pos.lineNumber, column: pos.column, hasActiveDebug: !!dbgStateRef?.sessionId });
+        logger.debug('GOTO_DECLARATION_NAV_ONLY', { line: pos.lineNumber, hasActiveDebug: !!dbgStateRef?.sessionId });
+
         const ref = parseRoutineReferenceAtPosition(model, pos);
         if (!ref) {
+            logger.warn('GOTO_DECLARATION_NOT_FOUND', { line: pos.lineNumber, column: pos.column });
             if (!silentIfMissing) {
                 showToast('info', 'Go to Declaration', 'No symbol under cursor');
             }
@@ -1766,12 +1935,14 @@
                 } else {
                     const readRes = await window.ahmadIDE.readRoutine(routine);
                     if (!readRes?.ok) {
+                        logger.warn('GOTO_DECLARATION_LOAD_FAIL', { routine, error: readRes?.error });
                         showToast('error', 'Go to Declaration', `Could not load ${routine}: ${readRes?.error || 'Unknown error'}`);
                         return false;
                     }
                     createTab(routine, readRes.code || '');
                 }
             } catch (err) {
+                logger.warn('GOTO_DECLARATION_OPEN_FAIL', { routine: ref.routine, error: err?.message });
                 showToast('error', 'Go to Declaration', err.message || `Failed to open ${routine}`);
                 return false;
             }
@@ -1781,6 +1952,7 @@
                 if (tag && targetEditor) {
                     const found = revealTagInEditor(targetEditor, tag);
                     if (!found && !silentIfMissing) {
+                        logger.warn('GOTO_DECLARATION_TAG_NOT_FOUND', { routine, tag });
                         showToast('info', 'Go to Declaration', `Tag ${tag} not found in ${routine}`);
                     }
                 }
@@ -1796,6 +1968,7 @@
             if (found) {
                 showToast('success', 'Navigated', `Tag: ${ref.tag}`);
             } else if (!silentIfMissing) {
+                logger.warn('GOTO_DECLARATION_TAG_NOT_FOUND', { routine: getActiveRoutine(), tag: ref.tag });
                 showToast('info', 'Go to Declaration', `Tag ${ref.tag} not found in this routine`);
             }
             return found;
@@ -2029,6 +2202,7 @@
         updateFindScopeLabels();
         document.getElementById('findOverlay')?.classList.remove('hidden');
         document.getElementById('findDialog')?.classList.remove('hidden');
+        logger.info('SEARCH_DIALOG_OPEN', { mode, prefill });
         const findInput = document.getElementById('findQueryInput');
         if (findInput) {
             findInput.value = prefill || findInput.value;
@@ -2065,11 +2239,11 @@
                 return;
             }
 
-        const options = {
-            matchCase: !!document.getElementById('findCaseOption')?.checked,
-            wholeWords: !!document.getElementById('findWholeOption')?.checked,
-            regex: !!document.getElementById('findRegexOption')?.checked
-        };
+            const options = {
+                matchCase: !!document.getElementById('findCaseOption')?.checked,
+                wholeWords: !!document.getElementById('findWholeOption')?.checked,
+                regex: !!document.getElementById('findRegexOption')?.checked
+            };
             findReplaceState.options = options;
             const regex = buildSearchRegex(term, options);
             if (!regex) {
@@ -2077,33 +2251,36 @@
                 return;
             }
 
-        const token = ++findReplaceState.token;
-        const { folder } = getScopeInfo();
-        host.textContent = applyReplace ? 'Replacing across files…' : 'Searching…';
+            const token = ++findReplaceState.token;
+            const { folder } = getScopeInfo();
+            host.textContent = applyReplace ? 'Replacing across files…' : 'Searching…';
+            logger.info('SEARCH_FIND_IN_PATH_QUERY', { term, replaceTerm: applyReplace ? replaceTerm : undefined, scopeFolder: folder, options, mode: findReplaceState.mode });
 
-        // Fast path: ask backend to grep all routines in scope
-        if (!applyReplace && window.ahmadIDE.searchRoutines) {
-            try {
-                const fast = await withTimeout(
-                    window.ahmadIDE.searchRoutines(term, { folder, ...options }),
-                    10000,
-                    'Search routines (fast)'
-                );
-                if (fast?.ok) {
-                    renderFindResults(fast.hits || [], term, findReplaceState.mode);
-                    return;
+            // Fast path: ask backend to grep all routines in scope
+            if (!applyReplace && window.ahmadIDE.searchRoutines) {
+                try {
+                    const fast = await withTimeout(
+                        window.ahmadIDE.searchRoutines(term, { folder, ...options }),
+                        10000,
+                        'Search routines (fast)'
+                    );
+                    if (fast?.ok) {
+                        const hits = fast.hits || [];
+                        renderFindResults(hits, term, findReplaceState.mode);
+                        logger.info('SEARCH_FIND_IN_PATH_RESULTS', { term, count: hits.length, mode: findReplaceState.mode });
+                        return;
+                    }
+                    console.warn('Fast search failed, falling back to slow scan:', fast?.error);
+                } catch (err) {
+                    console.warn('Fast search errored, falling back:', err);
                 }
-                console.warn('Fast search failed, falling back to slow scan:', fast?.error);
-            } catch (err) {
-                console.warn('Fast search errored, falling back:', err);
             }
-        }
 
-        const routines = await listScopedRoutines(folder);
-        if (!routines.length) {
-            host.textContent = `No routines found in scope "${folder || 'UNKNOWN – NEED DESIGN DECISION: localR / routines paths'}".`;
-            return;
-        }
+            const routines = await listScopedRoutines(folder);
+            if (!routines.length) {
+                host.textContent = `No routines found in scope "${folder || 'UNKNOWN – NEED DESIGN DECISION: localR / routines paths'}".`;
+                return;
+            }
 
             const total = routines.length;
             let processed = 0;
@@ -2188,6 +2365,7 @@
 
             if (token !== findReplaceState.token || failed) return;
             renderFindResults(hits, term, findReplaceState.mode);
+            logger.info('SEARCH_FIND_IN_PATH_RESULTS', { term, count: hits.length, mode: findReplaceState.mode });
             if (applyReplace && host) {
                 const summary = document.createElement('div');
                 summary.className = 'search-hit-file';
@@ -2218,10 +2396,12 @@
     const openSearchEverywhereResult = async (path) => {
         if (!path) return;
         try {
+            logger.info('SEARCH_EVERYWHERE_OPEN_RESULT', { path });
             const ok = await loadRoutineByName(path, routineState, activeEditor, routinesCache, globalTerminalState);
             if (ok !== false) closeSearchEverywhere();
         } catch (err) {
             showToast('error', 'Search Everywhere', err?.message || 'Could not open selection.');
+            logger.error('SEARCH_EVERYWHERE_OPEN_ERROR', { path, message: err?.message, stack: err?.stack });
         }
     };
 
@@ -2232,6 +2412,7 @@
         const resultsHost = document.getElementById('searchEverywhereResults');
         searchEverywhereState.open = true;
         searchEverywhereState.selectedIndex = 0;
+        logger.info('SEARCH_EVERYWHERE_OPEN', { prefill });
         if (input) {
             input.value = prefill || '';
             input.focus();
@@ -2266,6 +2447,7 @@
         const host = document.getElementById('searchEverywhereResults');
         if (!host) return;
         const q = (query || '').toLowerCase();
+        logger.debug('SEARCH_EVERYWHERE_QUERY', { query });
         const scored = searchEverywhereState.index
             .map(item => {
                 const name = (item.name || '').toLowerCase();
@@ -2283,8 +2465,10 @@
         if (!results.length) {
             searchEverywhereState.selectedIndex = 0;
             host.textContent = q ? 'No matches.' : 'No files indexed yet.';
+            logger.info('SEARCH_EVERYWHERE_RESULTS', { query, count: 0 });
             return;
         }
+        logger.info('SEARCH_EVERYWHERE_RESULTS', { query, count: results.length });
         searchEverywhereState.selectedIndex = Math.max(0, Math.min(searchEverywhereState.selectedIndex, results.length - 1));
 
         results.forEach((res, idx) => {
@@ -2339,7 +2523,7 @@
             li.appendChild(icon);
             li.appendChild(text);
             li.onclick = () => {
-                navigator.clipboard?.writeText(`${sc.label} :: ${describeBinding(sc.binding)}`).catch(() => {});
+                navigator.clipboard?.writeText(`${sc.label} :: ${describeBinding(sc.binding)}`).catch(() => { });
             };
             list.appendChild(li);
         });
@@ -2433,6 +2617,7 @@
             </div>
         `;
 
+        logger.info('PROJECT_OPEN_DIALOG', {});
         $('body').append(dialogHtml);
 
         const closeDialog = () => {
@@ -2455,6 +2640,7 @@
 
         document.getElementById('confirmOpenProject').addEventListener('click', async () => {
             const projectPath = document.getElementById('openProjectPath').value.trim();
+            logger.info('PROJECT_OPEN_REQUEST', { projectPath });
             if (!projectPath) {
                 showToast('error', 'Error', 'Please enter a path');
                 return;
@@ -2466,12 +2652,15 @@
                 const result = await window.ahmadIDE.openProject(projectPath);
                 if (result.ok) {
                     showToast('success', 'Project Opened', result.message || `Loaded: ${result.projectPath}`);
+                    logger.info('PROJECT_OPEN_SUCCESS', { projectPath: result.projectPath, message: result.message });
                     loadProjectIntoTree(result);
                 } else {
                     showToast('error', 'Open Failed', result.error);
+                    logger.error('PROJECT_OPEN_FAIL', { projectPath, error: result.error });
                 }
             } catch (err) {
                 showToast('error', 'Error', err.message);
+                logger.error('PROJECT_OPEN_ERROR', { projectPath, message: err.message, stack: err.stack });
             }
         });
 
@@ -2518,6 +2707,7 @@
     };
 
     async function runGitQuickCmd(cmd, { toastLabel = 'Git', silent = false } = {}) {
+        logger.info('GIT_COMMAND', { cmd, toastLabel });
         if (!silent) gitOutputGlobal(`$ ${cmd}`);
         const res = await window.ahmadIDE.git(cmd);
         if (res.ok) {
@@ -2525,10 +2715,12 @@
                 if (res.stdout) gitOutputGlobal(res.stdout);
                 if (res.stderr) gitOutputGlobal(res.stderr);
             }
+            logger.info('GIT_COMMAND_SUCCESS', { cmd, stdout: res.stdout?.slice(0, 200), stderr: res.stderr?.slice(0, 200) });
         } else {
             const message = normalizeGitError(res.error || res.stderr);
             if (!silent) gitOutputGlobal(`✗ ${message}`);
             showToast('error', toastLabel, message);
+            logger.error('GIT_COMMAND_FAIL', { cmd, error: message, stderr: res.stderr });
         }
         return res;
     }
@@ -2545,6 +2737,7 @@
             msg?.focus();
         };
         const refresh = () => document.getElementById('gitStatusBtn')?.click();
+        logger.info('GIT_CONTEXT_ACTION', { action, target });
 
         switch (action) {
             case 'add':
@@ -2664,6 +2857,7 @@
         };
 
         const runMenuAction = async (action) => {
+            logger.info('MENU_ACTION', { action });
             switch (action) {
                 case 'save':
                 case 'save-all':
@@ -2745,6 +2939,9 @@
                         focusTerminal();
                     }, 50);
                     return;
+                case 'connections':
+                    clickEl('toggleConnections');
+                    return;
                 case 'extensions':
                     toggleToolWindowPanel('extensionsPanel', 'bottom');
                     return;
@@ -2797,7 +2994,15 @@
                 case 'docs':
                 case 'about':
                 case 'exit-app':
-                    notImplemented(action.replace('-', ' '));
+                    try {
+                        if (window.ahmadIDE?.exitApp) {
+                            await window.ahmadIDE.exitApp();
+                        } else {
+                            window.close();
+                        }
+                    } catch (err) {
+                        showToast('error', 'Exit', err?.message || 'Exit failed');
+                    }
                     return;
                 default:
                     notImplemented(action);
@@ -2901,27 +3106,7 @@
     }
 
     // --- Shared debug controls (hoisted) ---
-    function setDebugButtons(active) {
-        const ids = [
-            'dbgStepIntoBtn',
-            'dbgStepOverBtn',
-            'dbgStepOutBtn',
-            'dbgContinueBtn',
-            'dbgStopBtn',
-            'dbgRestartBtn',
-            'dbgPauseBtn'
-        ];
 
-        ids.forEach((id) => {
-            if ($) {
-                const $el = $('#' + id);
-                if ($el.length) $el.prop('disabled', !active);
-            } else {
-                const el = document.getElementById(id);
-                if (el) el.disabled = !active;
-            }
-        });
-    }
 
     function setDebugBarVisibility(show, active) {
         const bar = document.getElementById('debugBar');
@@ -2965,6 +3150,7 @@
     function toggleToolWindowPanel(panelId, position) {
         const state = toolWindowState[position];
         if (!state) return;
+        logger.info('TOOLWINDOW_TOGGLE', { panelId, position, visible: state.visible, activePanel: state.activePanel });
 
         const contentArea = document.getElementById(`${position}ToolWindow`);
         const buttons = document.querySelectorAll(`.tool-window-stripe-btn[data-position="${position}"]`);
@@ -3154,14 +3340,15 @@
             const editorHost = document.getElementById('editor');
 
             registerMumpsLanguage();
-        registerMumpsThemes();
-        const mumpsAutoData = await loadAutocompleteData();
-        registerMumpsCompletion(mumpsAutoData);
+            registerMumpsThemes();
+            const mumpsAutoData = await loadAutocompleteData();
+            registerMumpsCompletion(mumpsAutoData);
+            registerMumpsHover();
 
-        const rootStyles = getComputedStyle(document.documentElement);
-        const codeFont = (rootStyles.getPropertyValue('--font-code') || '').trim() || 'JetBrains Mono';
-        const codeFontSizeValue = (rootStyles.getPropertyValue('--font-size-code') || '').trim();
-        const codeFontSize = parseInt(codeFontSizeValue, 10) || 13;
+            const rootStyles = getComputedStyle(document.documentElement);
+            const codeFont = (rootStyles.getPropertyValue('--font-code') || '').trim() || 'JetBrains Mono';
+            const codeFontSizeValue = (rootStyles.getPropertyValue('--font-size-code') || '').trim();
+            const codeFontSize = parseInt(codeFontSizeValue, 10) || 13;
 
             const editor = monaco.editor.create(editorHost, {
                 value: sampleMumps(),
@@ -3177,8 +3364,8 @@
                 renderLineHighlight: 'line',
                 renderLineHighlightOnlyWhenFocus: false,
                 cursorBlinking: 'blink',
-                smoothScrolling: true,
-                minimap: { enabled: true },
+                smoothScrolling: false,
+                minimap: { enabled: false },
                 automaticLayout: true,
                 glyphMargin: true,
                 contextmenu: false
@@ -3382,54 +3569,6 @@
                     }
                 }
             });
-
-            // Helper function to parse routine/tag reference at cursor position
-            function parseRoutineReferenceAtPosition(model, position) {
-                const lineContent = model.getLineContent(position.lineNumber);
-                const column = position.column;
-
-                // Check if we're on a tag or routine name
-                // Pattern 1: TAG^ROUTINE (e.g., MAIN^ROUTINE, $$FUNC^ROUTINE)
-                const tagRoutineMatch = lineContent.match(/([A-Z%][A-Z0-9]*)\^([A-Z%][A-Z0-9]+)/gi);
-                if (tagRoutineMatch) {
-                    for (const match of tagRoutineMatch) {
-                        const idx = lineContent.indexOf(match);
-                        const endIdx = idx + match.length;
-                        if (column >= idx + 1 && column <= endIdx + 1) {
-                            const parts = match.split('^');
-                            const tag = parts[0];
-                            const routine = parts[1];
-                            return { type: 'external', routine, tag };
-                        }
-                    }
-                }
-
-                // Pattern 2: ^ROUTINE (standalone)
-                const routineMatch = lineContent.match(/\^([A-Z%][A-Z0-9]+)/gi);
-                if (routineMatch) {
-                    for (const match of routineMatch) {
-                        const idx = lineContent.indexOf(match);
-                        const endIdx = idx + match.length;
-                        if (column >= idx + 1 && column <= endIdx + 1) {
-                            const routine = match.substring(1); // Remove ^
-                            return { type: 'external', routine, tag: '' };
-                        }
-                    }
-                }
-
-                // Pattern 3: D TAG, DO TAG (local tag call)
-                const localTagMatch = lineContent.match(/(?:^|\s)(?:D(?:O)?)\s+([A-Z%][A-Z0-9]+)(?:\s|$|,|\()/i);
-                if (localTagMatch) {
-                    const tagName = localTagMatch[1];
-                    const idx = lineContent.indexOf(tagName);
-                    const endIdx = idx + tagName.length;
-                    if (column >= idx + 1 && column <= endIdx + 1) {
-                        return { type: 'local', tag: tagName };
-                    }
-                }
-
-                return null;
-            }
 
             applyCodeTheme(currentCodeTheme || defaultCodeTheme);
             bindThemeSelectors(editor);
@@ -3690,6 +3829,11 @@
                     .map(bp => bp.line)
                     .filter(n => !isNaN(n));
 
+            const getBpEntries = () =>
+                Array.from(dbgState.breakpoints || [])
+                    .map(parseBpKey)
+                    .filter(bp => !isNaN(bp.line));
+
             const relayout = () => editor.layout();
             window.addEventListener('resize', relayout);
 
@@ -3723,18 +3867,34 @@
             editor.onDidChangeCursorPosition(updateStatusBar);
             updateStatusBar(); // Initial update
 
-            // Update Git branch if in a git repo
-            (async () => {
+            const setBranchDisplay = (branchName) => {
+                const label = (branchName && branchName.trim()) ? branchName.trim() : 'Git';
+                const branchEl = document.getElementById('gitBranch');
+                if (branchEl) {
+                    branchEl.innerHTML = `<span class="icon">⎇</span> ${label}`;
+                }
+                const vcsToggle = document.getElementById('vcsWidgetBtn');
+                if (vcsToggle) {
+                    const hint = label === 'Git' ? 'Git' : `Git (${label})`;
+                    vcsToggle.title = hint;
+                    vcsToggle.setAttribute('aria-label', hint);
+                }
+            };
+
+            const fetchCurrentBranch = async () => {
                 if (currentProject && currentProject.projectPath) {
                     const branchRes = await window.ahmadIDE.git('git branch --show-current');
                     if (branchRes?.ok && branchRes.stdout) {
-                        const branchEl = document.getElementById('gitBranch');
-                        if (branchEl) {
-                            branchEl.innerHTML = `<span class="icon">⎇</span> ${branchRes.stdout.trim()}`;
-                        }
+                        const name = branchRes.stdout.trim();
+                        setBranchDisplay(name || 'Git');
+                        return name || 'Git';
                     }
                 }
-            })();
+                return null;
+            };
+
+            // Update Git branch if in a git repo
+            fetchCurrentBranch();
 
             // --- Env info ---
             const envInfo = await window.ahmadIDE.getEnv();
@@ -3745,6 +3905,76 @@
             wireMenuBar(editor, routineState, terminalState);
 
             // --- Run & Debug buttons ---
+            const runConfigState = {
+                active: 'run-current',
+                labels: {
+                    'run-current': 'Current file (Run)',
+                    'debug-current': 'Current file (Debug)'
+                }
+            };
+
+            const runConfigMenu = document.getElementById('runConfigMenu');
+            const runConfigBtn = document.getElementById('runConfigBtn');
+            const runBtnEl = document.getElementById('runBtn');
+            const debugStartBtnEl = document.getElementById('debugStartBtn');
+
+            const setRunConfig = (id) => {
+                if (!runConfigState.labels[id]) return;
+                runConfigState.active = id;
+                const label = runConfigState.labels[id];
+                if (runConfigBtn) {
+                    runConfigBtn.title = label;
+                    runConfigBtn.setAttribute('aria-label', label);
+                }
+                if (runBtnEl) {
+                    runBtnEl.title = `${label} (Ctrl+Enter)`;
+                }
+                if (runConfigMenu) {
+                    runConfigMenu.querySelectorAll('.run-config-item').forEach((item) => {
+                        const cfg = item.getAttribute('data-config');
+                        item.classList.toggle('active', cfg === id);
+                    });
+                }
+            };
+
+            const closeRunConfigMenu = () => runConfigMenu?.classList.add('hidden');
+            const toggleRunConfigMenu = () => {
+                if (!runConfigMenu) return;
+                const shouldOpen = runConfigMenu.classList.contains('hidden');
+                closeRunConfigMenu();
+                if (shouldOpen) runConfigMenu.classList.remove('hidden');
+            };
+
+            runConfigBtn?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                toggleRunConfigMenu();
+            });
+
+            runConfigMenu?.querySelectorAll('.run-config-item').forEach((btn) => {
+                if (btn.classList.contains('disabled')) return;
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const cfg = btn.getAttribute('data-config');
+                    setRunConfig(cfg);
+                    closeRunConfigMenu();
+                });
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!runConfigMenu || !runConfigBtn) return;
+                if (!runConfigMenu.contains(e.target) && !runConfigBtn.contains(e.target)) {
+                    closeRunConfigMenu();
+                }
+            });
+
+            const shouldDebugForRun = () => {
+                // Auto-enable debug if breakpoints exist OR debug mode is enabled
+                const bps = getBpLines();
+                return dbgState.debugModeEnabled || runConfigState.active === 'debug-current' || bps.length > 0;
+            };
+
+            // Initialize defaults
+            setRunConfig(runConfigState.active);
 
             // RUN: If debug mode enabled, start debugging. Otherwise, run normally.
             if ($) {
@@ -3761,9 +3991,12 @@
                     }
 
                     const bpLines = getBpLines();
+                    const debugActive = shouldDebugForRun();
 
                     // If debug mode enabled, start debugging (even if no breakpoints)
-                    if (dbgState.debugModeEnabled) {
+                    if (debugActive) {
+                        debugStartBtnEl?.classList.add('active');
+                        dbgState.debugModeEnabled = true;
                         await startDebugSession(editor, dbgState, terminalState, debugBar, bpLines);
                     } else {
                         // Normal execution (no debugging)
@@ -3808,9 +4041,12 @@
                     }
 
                     const bpLines = getBpLines();
+                    const debugActive = shouldDebugForRun();
 
                     // If debug mode enabled, start debugging (even if no breakpoints)
-                    if (dbgState.debugModeEnabled) {
+                    if (debugActive) {
+                        debugStartBtnEl?.classList.add('active');
+                        dbgState.debugModeEnabled = true;
                         await startDebugSession(editor, dbgState, terminalState, debugBar, bpLines);
                     } else {
                         // Normal execution (no debugging)
@@ -3840,7 +4076,7 @@
                         appendOutput('🛑 Debug mode disabled. Run will execute normally.', terminalState);
                     }
                 });
-        }
+            }
 
             const clearBtn = document.getElementById('terminalClearBtn');
             const newTabBtn = document.getElementById('terminalNewTabBtn');
@@ -3862,14 +4098,14 @@
                 $('#newRoutineBtn').on('click', async () => {
                     await newRoutineFlow(editor, routineState, terminalState);
                 });
-        } else {
-            document.getElementById('saveRoutineBtn')?.addEventListener('click', async () => {
-                await saveRoutineFlow(editor, routineState, terminalState);
-            });
-            document.getElementById('newRoutineBtn')?.addEventListener('click', async () => {
-                await newRoutineFlow(editor, routineState, terminalState);
-            });
-        }
+            } else {
+                document.getElementById('saveRoutineBtn')?.addEventListener('click', async () => {
+                    await saveRoutineFlow(editor, routineState, terminalState);
+                });
+                document.getElementById('newRoutineBtn')?.addEventListener('click', async () => {
+                    await newRoutineFlow(editor, routineState, terminalState);
+                });
+            }
 
             if ($) {
                 $('#lintBtn').on('click', async () => {
@@ -4483,6 +4719,9 @@
                         });
                     }
                 });
+                if (statusRes.ok) {
+                    fetchCurrentBranch().catch(() => { });
+                }
             };
 
             const loadGitHistory = async () => {
@@ -4494,8 +4733,8 @@
             openGitToolWindow = (opts = {}) => {
                 toggleToolWindowPanel('gitToolPanel', 'bottom');
                 if (!opts.skipRefresh) {
-                    refreshGitStatus().catch(() => {});
-                    loadGitHistory().catch(() => {});
+                    refreshGitStatus().catch(() => { });
+                    loadGitHistory().catch(() => { });
                 }
             };
 
@@ -4617,90 +4856,84 @@
                 openCommitToolWindow();
             });
 
+            const vcsWidget = document.getElementById('vcsWidget');
+            const vcsToggle = document.getElementById('vcsWidgetBtn');
+            const vcsMenu = document.getElementById('vcsWidgetMenu');
+            const handleVcsMenuAction = (action) => {
+                switch (action) {
+                    case 'commit':
+                        openCommitToolWindow();
+                        break;
+                    case 'history':
+                        openGitToolWindow();
+                        document.getElementById('gitLogBtn')?.click();
+                        break;
+                    case 'push':
+                        document.getElementById('gitPushBtn')
+                            ? document.getElementById('gitPushBtn').click()
+                            : showToast('info', 'Git', 'NOT IMPLEMENTED YET: Push');
+                        break;
+                    case 'pull': {
+                        const pullBtn = document.getElementById('gitPullBtn') || document.getElementById('gitFetchBtn');
+                        if (pullBtn) pullBtn.click();
+                        else showToast('info', 'Git', 'NOT IMPLEMENTED YET: Pull / Fetch');
+                        break;
+                    }
+                    case 'open-git':
+                        openGitToolWindow();
+                        break;
+                    default:
+                        showToast('info', 'Git', `NOT IMPLEMENTED YET: ${action}`);
+                }
+            };
+
+            const closeVcsMenu = () => vcsMenu?.classList.add('hidden');
+
+            vcsToggle?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!vcsMenu) return;
+                const shouldOpen = vcsMenu.classList.contains('hidden');
+                closeVcsMenu();
+                if (shouldOpen) vcsMenu.classList.remove('hidden');
+            });
+
+            vcsMenu?.querySelectorAll('.vcs-menu-item').forEach((btn) => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    handleVcsMenuAction(btn.getAttribute('data-action'));
+                    closeVcsMenu();
+                });
+            });
+
+            document.addEventListener('click', (e) => {
+                if (vcsWidget && !vcsWidget.contains(e.target)) {
+                    closeVcsMenu();
+                }
+            });
+
             // Initial refresh when tool window wires up
             refreshGitStatus();
             loadGitHistory(); // TODO: add pagination / filters for larger histories
 
-            // --- Debug bar buttons wiring (overlay only, NO main debugStartBtn here) ---
-            const debugButtonIds = [
-                'dbgContinueBtn',
-                'dbgPauseBtn',
-                'dbgStepOverBtn',
-                'dbgStepIntoBtn',
-                'dbgStepOutBtn',
-                'dbgRestartBtn',
-                'dbgStopBtn'
-            ];
 
-            debugButtonIds.forEach((id) => {
-        if ($) {
-            const $btn = $('#' + id);
-            if (!$btn.length) return;
-            $btn.on('click', async () => {
-                switch (id) {
-                    case 'dbgContinueBtn':
-                        return handleDebugAction('continue', editor, dbgState, terminalState, debugBar);
-                    case 'dbgPauseBtn':
-                        return handleDebugAction('pause', editor, dbgState, terminalState, debugBar);
-                    case 'dbgStepOverBtn':
-                        return handleDebugAction('step-over', editor, dbgState, terminalState, debugBar);
-                    case 'dbgStepIntoBtn':
-                        return handleDebugAction('step-into', editor, dbgState, terminalState, debugBar);
-                    case 'dbgStepOutBtn':
-                        return handleDebugAction('step-out', editor, dbgState, terminalState, debugBar);
-                    case 'dbgRestartBtn':
-                        dbgState.sessionId = null;
-                        return startDebugSession(
-                            editor,
-                            dbgState,
-                            terminalState,
-                            debugBar,
-                            getBpLines()
-                        );
-                    case 'dbgStopBtn':
-                        return stopDebug(editor, dbgState, terminalState, debugBar);
-                }
-            });
-        } else {
-            const btnEl = document.getElementById(id);
-            if (!btnEl) return;
-            btnEl.addEventListener('click', async () => {
-                switch (id) {
-                    case 'dbgContinueBtn':
-                        return handleDebugAction('continue', editor, dbgState, terminalState, debugBar);
-                    case 'dbgPauseBtn':
-                        return handleDebugAction('pause', editor, dbgState, terminalState, debugBar);
-                    case 'dbgStepOverBtn':
-                        return handleDebugAction('step-over', editor, dbgState, terminalState, debugBar);
-                    case 'dbgStepIntoBtn':
-                        return handleDebugAction('step-into', editor, dbgState, terminalState, debugBar);
-                    case 'dbgStepOutBtn':
-                        return handleDebugAction('step-out', editor, dbgState, terminalState, debugBar);
-                    case 'dbgRestartBtn':
-                        dbgState.sessionId = null;
-                        return startDebugSession(
-                            editor,
-                            dbgState,
-                            terminalState,
-                            debugBar,
-                            getBpLines()
-                        );
-                    case 'dbgStopBtn':
-                        return stopDebug(editor, dbgState, terminalState, debugBar);
-                }
-            });
-        }
-            });
 
             // --- Initial debug / UI state ---
             setDebugButtons(false);
-            await loadRoutineList(routineState, editor);
-            await addTerminalTab(terminalState, true);
+            renderProjectTreeLoading('Loading routines…');
+            loadRoutineList(routineState, editor).catch((err) => {
+                console.error('ROUTINE_LIST_INIT_FAIL', err);
+                renderProjectTree([], routineState, editor);
+                showToast('error', 'Routines', err?.message || 'Failed to load routines');
+            });
+            // Make terminal init non-blocking to prevent freeze if xterm fails
+            addTerminalTab(terminalState, true).catch(err => {
+                console.warn('Terminal init failed (non-fatal):', err);
+            });
             renderBreakpoints(dbgState);
             renderLocals({});
             renderStack([]);
             renderDebugConsole([]);
-            setDebugState('stopped', { currentLine: null, barEl: debugBar }, editor, dbgState);
+            resetDebugUI();
 
             // Ctrl+Hover: Change cursor to pointer only when hovering over valid tag/routine
             let isCtrlPressed = false;
@@ -5173,8 +5406,8 @@
                 tab.buffer = '';
                 render();
             },
-            resize: () => {},
-            dispose: () => {},
+            resize: () => { },
+            dispose: () => { },
             focus: () => hiddenInput.focus()
         };
 
@@ -5221,6 +5454,7 @@
 
     async function addTerminalTab(state, isDefault = false) {
         try {
+            logger.info('TERMINAL_NEW_TAB', { isDefault, existingTabs: state?.tabs?.length });
             let terminalCtor = null;
             try {
                 terminalCtor = await ensureTerminalEngine();
@@ -5284,10 +5518,12 @@
             setTimeout(() => refreshTerminalLayout(state), 50);
             flushBufferedOutput(tab);
             await startTerminalSession(tab, state);
+            logger.info('TERMINAL_TAB_READY', { id, sessionId: tab.sessionId });
         } catch (err) {
             console.error('Failed to create terminal tab', err);
             setTerminalError(err?.message || 'Terminal engine unavailable');
             showToast('error', 'Terminal', err?.message || 'Unable to start terminal');
+            logger.error('TERMINAL_START_ERROR', { message: err?.message, stack: err?.stack });
         }
     }
 
@@ -5296,6 +5532,7 @@
         const idx = state.tabs.findIndex(t => t.id === id);
         if (idx === -1) return;
         const tab = state.tabs[idx];
+        logger.info('TERMINAL_CLOSE_TAB', { id, sessionId: tab?.sessionId });
         if (tab.sessionId && window.ahmadIDE.terminalClose) {
             await window.ahmadIDE.terminalClose(tab.sessionId);
             delete state.sessionMap[tab.sessionId];
@@ -5378,8 +5615,10 @@
         const key = bpKeyFor(file, line);
         if (dbgState.breakpoints.has(key)) {
             dbgState.breakpoints.delete(key);
+            logger.info('DEBUG_BREAKPOINT_REMOVED', { file, line });
         } else {
             dbgState.breakpoints.add(key);
+            logger.info('DEBUG_BREAKPOINT_SET', { file, line });
         }
         renderBreakpoints(dbgState);
         decorateBreakpoints(editor, dbgState);
@@ -5707,419 +5946,247 @@
         return true;
     }
 
-    async function startDebugSession(editor, dbgState, termState, debugMenu, bpLines = []) {
-        const model = editor.getModel();
-        if (!model) return;
+    // --- Debugger Functions ---
 
-        const code = editor.getValue();
-        dbgState.homeTabId = activeTabId;
-        dbgState.homeRoutine = routineKey(getActiveRoutine(), 'TMPDBG');
+    let currentDebugSession = null;
 
-        // Call backend to start debug session
-        appendOutput('🐞 Starting debug session...', termState);
-        const result = await window.ahmadIDE.debugStart(code, bpLines);
-
-        if (!result || !result.ok) {
-            appendOutput(`✗ Debug start failed: ${result?.error || 'Unknown error'}`, termState);
-            if (result?.output) {
-                appendOutput(result.output, termState);
-            }
-            setDebugBarVisibility(false, false);
-            return;
-        }
-
-        // Store session ID and initial state
-        dbgState.sessionId = result.sessionId;
-        dbgState.engine = result.engine || 'legacy';
-        let initialLine = result.currentLine || 1;
-        let initialLocals = result.locals || {};
-        let initialStack = normalizeCallStack(result.stack || result.callStack || ['TMPDBG:1']);
-        let initialRoutine = routineKey(result.currentRoutine || result.routine || dbgState.homeRoutine || 'TMPDBG');
-
-        // Auto-run to the next breakpoint so we start paused where the user expects
-        if (bpLines && bpLines.length) {
-            const cont = await window.ahmadIDE.debugContinue(dbgState.sessionId);
-            if (cont?.ok) {
-                initialLine = cont.currentLine || initialLine;
-                initialLocals = cont.locals || initialLocals;
-                initialStack = normalizeCallStack(cont.stack || cont.callStack || initialStack);
-                initialRoutine = routineKey(cont.currentRoutine || initialRoutine || 'TMPDBG');
-                if (cont.output) {
-                    appendOutput(cont.output, termState);
-                }
-            }
-        }
-
-        dbgState.currentLine = initialLine;
-        dbgState.locals = initialLocals;
-        dbgState.stack = initialStack;
-        dbgState.currentRoutine = initialRoutine;
-        setDebugBarVisibility(true, true);
-
-        logDebug(['🐞 Debug session started. Use Step/Continue buttons to execute code.'], termState, false);
-        appendOutput(
-            `📍 Stopped at line ${dbgState.currentLine}${bpLines && bpLines.length ? ' (breakpoint)' : ''}. Press Step to execute.`,
-            termState
-        );
-        showToast('success', 'Debug Started', 'Debug session is active');
-        setActiveToolWindow('debugPanel');
-
-        await focusDebugLocation(dbgState.currentRoutine, dbgState.currentLine, termState, dbgState);
-
-        setDebugState(
-            'paused',
-            {
-                currentLine: dbgState.currentLine,
-                locals: dbgState.locals,
-                stack: dbgState.stack,
-                currentRoutine: dbgState.currentRoutine,
-                barEl: debugMenu
-            },
-            editor,
-            dbgState
-        );
+    function showDebugError(msg) {
+        console.error(msg);
+        alert(msg);
     }
 
-    async function performStep(type, editor, dbgState, termState, bar) {
-        if (!dbgState.sessionId) {
-            const bpLines = typeof getBpLines === 'function' ? getBpLines() : [];
-            dbgState.debugModeEnabled = true;
-            const btn = document.getElementById('debugStartBtn');
-            if (btn) btn.classList.add('active');
-            await startDebugSession(editor, dbgState, termState, bar, bpLines);
-        }
-
-        if (!dbgState.sessionId) return;
-
-        const label =
-            type === 'over' ? 'Step over' :
-                type === 'out' ? 'Step out' :
-                    'Step into';
-
-        appendOutput(`⏭️  ${label}...`, termState);
-        const prevRoutine = routineKey(dbgState.currentRoutine || dbgState.homeRoutine || getActiveRoutine() || 'TMPDBG');
-
-        // Call backend to execute current line (normal step behavior)
-        console.log(`[FRONTEND] Calling debugStep with type="${type}", currentLine=${dbgState.currentLine}`);
-        const result = await window.ahmadIDE.debugStep(dbgState.sessionId, type);
-        console.log('[FRONTEND] debugStep result:', result);
-
-        if (!result || !result.ok) {
-            const errMsg = result?.error || 'Unknown error';
-            if (errMsg === 'End of code reached' || errMsg === 'Program finished') {
-                stopDebug(editor, dbgState, termState, bar, { keepMode: true });
-                appendOutput('✅ Execution completed.', termState);
-                showToast('success', 'Debug', 'Execution completed');
-            } else {
-                appendOutput(`✗ Step failed: ${errMsg}`, termState);
-                showToast('error', 'Debug', `Step failed: ${errMsg}`);
-            }
-            return;
-        }
-
-        // Handle local tag call (same routine) when using legacy engine
-        if (dbgState.engine !== 'zstep' && result.isLocalTagCall && result.tagLine) {
-            const {tagLine, tagName} = result;
-            dbgState.currentLine = tagLine;
-            dbgState.currentRoutine = prevRoutine;
-            dbgState.locals = result.locals || dbgState.locals;
-            dbgState.stack = normalizeCallStack(result.stack || dbgState.stack);
-            appendOutput(`🔍 Stepping into local tag ${tagName} at line ${tagLine}...`, termState);
-            await focusDebugLocation(prevRoutine, dbgState.currentLine, termState, dbgState);
-            setDebugState('paused', {
-                currentLine: dbgState.currentLine,
-                locals: dbgState.locals,
-                stack: dbgState.stack,
-                currentRoutine: dbgState.currentRoutine,
-                barEl: bar
-            }, editor, dbgState);
-            appendOutput(`📍 Positioned at tag ${tagName} (line ${tagLine})`, termState);
-            showToast('info', 'Step Into', `Jumped to ${tagName}`);
-            return;
-        }
-
-        // Handle external routine call (backend signals this) for legacy engine
-        if (dbgState.engine !== 'zstep' && result.isExternalCall && result.callTarget) {
-            const {routine, tag} = result.callTarget;
-            appendOutput(`🔍 Stepping into ${tag ? tag + '^' : '^'}${routine}...`, termState);
-
-            // Load external routine
-            const existingTab = findOpenTab(routine);
-            if (existingTab) {
-                switchTab(existingTab.id);
-            } else {
-                const readRes = await window.ahmadIDE.readRoutine(routine);
-                if (readRes.ok) {
-                    createTab(routine, readRes.code || '');
-                    appendOutput(`✓ Loaded routine: ${routine}`, termState);
-                } else {
-                    appendOutput(`✗ Failed to load ${routine}: ${readRes.error}`, termState);
-                    showToast('error', 'Failed', `Could not load ${routine}`);
-                    return;
-                }
-            }
-
-            await new Promise(resolve => setTimeout(resolve, 50));
-
-            // Jump to tag if specified, otherwise start at line 1
-            let targetLine = 1;
-            if (tag && activeEditor) {
-                const newModel = activeEditor.getModel();
-                if (newModel) {
-                    const lineCount = newModel.getLineCount();
-                    for (let i = 1; i <= lineCount; i++) {
-                        const content = newModel.getLineContent(i);
-                        if (new RegExp(`^${tag}(?:\\s|;|\\(|$)`, 'i').test(content.trim())) {
-                            targetLine = i;
-                            activeEditor.revealLineInCenter(i);
-                            activeEditor.setPosition({ lineNumber: i, column: 1 });
-                            appendOutput(`📍 Found tag ${tag} at line ${i}`, termState);
-                            break;
-                        }
-                    }
-                }
-            }
-
-            // Stop old session, start new in external routine at the tag line
-            await window.ahmadIDE.debugStop(dbgState.sessionId);
-
-            const newCode = activeEditor.getValue();
-            const bpLines = typeof getBpLines === 'function' ? getBpLines() : [];
-
-            // CRITICAL: Start debug session at the tag line, not line 1
-            const newSession = await window.ahmadIDE.debugStart(newCode, bpLines, targetLine);
-
-            if (newSession?.ok) {
-                dbgState.sessionId = newSession.sessionId;
-                dbgState.engine = newSession.engine || 'legacy';
-                dbgState.currentLine = newSession.currentLine;  // Backend now starts at targetLine
-                dbgState.locals = newSession.locals || {};
-                dbgState.stack = normalizeCallStack(newSession.stack || newSession.callStack || []);
-                dbgState.currentRoutine = routineKey(newSession.currentRoutine || routine || 'TMPDBG');
-
-                appendOutput(`🐞 Debug session started in ${routine} at line ${dbgState.currentLine}`, termState);
-                showToast('info', 'Debug', `Stepped into ${tag ? tag + '^' : '^'}${routine}`);
-
-                await focusDebugLocation(dbgState.currentRoutine, dbgState.currentLine, termState, dbgState);
-
-                setDebugState('paused', {
-                    currentLine: dbgState.currentLine,
-                    locals: dbgState.locals,
-                    stack: dbgState.stack,
-                    currentRoutine: dbgState.currentRoutine,
-                    barEl: bar
-                }, editor, dbgState);
-            }
-
-            return;
-        }
-
-        // Update state with real execution results
-        const topFrame = (result.callStack || []).slice(-1)[0] || {};
-        const stackRoutine = routineKey(topFrame.routine || topFrame.returnRoutine || '');
-        const nextRoutine = routineKey(result.currentRoutine || result.routine || stackRoutine || prevRoutine || 'TMPDBG');
-        dbgState.currentRoutine = nextRoutine;
-        dbgState.currentLine = topFrame.line || result.currentLine;
-        dbgState.locals = result.locals || dbgState.locals || {};
-        dbgState.stack = normalizeCallStack(result.stack || result.callStack || dbgState.stack);
-
-        // Handle QUIT return from tag
-        if (result.isReturn) {
-            appendOutput(`↩️  Returned from tag to line ${dbgState.currentLine}`, termState);
-            showToast('info', 'Return', `Returned to caller`);
-        }
-
-        await focusDebugLocation(nextRoutine, dbgState.currentLine, termState, dbgState);
-
-        // Show execution output if any
-        if (result.output) {
-            appendOutput(result.output, termState);
-        }
-
-        // Log WRITE/READ if present (after focusing correct routine)
-        logDebugIO(editor, Math.max(1, dbgState.currentLine), termState);
-
-        // Check if we've reached a QUIT line at the top level (end of routine)
-        if (dbgState.engine !== 'zstep' && isStopLine(editor, dbgState.currentLine)) {
-            stopDebug(editor, dbgState, termState, bar, { keepMode: true });
-            appendOutput('🛑 Execution stopped (QUIT/Q or end of file).', termState);
-            return;
-        }
-
-        setDebugState(
-            'paused',
-            {
-                currentLine: dbgState.currentLine,
-                locals: dbgState.locals,
-                stack: dbgState.stack,
-                currentRoutine: dbgState.currentRoutine,
-                barEl: bar
-            },
-            editor,
-            dbgState
-        );
-
-        appendOutput(`📍 Now at line ${dbgState.currentLine}`, termState);
+    function gotoEditorLine(lineNumber) {
+        if (!activeEditor || !lineNumber) return;
+        activeEditor.revealLineInCenter(lineNumber);
+        activeEditor.setPosition({ lineNumber: lineNumber, column: 1 });
+        highlightLine(activeEditor, lineNumber);
     }
 
-    async function performContinue(editor, dbgState, termState, debugMenu) {
-        if (!dbgState.sessionId) return;
+    async function startDebugSession() {
+        if (!activeEditor) return;
+        const code = activeEditor.getValue();
 
-        appendOutput('▶️  Continuing execution...', termState);
+        // 1. Build real breakpoints from global window.editorBreakpoints
+        // Assumes window.editorBreakpoints is an array of line numbers [2, 5, 10...]
+        const rawBps = (window.editorBreakpoints && Array.isArray(window.editorBreakpoints))
+            ? window.editorBreakpoints
+            : [];
 
-        // Call backend to continue execution to next breakpoint
-        const result = await window.ahmadIDE.debugContinue(dbgState.sessionId);
+        const breakpoints = rawBps.map(line => ({ line: line }));
 
-        if (!result || !result.ok) {
-            const errMsg = result?.error || 'Unknown error';
-            if (errMsg === 'Program finished') {
-                stopDebug(editor, dbgState, termState, debugMenu, { keepMode: true });
-                appendOutput('✅ Execution completed.', termState);
-                return;
-            }
-            appendOutput(`✗ Continue failed: ${errMsg}`, termState);
-            return;
-        }
-
-        // Update state with results
-        const topFrame = (result.callStack || []).slice(-1)[0] || {};
-        const stackRoutine = routineKey(topFrame.routine || topFrame.returnRoutine || '');
-        const nextRoutine = routineKey(result.currentRoutine || result.routine || stackRoutine || dbgState.currentRoutine || dbgState.homeRoutine || 'TMPDBG');
-        dbgState.currentRoutine = nextRoutine;
-        dbgState.currentLine = topFrame.line || result.currentLine;
-        dbgState.locals = result.locals || dbgState.locals || {};
-        dbgState.stack = normalizeCallStack(result.stack || result.callStack || dbgState.stack);
-
-        // Show all execution output
-        if (result.output) {
-            appendOutput(result.output, termState);
-        }
-
-        await focusDebugLocation(nextRoutine, dbgState.currentLine, termState, dbgState);
-
-        // Check if we've reached end or QUIT
-        if (dbgState.engine !== 'zstep' && isStopLine(editor, dbgState.currentLine)) {
-            stopDebug(editor, dbgState, termState, debugMenu, { keepMode: true });
-            appendOutput('✅ Execution completed.', termState);
-            return;
-        }
-
-        setDebugState(
-            'paused',
-            {
-                currentLine: dbgState.currentLine,
-                locals: dbgState.locals,
-                stack: dbgState.stack,
-                currentRoutine: dbgState.currentRoutine,
-                barEl: debugMenu
-            },
-            editor,
-            dbgState
-        );
-
-        appendOutput(`📍 Stopped at line ${dbgState.currentLine} (breakpoint)`, termState);
-    }
-
-    async function stopDebug(editor, dbgState, termState, debugMenu, opts = {}) {
-        const keepMode = !!opts.keepMode;
-        if (!dbgState.sessionId) {
-            // Still make sure bar + buttons reset
-            setDebugState(
-                'stopped',
-                { currentLine: null, output: ['Stopped'], barEl: debugMenu, keepMode },
-                editor,
-                dbgState
-            );
-            return;
-        }
-
-        // Call backend to clean up debug session
-        await window.ahmadIDE.debugStop(dbgState.sessionId);
-
-        logDebug(['Debug session stopped.'], termState, false);
-        dbgState.sessionId = null;
-        dbgState.locals = {};
-        dbgState.stack = [];
-        dbgState.currentRoutine = null;
-        dbgState.homeTabId = null;
-        dbgState.homeRoutine = null;
-
-        // Disable debug mode and update button state
-        if (!keepMode) {
-            dbgState.debugModeEnabled = false;
-            if ($) {
-                $('#debugStartBtn').removeClass('active');
-            } else {
-                const debugBtn = document.getElementById('debugStartBtn');
-                if (debugBtn) debugBtn.classList.remove('active');
+        // 2. Determine startLine from current cursor position
+        let startLine = null;
+        /* // DISABLED: Don't assume "Run to Cursor" for generic Debug button.
+           // User should explicitly set breakpoints.
+        const position = activeEditor.getPosition();
+        if (position && position.lineNumber) {
+            startLine = position.lineNumber;
+            if (!breakpoints.some(bp => bp.line === startLine)) {
+                breakpoints.push({ line: startLine });
             }
         }
+        */
 
-        setDebugState(
-            'stopped',
-            { currentLine: null, output: ['Stopped'], barEl: debugMenu, keepMode },
-            editor,
-            dbgState
-        );
-        appendOutput(
-            keepMode
-                ? '🛑 Debug session stopped. Debug mode still enabled.'
-                : '🛑 Debug session stopped. Debug mode disabled.',
-            termState
-        );
-        showToast('info', 'Debug Stopped', keepMode ? 'Session stopped' : 'Debug mode disabled');
-    }
+        // Reset UI before starting to ensure clean state
+        resetDebugUI();
 
-    function setDebugState(state, payload, editor, dbgState) {
-        const keepMode = !!(payload && payload.keepMode);
-        dbgState.state = state;
-        if (payload?.currentLine !== undefined) dbgState.currentLine = payload.currentLine;
-        if (payload?.locals) dbgState.locals = payload.locals;
-        if (payload?.stack) dbgState.stack = payload.stack;
-        if (payload?.currentRoutine) dbgState.currentRoutine = payload.currentRoutine;
+        console.log('Starting debug session...', { breakpoints, startLine });
 
-        renderLocals(dbgState.locals || {});
-        renderStack(dbgState.stack || []);
+        showToast('info', 'Debug', 'Initializing debug session...');
 
-        if (payload?.output) {
-            logDebug(payload.output, null, false);
+        let res;
+        try {
+            res = await window.ahmadIDE.debugStart(code, breakpoints, startLine);
+        } catch (e) {
+            showToast('error', 'Debug', 'Start exception: ' + e.message);
+            console.error(e);
+            return;
         }
 
-        if (payload?.currentLine) {
-            highlightLine(editor, payload.currentLine);
+        if (!res || !res.ok) {
+            const errorMsg = 'Start failed: ' + (res?.error || 'Unknown error');
+            showToast('error', 'Debug', errorMsg);
+            console.error(errorMsg);
+            alert(errorMsg); // Temporary: ensure user sees this
+            return;
+        }
+
+        console.log('debugStart response OK', res);
+        // alert('Debugger started! Session ID: ' + res.sessionId); // Temporary success confirmation
+
+        currentDebugSession = {
+            id: res.sessionId,
+            engine: res.engine || 'zstep',
+            currentLine: res.currentLine || 1,
+            currentRoutine: res.currentRoutine || 'TMPDBG',
+            stack: res.stack || [],
+            locals: res.locals || {},
+        };
+
+        console.log('Debug Session Started:', currentDebugSession);
+
+        // Update UI
+        setDebugButtons(true);
+
+        // Show debug bar if hidden
+        const bar = document.getElementById('debugBar');
+        console.log('[DEBUG UI] debugBar element:', bar);
+        if (bar) {
+            bar.classList.remove('hidden');
+            bar.style.display = 'flex'; // Force show
+            console.log('[DEBUG UI] debugBar shown');
+        }
+
+        // Auto-open Debug panel (click the Debug tab button)
+        const debugPanelBtn = document.querySelector('[data-panel="debugPanel"]');
+        console.log('[DEBUG UI] debugPanel button:', debugPanelBtn);
+        if (debugPanelBtn) {
+            debugPanelBtn.click();
+            console.log('[DEBUG UI] debugPanel button clicked');
+        }
+
+        if (currentDebugSession.currentLine) {
+            gotoEditorLine(currentDebugSession.currentLine);
+            showToast('success', 'Debug', 'Debugger initialized. Press Run/Continue to start.');
+        }
+    }
+
+    async function debugStepInto() {
+        if (!currentDebugSession || !currentDebugSession.id) {
+            showToast('warn', 'Debug', 'No active debug session');
+            return;
+        }
+        const result = await window.ahmadIDE.debugStep(currentDebugSession.id, 'into');
+        handleDebugResult(result);
+    }
+
+    async function debugStepOver() {
+        if (!currentDebugSession || !currentDebugSession.id) {
+            showToast('warn', 'Debug', 'No active debug session');
+            return;
+        }
+        const result = await window.ahmadIDE.debugStep(currentDebugSession.id, 'over');
+        handleDebugResult(result);
+    }
+
+    async function debugStepOut() {
+        if (!currentDebugSession || !currentDebugSession.id) {
+            showToast('warn', 'Debug', 'No active debug session');
+            return;
+        }
+        const result = await window.ahmadIDE.debugStep(currentDebugSession.id, 'out');
+        handleDebugResult(result);
+    }
+
+    async function debugContinue() {
+        if (!currentDebugSession || !currentDebugSession.id) {
+            showToast('warn', 'Debug', 'No active debug session');
+            return;
+        }
+        const result = await window.ahmadIDE.debugContinue(currentDebugSession.id);
+        handleDebugResult(result);
+    }
+
+    async function debugStop() {
+        if (!currentDebugSession || !currentDebugSession.id) {
+            // Just reset UI if no session
+            currentDebugSession = null;
+            resetDebugUI();
+            return;
+        }
+        const result = await window.ahmadIDE.debugStop(currentDebugSession.id);
+        if (result && result.ok) {
+            currentDebugSession = null;
+            resetDebugUI();
         } else {
-            highlightLine(editor, null);
-        }
-
-        const bar = payload?.barEl || document.getElementById('debugBar');
-        setDebugBarVisibility(!(state === 'stopped' && !keepMode), state !== 'stopped');
-
-        setDebugButtons(state !== 'stopped' || keepMode);
-        if (state === 'stopped' && !keepMode) {
-            setDebugBarVisibility(false, false);
+            showDebugError('Stop failed: ' + (result?.error || 'Unknown'));
         }
     }
 
-    function handleDebugAction(action, editor, dbgState, termState, bar) {
-        switch (action) {
-            case 'continue':
-                return performContinue(editor, dbgState, termState, bar);
-            case 'step-over':
-                return performStep('over', editor, dbgState, termState, bar);
-            case 'step-into':
-                return performStep('into', editor, dbgState, termState, bar);
-            case 'step-out':
-                return performStep('out', editor, dbgState, termState, bar);
-            case 'restart':
-                dbgState.sessionId = null;
-                return startDebugSession(editor, dbgState, termState, bar, []);
-            case 'stop':
-                return stopDebug(editor, dbgState, termState, bar);
-            case 'pause':
-            default:
-                logDebug([`${action} (stub)`], termState, false);
+    function handleDebugResult(result) {
+        if (!result || !result.ok) {
+            const msg = result?.error || 'Unknown error';
+            if (msg === 'Program finished' || msg === 'end') {
+                console.log('Program finished');
+                currentDebugSession = null;
+                resetDebugUI();
+                showToast('success', 'Debug', 'Program finished');
+            } else {
+                showToast('error', 'Debug', msg);
+            }
+            return;
+        }
+
+        if (result.currentLine) {
+            currentDebugSession.currentLine = result.currentLine;
+            currentDebugSession.currentRoutine = result.currentRoutine || currentDebugSession.currentRoutine;
+            currentDebugSession.stack = result.stack || currentDebugSession.stack;
+            currentDebugSession.locals = result.locals || currentDebugSession.locals || {};
+
+            gotoEditorLine(result.currentLine);
+            console.log('Debug State Updated:', currentDebugSession);
         }
     }
+
+    function resetDebugUI() {
+        setDebugButtons(false);
+        const bar = document.getElementById('debugBar');
+        if (bar) bar.classList.add('hidden');
+
+        // Clear editor decorations
+        if (activeEditor) {
+            // Remove highlight line
+            highlightLine(activeEditor, null);
+        }
+
+        // Clear stack and locals panels
+        renderStack([]);
+        renderLocals({});
+
+        // Reset session
+        // currentDebugSession = null; // Do not nullify here if called during start, but okay if called from stop
+    }
+
+    // Helper to toggle button states
+    function setDebugButtons(enabled) {
+        const ids = [
+            'dbgStepIntoBtn', 'dbgStepOverBtn', 'dbgStepOutBtn',
+            'dbgContinueBtn', 'dbgStopBtn', 'dbgRestartBtn', 'dbgPauseBtn'
+        ];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.disabled = !enabled;
+        });
+    }
+
+    // Wire buttons (called during init or effectively replaced here)
+    // We'll wrap this in a safe executor or assume the DOM is ready since this file runs after DOM?
+    // Actually renderer.js usually runs after DOM or is deferred.
+    // We will attach listeners if elements exist.
+    setTimeout(() => {
+        const bind = (id, fn) => {
+            const el = document.getElementById(id);
+            if (el) {
+                // Remove old listeners involves cloning or removing event listener if we had the ref.
+                // Simpler: clone node to wipe old listeners
+                const newEl = el.cloneNode(true);
+                el.parentNode.replaceChild(newEl, el);
+                newEl.addEventListener('click', fn);
+            }
+        };
+
+        // Note: adapting to ACTUAL HTML IDs found in index.html
+        bind('debugStartBtn', startDebugSession);
+        bind('dbgStepIntoBtn', debugStepInto);
+        bind('dbgStepOverBtn', debugStepOver);
+        bind('dbgStepOutBtn', debugStepOut);
+        bind('dbgContinueBtn', debugContinue);
+        bind('dbgStopBtn', debugStop);
+
+        // Also bind the toolbar Step buttons if they exist separately?
+        // In the HTML I saw specific IDs on the debug bar.
+    }, 500);
+
 
     // ---------- Problems / Docker / Misc ----------
 
@@ -6939,9 +7006,11 @@
         if (res.ok) {
             state._cacheFull = res.routines;
             routinesCache = res.routines || routinesCache;
-            renderProjectTree(state._cacheFull || state._lastRoutines || [], state, editor);
+            setTimeout(() => {
+                renderProjectTree(state._cacheFull || state._lastRoutines || [], state, editor);
+            }, 0);
         } else {
-            renderProjectTree([], state, editor);
+            setTimeout(() => renderProjectTree([], state, editor), 0);
         }
         state._lastRoutines = res.ok ? res.routines : [];
     }
@@ -6950,6 +7019,7 @@
         const targetInfo = normalizeRoutineTarget(name);
         const targetRoutineKey = targetInfo.path || targetInfo.base;
         if (!targetRoutineKey) return;
+        logger.info('FILE_OPEN', { routine: targetRoutineKey });
 
         // Check if tab already exists for this routine
         const existingTab = findOpenTab(targetRoutineKey);
@@ -6962,6 +7032,7 @@
         // Load routine from backend
         const readRes = await window.ahmadIDE.readRoutine(targetRoutineKey);
         if (!readRes.ok) {
+            logger.warn('FILE_OPEN_FAIL', { routine: targetRoutineKey, error: readRes.error || readRes.stderr });
             appendOutput(`✗ Failed to load ${targetRoutineKey}: ${readRes.error || readRes.stderr}`, termState);
             showToast('error', 'Search', `Could not open ${targetRoutineKey}`);
             return false;
@@ -6973,9 +7044,12 @@
         // Validate the freshly loaded model
         const modelToValidate = editor?.getModel ? editor.getModel() : activeEditor?.getModel?.();
         if (modelToValidate) {
-            validateMumps(modelToValidate);
+            const delayed = () => validateMumps(modelToValidate);
+            if (window.requestIdleCallback) window.requestIdleCallback(delayed, { timeout: 120 });
+            else setTimeout(delayed, 50);
         }
 
+        logger.info('FILE_OPEN_SUCCESS', { routine: targetRoutineKey });
         appendOutput(`✓ Loaded routine ${targetRoutineKey}`, termState);
         return true;
     }
@@ -6989,6 +7063,7 @@
             });
             return;
         }
+        logger.info('FILE_SAVE_REQUEST', { routine: name });
         await performSave(name, editor, state, termState);
     }
 
@@ -7007,6 +7082,7 @@
             name = name.toUpperCase();
         }
         const code = editor.getValue();
+        logger.debug('FILE_SAVE', { routine: name });
         const res = await window.ahmadIDE.saveRoutine(name, code);
         if (res.ok) {
             const savedPath = res.folder ? `${res.folder}/${res.routine}` : (res.routine || name);
@@ -7016,6 +7092,7 @@
             await window.ahmadIDE.zlinkRoutine(state.current);
             appendOutput(`✓ ZLINK ${state.current}`, termState);
             await loadRoutineList(state, editor, '', termState);
+            logger.info('FILE_SAVE_SUCCESS', { routine: savedPath });
 
             // Clear dirty state for current tab
             if (activeTabId) {
@@ -7032,6 +7109,7 @@
             }
         } else {
             appendOutput(`✗ Save failed: ${res.error || res.stderr}`, termState);
+            logger.error('FILE_SAVE_FAIL', { routine: name, error: res.error || res.stderr });
         }
     }
 
@@ -7050,6 +7128,7 @@
                 }
             }
             const routineName = trimmed.toUpperCase();
+            logger.info('FILE_CREATE', { routine: routineName });
             const code = `MAIN ; ${routineName} routine\n    WRITE "Hello from ${routineName}!", !\n    QUIT\n`;
 
             // Create a new tab for the routine
@@ -7062,5 +7141,66 @@
             setCurrentRoutine(routineName);
             await saveRoutineFlow(editor, state, termState);
         });
+
     }
+
+    function registerMumpsHover() {
+        monaco.languages.registerHoverProvider('mumps', {
+            provideHover: function (model, position) {
+                if (!currentDebugSession || !currentDebugSession.locals) return null;
+
+                const word = model.getWordAtPosition(position);
+                if (!word) return null;
+
+                let varName = word.word.toUpperCase();
+
+                // Handle Mumps % variables (e.g., %Z) which getWordAtPosition might split
+                // Check character immediately before the word
+                if (word.startColumn > 1) {
+                    const prevCharRange = new monaco.Range(position.lineNumber, word.startColumn - 1, position.lineNumber, word.startColumn);
+                    const prevChar = model.getValueInRange(prevCharRange);
+                    if (prevChar === '%') {
+                        varName = '%' + varName;
+                    }
+                }
+
+                // Check locals for the variable
+                // 1. Exact match (uppercased)
+                // 2. Or if key exists with differtent case, use that
+                let val = currentDebugSession.locals[varName];
+
+                // Fallback: try to find case-insensitive match if exact fail
+                if (val === undefined) {
+                    const keys = Object.keys(currentDebugSession.locals);
+                    const match = keys.find(k => k.toUpperCase() === varName);
+                    if (match) val = currentDebugSession.locals[match];
+                }
+
+                if (val !== undefined && val !== null) {
+                    let displayValue = '';
+                    if (typeof val === 'object' && val._isArray) {
+                        const len = Object.keys(val._elements || {}).length;
+                        displayValue = `Array (${len} element${len === 1 ? '' : 's'})`;
+                        const keys = Object.keys(val._elements || {}).slice(0, 10);
+                        keys.forEach(k => {
+                            displayValue += `\n  ${k}: ${val._elements[k]}`;
+                        });
+                        if (len > 10) displayValue += '\n  ...';
+                    } else {
+                        displayValue = String(val);
+                    }
+
+                    return {
+                        range: new monaco.Range(position.lineNumber, word.startColumn - (varName.startsWith('%') ? 1 : 0), position.lineNumber, word.endColumn),
+                        contents: [
+                            { value: `**${varName}**` },
+                            { value: '```text\n' + displayValue + '\n```' }
+                        ]
+                    };
+                }
+                return null;
+            }
+        });
+    }
+
 })();
