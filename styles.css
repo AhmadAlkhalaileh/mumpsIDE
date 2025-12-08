@@ -9,10 +9,10 @@
     --panel-soft: #f5f7fb;
     --sidebar: #f5f7fb;
     --rail-bg: #eef1f7;
-    --editor-bg: #ffffff;
-    --gutter-bg: #f3f5f9;
-    --terminal-bg: #f8f9fb;
-    --terminal-input-bg: #edf0f7;
+    --editor-bg: #f1f3f7;
+    --gutter-bg: #eeeff5;
+    --terminal-bg: #f1f3f7;
+    --terminal-input-bg: #eaedf3;
 
     /* Accents */
     --accent: #3574f0;
@@ -126,7 +126,7 @@ button, input, select, textarea {
     transition: all 0.12s ease;
     z-index: 200;
 }
-.menu-item.open .menu-dropdown {
+.menu-item.open .menu-dropdown ,.menu-item:hover .menu-dropdown {
     opacity: 1;
     pointer-events: auto;
     transform: translateY(0);

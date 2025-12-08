@@ -2646,7 +2646,7 @@ module.exports = {
     let routine, targetFolder;
     if (name.includes('/')) {
       const parts = name.split('/');
-      targetFolder = parts[0]; // "localr" or "routines"
+      targetFolder = parts[0].toLowerCase(); // normalize to lowercase
       routine = sanitizeRoutineName(parts[1]);
     } else {
       routine = sanitizeRoutineName(name);
@@ -2663,7 +2663,7 @@ module.exports = {
     // If folder specified, save to that folder; otherwise use first dir (localr)
     let routinesPath;
     if (targetFolder) {
-      routinesPath = routineDirs.find(d => d.includes(`/${targetFolder}`));
+      routinesPath = routineDirs.find(d => d.toLowerCase().includes(`/${targetFolder}`));
       if (!routinesPath) return { ok: false, error: `Folder '${targetFolder}' not found` };
     } else {
       routinesPath = routineDirs[0];

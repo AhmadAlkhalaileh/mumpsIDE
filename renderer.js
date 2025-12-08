@@ -667,6 +667,7 @@
     }
 
     let globalTerminalState = null;
+    let globalRoutineState = null;
 
     const mumpsFileIconSvg = `<svg width="16" height="16" viewBox="0 0 16 16"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f0a35c"/><stop offset="100%" stop-color="#d67f3c"/></linearGradient></defs><rect width="16" height="16" rx="3" fill="url(#mg)"/><text x="4" y="12" font-size="10" font-weight="bold" fill="#19100c" font-family="monospace">M</text></svg>`;
 
@@ -3097,6 +3098,17 @@
             const match = coreShortcutMap[combo];
             if (!match) return;
             if (isEditableTarget(e.target) && combo !== 'ctrl+s' && combo !== 'ctrl+shift+s') return;
+
+            // Handle Ctrl+S directly to avoid conflicts with Monaco
+            if (combo === 'ctrl+s' || combo === 'ctrl+shift+s') {
+                e.preventDefault();
+                e.stopPropagation();
+                if (globalRoutineState && globalTerminalState && activeEditor) {
+                    await saveRoutineFlow(activeEditor, globalRoutineState, globalTerminalState);
+                }
+                return;
+            }
+
             e.preventDefault();
             e.stopImmediatePropagation();
             await runMenuAction(match.action);
@@ -3372,6 +3384,14 @@
             });
             activeEditor = editor;
 
+            // Initialize states BEFORE adding editor actions (so Ctrl+S can access them)
+            routineState = { current: null };
+            routineStateRef = routineState;
+            globalRoutineState = routineState;
+            const terminalState = createTerminalState();
+            globalTerminalState = terminalState;
+            updateTerminalStatusPill();
+
             // Add PhpStorm-style context menu actions
             editor.addAction({
                 id: 'cut',
@@ -3408,6 +3428,8 @@
                     ed.setSelection(ed.getModel().getFullModelRange());
                 }
             });
+
+            // Note: Ctrl+S is handled by global keydown handler to avoid conflicts
 
             editor.addAction({
                 id: 'commentLine',
@@ -3488,11 +3510,6 @@
                 }
             });
 
-            routineState = { current: null };
-            routineStateRef = routineState;
-            const terminalState = createTerminalState();
-            globalTerminalState = terminalState; // Save for context menus
-            updateTerminalStatusPill();
             const dbgState = {
                 sessionId: null,
                 breakpoints: new Set(),
@@ -7074,11 +7091,14 @@
             return;
         }
         if (mumpsValidator) {
-            const check = mumpsValidator.validateRoutineName(name.toUpperCase());
+            // Extract just the routine name (remove folder path if present)
+            const routineNameOnly = name.includes('/') ? name.split('/').pop() : name;
+            const check = mumpsValidator.validateRoutineName(routineNameOnly.toUpperCase());
             if (!check.valid) {
                 appendOutput(`✗ Invalid routine: ${check.errors.join('; ')}`, termState);
                 return;
             }
+            // Convert full path to uppercase
             name = name.toUpperCase();
         }
         const code = editor.getValue();
@@ -7120,14 +7140,49 @@
                 appendOutput('✗ New routine cancelled (no name).', termState);
                 return;
             }
+
+            // Validate length first
+            if (trimmed.length > 16) {
+                appendOutput(`✗ Invalid routine name: Name must be 16 characters or less (got ${trimmed.length})`, termState);
+                showToast('error', 'New Routine', `Name must be 16 characters or less (got ${trimmed.length})`);
+                return;
+            }
+
             if (mumpsValidator) {
                 const check = mumpsValidator.validateRoutineName(trimmed.toUpperCase());
                 if (!check.valid) {
                     appendOutput(`✗ Invalid routine: ${check.errors.join('; ')}`, termState);
+                    showToast('error', 'New Routine', check.errors.join('; '));
                     return;
                 }
             }
+
             const routineName = trimmed.toUpperCase();
+
+            // Check if routine already exists
+            const existingRoutine = await window.ahmadIDE.readRoutine(routineName);
+            if (existingRoutine.ok && existingRoutine.code) {
+                // Routine exists - open it instead of creating new one
+                logger.info('FILE_OPEN_EXISTING', { routine: routineName, codeLength: existingRoutine.code.length });
+                appendOutput(`ℹ Routine ${routineName} already exists - opening it`, termState);
+                showToast('info', 'New Routine', `Routine ${routineName} already exists - opened for editing`);
+
+                // Check if tab already exists
+                const targetInfo = normalizeRoutineTarget(routineName);
+                const routineKey = existingRoutine.folder ? `${existingRoutine.folder}/${routineName}` : routineName;
+                const existingTab = findOpenTab(routineKey);
+
+                if (existingTab) {
+                    switchTab(existingTab.id);
+                } else {
+                    // Create tab with existing code
+                    createTab(routineName, existingRoutine.code, state, { folder: existingRoutine.folder });
+                    state.current = existingRoutine.folder ? `${existingRoutine.folder}/${routineName}` : routineName;
+                    setCurrentRoutine(state.current);
+                }
+                return;
+            }
+
             logger.info('FILE_CREATE', { routine: routineName });
             const code = `MAIN ; ${routineName} routine\n    WRITE "Hello from ${routineName}!", !\n    QUIT\n`;
 
