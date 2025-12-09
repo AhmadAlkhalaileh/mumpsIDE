@@ -372,8 +372,8 @@
     let shortcutDefaults = {};
     let routineFilterTerm = '';
     let activeDebugTab = 'tab-breakpoints';
-    const maxLintTextLength = 60000;
-    const maxProblemItems = 300;
+    const maxLintTextLength = 20000;  // Skip linting for files > 20KB
+    const maxProblemItems = 100;  // Limit problems panel for performance
     let lintSkipNotified = false;
     const extensionsState = {
         installed: [],
@@ -742,7 +742,8 @@
             content,
             isDirty: false,
             state: tabState,
-            icon: tabMumpsIcon
+            icon: tabMumpsIcon,
+            disposables: []  // Store disposables for cleanup
         };
         openTabs.push(tab);
 
@@ -751,14 +752,15 @@
             const model = monaco.editor.createModel(content, 'mumps');
             tabModels.set(id, model);
 
-            // Track changes for dirty state
-            model.onDidChangeContent(() => {
+            // Track changes for dirty state - STORE the disposable!
+            const changeDisposable = model.onDidChangeContent(() => {
                 const t = openTabs.find(x => x.id === id);
                 if (t && !t.isDirty) {
                     t.isDirty = true;
-                    renderTabs();
+                    debouncedRenderTabs();  // Debounced!
                 }
             });
+            tab.disposables.push(changeDisposable);
         }
 
         renderTabs();
@@ -835,6 +837,12 @@
         if (index === -1) return;
         const closing = openTabs[index];
 
+        // Dispose all event listeners for this tab
+        if (closing.disposables) {
+            closing.disposables.forEach(d => d.dispose());
+            closing.disposables = [];
+        }
+
         // Dispose Monaco model
         const model = tabModels.get(tabId);
         if (model) {
@@ -902,9 +910,16 @@
         const tabBar = document.getElementById('tabBar');
         const activeTab = tabBar?.querySelector('.tab.active');
         if (activeTab) {
-            activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+            activeTab.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'nearest' });
         }
     }
+
+    // Debounced version of renderTabs to prevent excessive re-renders
+    let renderTabsTimer = null;
+    const debouncedRenderTabs = () => {
+        if (renderTabsTimer) clearTimeout(renderTabsTimer);
+        renderTabsTimer = setTimeout(() => renderTabs(), 16); // ~60fps
+    };
 
     function renderTabs() {
         const tabBar = $('#tabBar');
@@ -3172,7 +3187,7 @@
             state.visible = false;
             state.activePanel = null;
             if (position === 'bottom') {
-                if (contentArea) contentArea.classList.add('collapsed');
+                if (contentArea) contentArea.classList.add('hidden'); // Use hidden to collapse fully
                 const bottomPanels = ['terminalPanel', 'debugPanel', 'problemsPanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel'];
                 bottomPanels.forEach(id => {
                     const el = document.getElementById(id);
@@ -3380,7 +3395,51 @@
                 minimap: { enabled: false },
                 automaticLayout: true,
                 glyphMargin: true,
-                contextmenu: false
+                contextmenu: false,
+                // Performance optimizations
+                renderValidationDecorations: 'on',
+                quickSuggestions: false,  // Disable for speed
+                suggestOnTriggerCharacters: false,
+                folding: false,  // Disable code folding for performance
+                foldingHighlight: false,
+                showFoldingControls: 'never',
+                occurrencesHighlight: 'off',  // Disable occurrence highlighting
+                renderWhitespace: 'none',  // Don't render whitespace
+                overviewRulerBorder: false,
+                scrollBeyondLastLine: false,
+                wordBasedSuggestions: 'off',
+                parameterHints: { enabled: false },
+                // Additional performance optimizations
+                matchBrackets: 'never',  // Disable bracket matching
+                selectionHighlight: false,  // Disable selection highlighting
+                links: false,  // Disable link detection
+                colorDecorators: false,  // Disable color decorators
+                codeLens: false,  // Disable code lens
+                lightbulb: { enabled: 'off' },  // Disable lightbulb suggestions
+                hover: { enabled: false },  // Disable hover (we handle it manually)
+                inlayHints: { enabled: 'off' },  // Disable inlay hints
+                stickyScroll: { enabled: false },  // Disable sticky scroll
+                guides: { indentation: false, bracketPairs: false },  // Disable guides
+                accessibilitySupport: 'off',  // Reduce accessibility overhead
+                cursorSmoothCaretAnimation: 'off',  // Disable cursor animation
+                // SCROLL PERFORMANCE - critical for lag fix
+                scrollbar: {
+                    vertical: 'visible',
+                    horizontal: 'visible',
+                    useShadows: false,  // Disable scrollbar shadows
+                    verticalScrollbarSize: 10,
+                    horizontalScrollbarSize: 10,
+                    scrollByPage: false
+                },
+                overviewRulerLanes: 0,  // Disable overview ruler lanes
+                hideCursorInOverviewRuler: true,
+                renderLineHighlightOnlyWhenFocus: true,  // Only highlight when focused
+                fastScrollSensitivity: 7,  // Faster scroll response
+                mouseWheelScrollSensitivity: 1.5,  // Better scroll feel
+                cursorWidth: 2,  // Simpler cursor
+                renderFinalNewline: 'off',  // Skip rendering trailing newline
+                lineDecorationsWidth: 0,  // Reduce line decoration overhead
+                lineNumbersMinChars: 3  // Reduce gutter width
             });
             activeEditor = editor;
 
@@ -3689,10 +3748,15 @@
             bindDebugTabs();
             bindToolWindows();
             bindGlobalShortcuts();
+            // Debounced terminal resize for performance
+            let terminalResizeTimer = null;
             window.addEventListener('resize', () => {
-                if (globalTerminalState) {
-                    refreshTerminalLayout(globalTerminalState, { resizeSession: true });
-                }
+                if (terminalResizeTimer) clearTimeout(terminalResizeTimer);
+                terminalResizeTimer = setTimeout(() => {
+                    if (globalTerminalState) {
+                        refreshTerminalLayout(globalTerminalState, { resizeSession: true });
+                    }
+                }, 100); // Debounce 100ms
             });
             initExtensionsView();
 
@@ -3858,7 +3922,7 @@
             let validateTimer = null;
             const triggerValidate = () => {
                 clearTimeout(validateTimer);
-                validateTimer = setTimeout(() => validateMumps(editor.getModel()), 180);
+                validateTimer = setTimeout(() => validateMumps(editor.getModel()), 400);
 
                 // Mark current tab as dirty when content changes
                 if (activeTabId) {
@@ -3867,7 +3931,7 @@
             };
             editor.onDidChangeModelContent(triggerValidate);
             validateMumps(editor.getModel());
-            setTimeout(() => validateMumps(editor.getModel()), 1200);
+            // Removed duplicate validation - already called on line 3902
 
             // --- Status Bar Updates ---
             const updateStatusBar = () => {
@@ -3996,15 +4060,37 @@
             // RUN: If debug mode enabled, start debugging. Otherwise, run normally.
             if ($) {
                 $('#runBtn').on('click', async () => {
-                    // Stop on first validation error
-                    const markers = monaco.editor.getModelMarkers({ owner: 'mumps-check' }) || [];
-                    if (markers.length) {
-                        const m = markers[0];
-                        appendOutput(
-                            `✗ Cannot run: ${m.message} (line ${m.startLineNumber})`,
-                            terminalState
-                        );
-                        return;
+                    // Lint code - only errors block execution (warnings/info allowed)
+                    const code = editor.getValue();
+                    const linter = window._mumpsLinter || mumpsLinter;
+                    if (hasLintRules(linter)) {
+                        const lintResult = linter.lint(code || '', { mode: 'create' });
+                        applyLintMarkers(editor.getModel(), lintResult.issues || []);
+                        renderProblems((lintResult.issues || []).map(i => ({
+                            message: i.message || i.description || '',
+                            severity: i.severity || 'info',
+                            line: i.line || null,
+                            code: i.ruleId || i.code || null
+                        })));
+                        const summary = lintResult.summary || { errors: 0, warnings: 0, info: 0 };
+                        if (summary.errors > 0) {
+                            appendOutput(
+                                `✗ Cannot run: ${summary.errors} error(s) found`,
+                                terminalState
+                            );
+                            return;
+                        }
+                    } else {
+                        // Fallback to existing marker check
+                        const markers = monaco.editor.getModelMarkers({ owner: 'mumps-check' }) || [];
+                        if (markers.length) {
+                            const m = markers[0];
+                            appendOutput(
+                                `✗ Cannot run: ${m.message} (line ${m.startLineNumber})`,
+                                terminalState
+                            );
+                            return;
+                        }
                     }
 
                     const bpLines = getBpLines();
@@ -4047,14 +4133,37 @@
             } else {
                 const runBtn = document.getElementById('runBtn');
                 runBtn?.addEventListener('click', async () => {
-                    const markers = monaco.editor.getModelMarkers({ owner: 'mumps-check' }) || [];
-                    if (markers.length) {
-                        const m = markers[0];
-                        appendOutput(
-                            `✗ Cannot run: ${m.message} (line ${m.startLineNumber})`,
-                            terminalState
-                        );
-                        return;
+                    // Lint code - only errors block execution (warnings/info allowed)
+                    const code = editor.getValue();
+                    const linter = window._mumpsLinter || mumpsLinter;
+                    if (hasLintRules(linter)) {
+                        const lintResult = linter.lint(code || '', { mode: 'create' });
+                        applyLintMarkers(editor.getModel(), lintResult.issues || []);
+                        renderProblems((lintResult.issues || []).map(i => ({
+                            message: i.message || i.description || '',
+                            severity: i.severity || 'info',
+                            line: i.line || null,
+                            code: i.ruleId || i.code || null
+                        })));
+                        const summary = lintResult.summary || { errors: 0, warnings: 0, info: 0 };
+                        if (summary.errors > 0) {
+                            appendOutput(
+                                `✗ Cannot run: ${summary.errors} error(s) found`,
+                                terminalState
+                            );
+                            return;
+                        }
+                    } else {
+                        // Fallback to existing marker check
+                        const markers = monaco.editor.getModelMarkers({ owner: 'mumps-check' }) || [];
+                        if (markers.length) {
+                            const m = markers[0];
+                            appendOutput(
+                                `✗ Cannot run: ${m.message} (line ${m.startLineNumber})`,
+                                terminalState
+                            );
+                            return;
+                        }
                     }
 
                     const bpLines = getBpLines();
@@ -4130,7 +4239,7 @@
                     appendOutput('🧹 Linting...', terminalState);
                     const linter = window._mumpsLinter || mumpsLinter;
                     if (hasLintRules(linter)) {
-                        const res = linter.lint(code || '');
+                        const res = linter.lint(code || '', { mode: 'edit' });
                         applyLintMarkers(editor.getModel(), res.issues || []);
                         renderProblems((res.issues || []).map(i => ({
                             message: i.message || i.description || '',
@@ -4157,7 +4266,7 @@
                     appendOutput('🧹 Linting...', terminalState);
                     const linter = window._mumpsLinter || mumpsLinter;
                     if (hasLintRules(linter)) {
-                        const res = linter.lint(code || '');
+                        const res = linter.lint(code || '', { mode: 'edit' });
                         applyLintMarkers(editor.getModel(), res.issues || []);
                         renderProblems((res.issues || []).map(i => ({
                             message: i.message || i.description || '',
@@ -6210,14 +6319,20 @@
     function renderProblems(items) {
         const list = document.getElementById('problemsList');
         if (!list) return;
-        list.innerHTML = '';
+
         const problems = Array.isArray(items) ? items : [];
         const limited = problems.slice(0, maxProblemItems);
         const trimmed = problems.length > limited.length;
+
+        // Use DocumentFragment to batch DOM operations (reduces reflows)
+        const fragment = document.createDocumentFragment();
+
         if (!limited.length) {
             const li = document.createElement('li');
             li.textContent = 'No problems.';
-            list.appendChild(li);
+            fragment.appendChild(li);
+            list.innerHTML = '';
+            list.appendChild(fragment);
             return;
         }
 
@@ -6252,14 +6367,19 @@
                 const ln = parseInt(li.dataset.line || '0', 10);
                 if (ln) revealLine(ln);
             };
-            list.appendChild(li);
+            fragment.appendChild(li);
         });
         if (trimmed) {
             const li = document.createElement('li');
             li.className = 'problem-item info';
             li.textContent = `Showing first ${maxProblemItems} issues...`;
-            list.appendChild(li);
+            fragment.appendChild(li);
         }
+
+        // Single DOM operation: clear and append all at once
+        list.innerHTML = '';
+        list.appendChild(fragment);
+
         updateProblemSummary(limited);
         setActiveDebugTab(activeDebugTab);
     }
@@ -6523,29 +6643,29 @@
             base: 'vs',
             inherit: true,
             rules: [
-                { token: 'comment', foreground: '7a8294', fontStyle: 'italic' },
-                { token: 'string', foreground: '1b7f4d' },
-                { token: 'number', foreground: 'b05a00' },
-                { token: 'keyword', foreground: '0f5ccd', fontStyle: 'bold' },
-                { token: 'predefined', foreground: '8a4fd8', fontStyle: 'bold' },
-                { token: 'label', foreground: '0f5ccd', fontStyle: 'bold' },
-                { token: 'type.identifier', foreground: '2f6db5' },
+                { token: 'comment', foreground: '8c8c8c', fontStyle: 'italic' },
+                { token: 'string', foreground: '6a8759' },
+                { token: 'number', foreground: '1750eb' },
+                { token: 'keyword', foreground: '0033b3', fontStyle: 'bold' },
+                { token: 'predefined', foreground: '871094', fontStyle: 'bold' },
+                { token: 'label', foreground: '0033b3', fontStyle: 'bold' },
+                { token: 'type.identifier', foreground: '000000' },
             ],
             colors: {
                 'editor.background': '#ffffff',
-                'editorGutter.background': '#f3f5f9',
-                'editorLineNumber.foreground': '#a4acb9',
-                'editorLineNumber.activeForeground': '#1f4fff',
-                'editor.selectionBackground': '#d9e4ff',
-                'editor.selectionHighlightBackground': '#e8eefc',
-                'editor.inactiveSelectionBackground': '#eef2fb',
-                'editor.lineHighlightBackground': '#eef3ff',
-                'editor.lineHighlightBorder': '#c9d6f9',
-                'editorCursor.foreground': '#1f4fff',
-                'editorBracketMatch.border': '#89a7f2',
-                'editorIndentGuide.background': '#e1e6ef',
-                'editorIndentGuide.activeBackground': '#c6d3e8',
-                'editorWhitespace.foreground': '#e1e6ef'
+                'editorGutter.background': '#f0f0f0',
+                'editorLineNumber.foreground': '#999999',
+                'editorLineNumber.activeForeground': '#4d4d4d',
+                'editor.selectionBackground': '#a6d2ff',
+                'editor.selectionHighlightBackground': '#e8f2ff',
+                'editor.inactiveSelectionBackground': '#d4d4d4',
+                'editor.lineHighlightBackground': '#fcfcfc',
+                'editor.lineHighlightBorder': '#efefef',
+                'editorCursor.foreground': '#000000',
+                'editorBracketMatch.border': '#4a9eff',
+                'editorIndentGuide.background': '#d3d3d3',
+                'editorIndentGuide.activeBackground': '#939393',
+                'editorWhitespace.foreground': '#d3d3d3'
             }
         });
 
@@ -6553,29 +6673,29 @@
             base: 'vs-dark',
             inherit: true,
             rules: [
-                { token: 'comment', foreground: '9ea7b3', fontStyle: 'italic' },
-                { token: 'string', foreground: 'dfe7c8' },
-                { token: 'number', foreground: 'f0c27b' },
-                { token: 'keyword', foreground: 'f0a35c', fontStyle: 'bold' },
-                { token: 'predefined', foreground: 'ffd59a', fontStyle: 'bold' },
-                { token: 'label', foreground: 'f6dcb3', fontStyle: 'bold' },
-                { token: 'type.identifier', foreground: 'f2cfa3' },
+                { token: 'comment', foreground: '808080', fontStyle: 'italic' },
+                { token: 'string', foreground: '6a8759' },
+                { token: 'number', foreground: '6897bb' },
+                { token: 'keyword', foreground: 'cc7832', fontStyle: 'bold' },
+                { token: 'predefined', foreground: 'ffc66d', fontStyle: 'bold' },
+                { token: 'label', foreground: 'ffc66d', fontStyle: 'bold' },
+                { token: 'type.identifier', foreground: 'a9b7c6' },
             ],
             colors: {
-                'editor.background': '#0f0b0a',
-                'editorGutter.background': '#0d0907',
-                'editorLineNumber.foreground': '#6e5a51',
-                'editorLineNumber.activeForeground': '#f0c27b',
-                'editor.selectionBackground': '#2a1a12',
-                'editor.selectionHighlightBackground': '#2f1b13',
-                'editor.inactiveSelectionBackground': '#23160f',
-                'editor.lineHighlightBackground': '#1a120e',
-                'editor.lineHighlightBorder': '#3b241a',
-                'editorCursor.foreground': '#f0c27b',
-                'editorBracketMatch.border': '#f0c27b',
-                'editorIndentGuide.background': '#2c1e17',
-                'editorIndentGuide.activeBackground': '#3b291f',
-                'editorWhitespace.foreground': '#2c1e17'
+                'editor.background': '#2b2b2b',
+                'editorGutter.background': '#313335',
+                'editorLineNumber.foreground': '#606366',
+                'editorLineNumber.activeForeground': '#a4a3a3',
+                'editor.selectionBackground': '#214283',
+                'editor.selectionHighlightBackground': '#3a3d41',
+                'editor.inactiveSelectionBackground': '#3a3d41',
+                'editor.lineHighlightBackground': '#323232',
+                'editor.lineHighlightBorder': '#3a3d41',
+                'editorCursor.foreground': '#bbbbbb',
+                'editorBracketMatch.border': '#4a9eff',
+                'editorIndentGuide.background': '#3c3f41',
+                'editorIndentGuide.activeBackground': '#515658',
+                'editorWhitespace.foreground': '#3c3f41'
             }
         });
 
@@ -6583,29 +6703,29 @@
             base: 'vs-dark',
             inherit: true,
             rules: [
-                { token: 'comment', foreground: 'b39a8a', fontStyle: 'italic' },
-                { token: 'string', foreground: 'e9f1d8' },
-                { token: 'number', foreground: 'f2c27d' },
-                { token: 'keyword', foreground: 'd67f3c', fontStyle: 'bold' },
-                { token: 'predefined', foreground: 'f0c27b', fontStyle: 'bold' },
-                { token: 'label', foreground: 'f6dcb3', fontStyle: 'bold' },
-                { token: 'type.identifier', foreground: 'f2cfa3' },
+                { token: 'comment', foreground: '808080', fontStyle: 'italic' },
+                { token: 'string', foreground: '6a8759' },
+                { token: 'number', foreground: '6897bb' },
+                { token: 'keyword', foreground: 'cc7832', fontStyle: 'bold' },
+                { token: 'predefined', foreground: 'ffc66d', fontStyle: 'bold' },
+                { token: 'label', foreground: 'ffc66d', fontStyle: 'bold' },
+                { token: 'type.identifier', foreground: 'a9b7c6' },
             ],
             colors: {
-                'editor.background': '#1c120e',
-                'editorGutter.background': '#180f0b',
-                'editorLineNumber.foreground': '#7a6358',
-                'editorLineNumber.activeForeground': '#f0c27b',
-                'editor.selectionBackground': '#2f1b13',
-                'editor.selectionHighlightBackground': '#362015',
-                'editor.inactiveSelectionBackground': '#27160f',
-                'editor.lineHighlightBackground': '#241813',
-                'editor.lineHighlightBorder': '#3a2417',
-                'editorCursor.foreground': '#f0c27b',
-                'editorBracketMatch.border': '#f0c27b',
-                'editorIndentGuide.background': '#332419',
-                'editorIndentGuide.activeBackground': '#403023',
-                'editorWhitespace.foreground': '#332419'
+                'editor.background': '#2b2b2b',
+                'editorGutter.background': '#313335',
+                'editorLineNumber.foreground': '#606366',
+                'editorLineNumber.activeForeground': '#a4a3a3',
+                'editor.selectionBackground': '#214283',
+                'editor.selectionHighlightBackground': '#3a3d41',
+                'editor.inactiveSelectionBackground': '#3a3d41',
+                'editor.lineHighlightBackground': '#323232',
+                'editor.lineHighlightBorder': '#3a3d41',
+                'editorCursor.foreground': '#bbbbbb',
+                'editorBracketMatch.border': '#4a9eff',
+                'editorIndentGuide.background': '#3c3f41',
+                'editorIndentGuide.activeBackground': '#515658',
+                'editorWhitespace.foreground': '#3c3f41'
             }
         });
     }
@@ -6792,7 +6912,7 @@
         const Parser = window._mumpsParserClass || MUMPSParserClass;
 
         if (hasLintRules(linter)) {
-            const res = linter.lint(text || '');
+            const res = linter.lint(text || '', { mode: 'edit' });
             (res.issues || []).forEach(issue => {
                 const sev = normalizeSeverity(issue.severity);
                 problems.push({
@@ -7102,6 +7222,28 @@
             name = name.toUpperCase();
         }
         const code = editor.getValue();
+
+        // Lint with mode: 'edit' - block only on errors (warnings/info are allowed)
+        const linter = window._mumpsLinter || mumpsLinter;
+        if (hasLintRules(linter)) {
+            const lintResult = linter.lint(code || '', { mode: 'edit' });
+            applyLintMarkers(editor.getModel(), lintResult.issues || []);
+            renderProblems((lintResult.issues || []).map(i => ({
+                message: i.message || i.description || '',
+                severity: i.severity || 'info',
+                line: i.line || null,
+                code: i.ruleId || i.code || null
+            })));
+            const summary = lintResult.summary || { errors: 0, warnings: 0, info: 0 };
+            if (summary.errors > 0) {
+                appendOutput(
+                    `✗ Cannot save: ${summary.errors} error(s) found. Warnings and info are allowed.`,
+                    termState
+                );
+                return;
+            }
+        }
+
         logger.debug('FILE_SAVE', { routine: name });
         const res = await window.ahmadIDE.saveRoutine(name, code);
         if (res.ok) {

@@ -27,7 +27,7 @@
     "M005-UNREACHABLE-CODE": {
       "severity": "warning",
       "message": "Code after QUIT/HALT is unreachable",
-      "description": "Commands after QUIT or HALT will never execute",
+      "description": "Commands after QUIT or HALT on the same line will never execute",
       "autofix": false
     },
     "M006-MISSING-QUIT": {
@@ -113,8 +113,61 @@
       "message": "Potential SQL injection vulnerability",
       "description": "Use parameterized queries",
       "autofix": false
+    },
+    "M020-SPACE-AFTER-COMMA": {
+      "severity": "warning",
+      "message": "Space after comma in argument list",
+      "description": "Style warning: consider removing spaces after commas in argument lists",
+      "autofix": false
+    },
+    "M021-LABEL-AT-COLUMN1": {
+      "severity": "error",
+      "message": "Label must start at column 1 (no leading spaces)",
+      "description": "Routine labels must be placed in the first column without indentation",
+      "autofix": false
+    },
+    "M022-COMMAND-INDENTATION": {
+      "severity": "error",
+      "message": "Executable lines must be indented under their label",
+      "description": "Commands associated with a label should start with at least one leading space",
+      "autofix": false
+    },
+    "M023-TRAILING-COMMA": {
+      "severity": "error",
+      "message": "Trailing comma at end of command",
+      "description": "Commands cannot end with a comma; remove the comma or add the missing argument",
+      "autofix": false
+    },
+    "M024-EMPTY-ARGUMENT": {
+      "severity": "error",
+      "message": "Empty argument between commas",
+      "description": "Each comma must be followed by a valid argument; remove extra commas",
+      "autofix": false
+    },
+    "M025-MISSING-COMMAND-SPACE": {
+      "severity": "error",
+      "message": "Missing space before next command",
+      "description": "Multiple commands on a line must be separated by spaces",
+      "autofix": false
+    },
+    "M026-UNKNOWN-COMMAND": {
+      "severity": "error",
+      "message": "Unknown or invalid command '{cmd}'",
+      "description": "Command is neither a full keyword nor a valid abbreviation",
+      "autofix": false
+    },
+    "M027-AMBIGUOUS-COMMAND": {
+      "severity": "warning",
+      "message": "Ambiguous command abbreviation '{cmd}'",
+      "description": "Use a longer command name or the full keyword to avoid ambiguity",
+      "autofix": false
+    },
+    "M028-INVALID-LABEL": {
+      "severity": "error",
+      "message": "Invalid label name '{label}'",
+      "description": "Labels must be 1–16 uppercase alphanumeric characters starting with a letter or %",
+      "autofix": false
     }
-
   },
   "config": {
     "maxLineLength": 80,
@@ -122,6 +175,10 @@
     "checkUnusedVariables": false,
     "checkUnusedLabels": true,
     "enforceUppercase": true,
-    "checkMagicNumbers": false
+    "checkMagicNumbers": false,
+    "disallowSpaceAfterComma": false,
+    "enforceLabelIndentation": true,
+    "enforceCommandIndentation": true,
+    "checkUnreachableAfterQuit": true
   }
 }

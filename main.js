@@ -12,8 +12,12 @@ const enableNodePty = process.env.AHMAD_IDE_ENABLE_NODE_PTY === '1';
 // Terminal sessions (simple persistent shell per tab)
 const terminalSessions = new Map();
 
-// Reduce GPU-related errors on some Linux environments
+// GPU has issues on this system - use software rendering with optimizations
 app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
 
 // Handle uncaught errors
 process.on('uncaughtException', (err) => {

@@ -2396,13 +2396,49 @@ async function executeYDB(command) {
     });
   }
 
+  // ============================================================================
+  // CRITICAL FIX: Replace all "QUIT <value>" with plain "QUIT"
+  // ============================================================================
+  // When running via DO (not $$), QUIT with return values causes:
+  //   %YDB-E-NOTEXTRINSIC, QUIT/ZHALT does not return to an extrinsic function
+  // We must strip return values from ALL QUIT statements, not just the last one.
+  // Pattern: Q(UIT)? followed by whitespace and a non-comment value
+  // Preserve: Q(UIT)? at end of line, Q(UIT)? followed by semicolon (comment)
+  routineSource = routineSource.split('\n').map(line => {
+    // Don't modify comment lines
+    const trimmed = line.trim();
+    if (trimmed.startsWith(';')) return line;
+
+    // Match QUIT or Q followed by space and a value (but not followed by comment)
+    // Replace with just QUIT (or Q)
+    return line.replace(
+      /\b(Q(?:UIT)?)\s+(?!;)(\S)/gi,
+      (match, quitCmd, firstChar) => {
+        // If it's a postconditional like Q:condition, don't modify
+        if (firstChar === ':') return match;
+        // Otherwise strip the value, keep just QUIT
+        return quitCmd;
+      }
+    );
+  }).join('\n');
+
   // Add a safe QUIT to guarantee clean exit
   const contentLines = routineSource.split('\n').filter(line => line.trim() && !/^\s*;/.test(line.trim()));
   const lastContent = (contentLines[contentLines.length - 1] || '').trim();
-  if (!/^Q(UIT)?(\s|;|$)/i.test(lastContent)) {
+
+  // Check if last line is a QUIT with arguments (e.g., QUIT 1)
+  // Such QUITs are for extrinsic functions, but we're calling with DO, not $$
+  const quitWithArgs = /^Q(UIT)?\s+\S/i.test(lastContent);
+  const hasQuit = /^Q(UIT)?(\s|;|$)/i.test(lastContent);
+
+  if (!hasQuit || quitWithArgs) {
+    // Either no QUIT, or QUIT has arguments - add a plain QUIT
     if (!routineSource.endsWith('\n')) routineSource += '\n';
     routineSource += '\tQUIT\n';
   }
+  // Always ensure the routine ends with a newline (required by M/MUMPS)
+  if (!routineSource.endsWith('\n')) routineSource += '\n';
+
 
   const codeB64 = Buffer.from(routineSource, 'utf8').toString('base64');
   const cmdFile = '/tmp/ahmad_cmd.txt';
