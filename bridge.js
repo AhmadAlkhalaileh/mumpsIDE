@@ -1064,7 +1064,7 @@ function payloadLineToUserLine(session, payloadLine) {
   if (!session || !payloadLine) return payloadLine;
   const map = Array.isArray(session.payloadToUser) ? session.payloadToUser : [];
   const idx = payloadLine - 1;
-  if (idx >= 0 && idx < map.length && map[idx]) return map[idx];
+  if (idx >= 0 && idx < map.length && map[idx] !== undefined) return map[idx];
   const header = session.headerLines || 0;
   return payloadLine > header ? payloadLine - header : payloadLine;
 }
@@ -1184,6 +1184,56 @@ function resolvePending(session, evt) {
     session.eventQueue.push(evt);
     console.log('[DEBUG] resolvePending: queued event (no pending callbacks):', evt.event, 'queue length:', session.eventQueue.length);
   }
+}
+
+function pullQueuedEvent(session, eventName) {
+  if (!session || !session.eventQueue || !eventName) return null;
+  for (let i = 0; i < session.eventQueue.length; i += 1) {
+    if ((session.eventQueue[i] || {}).event === eventName) {
+      return session.eventQueue.splice(i, 1)[0];
+    }
+  }
+  return null;
+}
+
+function tryParseDebuggerEvent(line) {
+  if (!line) return null;
+
+  const attempts = [line];
+
+  // Attempt to strip non-printable control chars that can break JSON.parse
+  const noControl = line.replace(/[\u0000-\u001F]+/g, '');
+  if (noControl !== line) attempts.push(noControl);
+
+  // If we see backslash-escaped quotes, also try a variant where we collapse any over-escaped sequences.
+  const collapsed = line.replace(/\\\\+"/g, '\\"');
+  if (collapsed !== line) attempts.push(collapsed);
+
+  for (const candidate of attempts) {
+    try {
+      return JSON.parse(candidate);
+    } catch (_) {
+      // keep trying
+    }
+  }
+
+  // Last-chance fallback: extract the event type and output so we can still resolve the pending promise
+  const eventMatch = line.match(/"event"\s*:\s*"([^"]+)"/);
+  if (!eventMatch) return null;
+  const evtType = eventMatch[1];
+  const fallback = { event: evtType, raw: line };
+
+  const okMatch = line.match(/"ok"\s*:\s*(\d+)/);
+  if (okMatch) fallback.ok = parseInt(okMatch[1], 10);
+
+  const outputMatch = line.match(/"output"\s*:\s*"((?:\\.|[^"])*)"/);
+  if (outputMatch) {
+    // Preserve the escaped content; decode minimal backslash-escaped quotes so UI can show it.
+    fallback.output = outputMatch[1].replace(/\\\\/g, '\\').replace(/\\"/g, '"');
+  }
+
+  // Note: locals parsing is intentionally skipped in fallback to keep it simple.
+  return fallback;
 }
 
 function waitForEvent(session, allowedEvents = ['stopped', 'exit', 'error'], timeoutMs = 10000) {
@@ -1337,9 +1387,14 @@ function handleZStepStdout(session) {
       if (!line) continue;
       console.log('[DEBUG] AHMDBG stdout line:', line);
       try {
-        const evt = JSON.parse(line);
-        console.log('[DEBUG] AHMDBG parsed event:', evt.event);
-        resolvePending(session, evt);
+        const evt = tryParseDebuggerEvent(line);
+        if (evt) {
+          console.log('[DEBUG] AHMDBG parsed event:', evt.event);
+          resolvePending(session, evt);
+        } else {
+          console.log('[DEBUG] AHMDBG output (unparsed):', line);
+          session.output.push(line);
+        }
       } catch (e) {
         console.log('[DEBUG] AHMDBG output (non-JSON):', line);
         session.output.push(line);
@@ -1728,7 +1783,8 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     procExited: false,
     headerLines: headerLines,  // Track header lines for this session (2 or 5 depending on whether first tag has params)
     payloadToUser,
-    userToTransformed
+    userToTransformed,
+    lastUserLine: null
   };
 
   proc.stdout.on('data', handleZStepStdout(session));
@@ -2028,13 +2084,29 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   console.log('[DEBUG] Returning from startZStepSession:', JSON.stringify(returnValue, null, 2));
   return returnValue;
 }
+function decodeMString(val) {
+  if (typeof val !== 'string') return val;
+  // ZSHOW wraps strings in quotes and doubles inner quotes; normalize to how the user wrote it.
+  let out = val.replace(/""/g, '"');
 
+  // If there are backslash escapes (e.g., \" from JSON), try to unescape them safely.
+  if (out.includes('\\')) {
+    try {
+      out = JSON.parse(`"${out.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`);
+    } catch (_) {
+      // Fallback: minimally replace \" -> "
+      out = out.replace(/\\"/g, '"');
+    }
+  }
+  return out;
+}
 
 function normalizeDebuggerVars(rawVars = {}) {
   const locals = {};
   Object.entries(rawVars || {}).forEach(([rawKey, value]) => {
     if (!rawKey) return;
     const key = `${rawKey}`.toUpperCase();
+    const decodedVal = decodeMString(value);
     const arrMatch = key.match(/^([A-Z%][A-Z0-9]*)(\(.+\))$/);
     if (arrMatch) {
       const base = arrMatch[1];
@@ -2042,9 +2114,9 @@ function normalizeDebuggerVars(rawVars = {}) {
       if (!locals[base] || typeof locals[base] !== 'object' || !locals[base]._isArray) {
         locals[base] = { _isArray: true, _elements: {} };
       }
-      locals[base]._elements[sub] = value;
+      locals[base]._elements[sub] = decodedVal;
     } else {
-      locals[key] = value;
+      locals[key] = decodedVal;
     }
   });
   return locals;
@@ -2145,7 +2217,19 @@ async function sendZStepCommand(sessionId, command) {
   }
 
   // Map TMPDBG payload line back to user's editor coordinates
-  const userLine = payloadLineToUserLine(session, session.currentLine);
+  const isHeaderPos = session.currentRoutine === 'TMPDBG' &&
+    Number.isInteger(session.headerLines) &&
+    session.headerLines > 0 &&
+    session.currentLine <= session.headerLines;
+
+  let userLine = payloadLineToUserLine(session, session.currentLine);
+  if (isHeaderPos && session.lastUserLine) {
+    // Stay on the last real user line instead of bouncing to TMPDBG header
+    userLine = session.lastUserLine;
+  } else {
+    session.lastUserLine = userLine;
+  }
+
   const clientCallStack = (session.callStack || []).map((frame) => ({
     ...frame,
     line: payloadLineToUserLine(session, frame.line || frame.returnLine || 1),
@@ -2164,6 +2248,53 @@ async function sendZStepCommand(sessionId, command) {
     locals: session.locals || {},
     output: consumeSessionOutput(session)
   };
+}
+
+async function sendZStepEval(sessionId, code = '') {
+  const session = debugSessions[sessionId];
+  if (!session || session.engine !== 'zstep') return { ok: false, error: 'Session not found' };
+  if (session.procExited) {
+    return { ok: false, error: 'Program finished', output: consumeSessionOutput(session) };
+  }
+  const safeCode = (code || '').replace(/\r/g, '');
+  try {
+    session.proc.stdin.write(`EVAL;${safeCode}\n`);
+  } catch (err) {
+    return { ok: false, error: 'Failed to send eval: ' + err.message };
+  }
+  const EVAL_TIMEOUT_MS = 15000;
+  let evt = await waitForEvent(session, ['eval', 'error', 'exit'], EVAL_TIMEOUT_MS);
+  // If the M side is a bit slow, give one more chance to consume a late eval event
+  if (evt && evt.event === 'error' && evt.message === 'Timeout waiting for debugger event') {
+    const queuedEval = pullQueuedEvent(session, 'eval');
+    if (queuedEval) {
+      evt = queuedEval;
+    } else {
+      const graceEvt = await waitForEvent(session, ['eval', 'error', 'exit'], 4000);
+      if (graceEvt) evt = graceEvt;
+    }
+  }
+  if (!evt) return { ok: false, error: 'Eval timeout' };
+  if (evt.event === 'exit') {
+    session.procExited = true;
+    return { ok: false, error: 'Program finished', output: consumeSessionOutput(session) };
+  }
+  if (evt.event === 'error') {
+    return { ok: false, error: evt.message || 'Runtime error', output: consumeSessionOutput(session) };
+  }
+  if (evt.event === 'eval') {
+    if (evt.ok === 0) {
+      return { ok: false, error: evt.error || 'Eval failed', output: consumeSessionOutput(session) };
+    }
+    const locals = normalizeDebuggerVars(evt.locals || {});
+    session.locals = locals;
+    return {
+      ok: true,
+      output: `${consumeSessionOutput(session)}${decodeMString(evt.output || '')}`,
+      locals
+    };
+  }
+  return { ok: false, error: 'Unexpected eval response' };
 }
 
 function readGitConfig(projectPath) {
@@ -3111,6 +3242,15 @@ module.exports = {
       stack: session.stack,
       output: session.output.join('\n')
     };
+  },
+
+  async debugEval(sessionId, code) {
+    const session = debugSessions[sessionId];
+    if (!session) return { ok: false, error: 'Session not found' };
+    if (session.engine === 'zstep') {
+      return sendZStepEval(sessionId, code);
+    }
+    return { ok: false, error: 'Eval not supported for this engine' };
   },
 
   async debugStop(sessionId) {

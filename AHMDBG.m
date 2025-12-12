@@ -132,6 +132,8 @@ READLP   ; loop until we get a stepping command
         IF $EXTRACT(CMD,1,6)="SETBP;" DO SETBPCMD(CMD) GOTO READLP
         ; breakpoint clear commands
         IF $EXTRACT(CMD,1,8)="CLEARBP;" DO CLEARBPJSON(CMD) GOTO READLP
+        ; eval command
+        IF $EXTRACT(CMD,1,5)="EVAL;" DO EVJSON(CMD) GOTO READLP
         ; variable query command
         IF CMD="GETVARS" DO SENDVARS GOTO READLP
         ; stepping commands
@@ -273,6 +275,101 @@ SENDVARS ;
         . SET FIRST=0
         WRITE "}}",!
         QUIT
+        ;
+        ; -------------------------------------------------------------------
+        ; EVJSON: Evaluate arbitrary M code while paused, capture output safely
+        ; Input format: EVAL;<m-code>
+        ; Sends: {"event":"eval","ok":1,"output":"...","locals":{...}}
+        ; -------------------------------------------------------------------
+EVJSON(CMD) ;
+        NEW CODE,FN,OLDIO,LINE,OUT,I,JSON,ERR,LOCALS
+        SET CODE=$PIECE(CMD,";",2,999)
+        IF CODE="" DO  QUIT
+        . USE $PRINCIPAL
+        . WRITE "{""event"":""eval"",""ok"":0,""error"":""Empty command""}",!
+        SET FN="/tmp/ahmad_dbg/eval_"_$J_".tmp"
+        SET OLDIO=$IO,ERR=""
+        SET $ETRAP="GOTO EVAERR^AHMDBG"
+        ; capture output to file
+        OPEN FN:NEWVERSION
+        USE FN
+        XECUTE CODE
+        USE OLDIO
+        CLOSE FN
+        ; read captured output
+        OPEN FN:READONLY
+        USE FN
+        SET I=0
+        FOR  USE FN READ LINE QUIT:$ZEOF  DO
+        . SET I=I+1,OUT(I)=LINE
+        CLOSE FN
+        ; cleanup temp file (best-effort)
+        ZSYSTEM "rm -f "_FN
+        ; capture locals after eval
+        NEW I,LINEVAR,VAR,VAL,FIRST,SKIP
+        K ^%AHMDBG($J,"VARS")
+        ZSHOW "V":^%AHMDBG($J,"VARS")
+        SET LOCALS=""
+        SET I="",FIRST=1
+        FOR  SET I=$ORDER(^%AHMDBG($J,"VARS","V",I)) QUIT:I=""  DO
+        . SET LINEVAR=^%AHMDBG($J,"VARS","V",I)
+        . SET VAR=$PIECE(LINEVAR,"=",1)
+        . SET SKIP=0
+        . IF $EXTRACT(VAR,1,1)="%" SET SKIP=1
+        . IF VAR="SKIP" SET SKIP=1
+        . IF VAR="I" SET SKIP=1
+        . IF VAR="LINE" SET SKIP=1
+        . IF VAR="VAR" SET SKIP=1
+        . IF VAR="VAL" SET SKIP=1
+        . IF VAR="FIRST" SET SKIP=1
+        . IF VAR="CMD" SET SKIP=1
+        . IF VAR="CMDLINE" SET SKIP=1
+        . IF VAR="USR" SET SKIP=1
+        . IF VAR="POS" SET SKIP=1
+        . IF VAR="ROU" SET SKIP=1
+        . IF VAR="ROUT" SET SKIP=1
+        . IF VAR="TAG" SET SKIP=1
+        . IF VAR="OFF" SET SKIP=1
+        . IF VAR="LIN" SET SKIP=1
+        . IF VAR="STARTCMD" SET SKIP=1
+        . QUIT:SKIP
+        . SET VAL=$PIECE(LINEVAR,"=",2,999)
+        . IF $EXTRACT(VAL,1,1)="""" SET VAL=$EXTRACT(VAL,2,$LENGTH(VAL)-1)
+        . IF 'FIRST SET LOCALS=LOCALS_","
+        . SET LOCALS=LOCALS_""""_$$ESC(VAR)_""":"""_$$ESC(VAL)_""""
+        . SET FIRST=0
+        USE $PRINCIPAL
+        SET JSON="{""event"":""eval"",""ok"":1,""output"":"""_$$JOINOUT(.OUT)_""",""locals"":{"_LOCALS_"}}"
+        WRITE JSON,!
+        QUIT
+EVAERR  ; error during eval
+        USE OLDIO
+        SET ERR=$ZSTATUS
+        ZSYSTEM "rm -f "_FN
+        USE $PRINCIPAL
+        WRITE "{""event"":""eval"",""ok"":0,""error"":"""_$$ESC(ERR)_"""}",!
+        SET $ECODE=""
+        QUIT
+        ;
+JOINOUT(ARR) ; join captured output lines with \n and escape JSON
+        NEW I,RES
+        SET RES=""
+        SET I=0
+        FOR  SET I=$ORDER(ARR(I)) QUIT:'I  DO
+        . IF RES'="" SET RES=RES_"\n"
+        . SET RES=RES_$$ESC(ARR(I))
+        QUIT RES
+        ;
+ESC(STR) ; basic JSON string escape for " and \
+        NEW OUT,I,C
+        SET OUT=""
+        SET STR=$GET(STR)
+        FOR I=1:1:$LENGTH(STR) DO
+        . SET C=$EXTRACT(STR,I)
+        . IF C="""" SET OUT=OUT_"\\"_"""" QUIT
+        . IF C="\\" SET OUT=OUT_"\\"_"\\" QUIT
+        . SET OUT=OUT_C
+        QUIT OUT
         ;
         ; -------------------------------------------------------------------
         ; Tiny JSON helpers (very limited, for our own payload only)

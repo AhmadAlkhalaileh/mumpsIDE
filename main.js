@@ -188,6 +188,10 @@ ipcHandle('debug:stop', async (_event, payload) => {
     return bridge.debugStop(payload?.sessionId || '');
 });
 
+ipcHandle('debug:eval', async (_event, payload) => {
+    return bridge.debugEval(payload?.sessionId || '', payload?.code || '');
+});
+
 // ---------------------------------------------------------
 // LEGACY MDEBUG TCP HANDLERS (Isolated / Optional)
 // These are not exposed by preload.js anymore but kept if needed for reference

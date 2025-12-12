@@ -2399,6 +2399,21 @@ body.hide-terminal #terminalPanel {
     color: var(--text);
 }
 
+.debug-console-input {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.debug-console-input input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--panel);
+    color: var(--text);
+}
+
 .debug-columns {
     display: grid;
     grid-template-columns: repeat(4, 1fr);

@@ -5892,6 +5892,74 @@
         host.scrollTop = host.scrollHeight;
     }
 
+    function appendDebugConsole(lines) {
+        const host = document.getElementById('debugOutput');
+        if (!host) return;
+        const existing = host.textContent ? host.textContent.split('\n') : [];
+        const next = existing.concat(Array.isArray(lines) ? lines : [lines]);
+        host.textContent = next.join('\n');
+        host.scrollTop = host.scrollHeight;
+    }
+
+    function ensureConsoleInput() {
+        const pane = document.getElementById('tab-console');
+        if (!pane) return;
+        if (document.getElementById('debugConsoleInput')) return;
+        const wrapper = document.createElement('div');
+        wrapper.className = 'debug-console-input';
+        const input = document.createElement('input');
+        input.id = 'debugConsoleInput';
+        input.type = 'text';
+        input.placeholder = 'M command (e.g., SET X=5 or WRITE X)';
+        const btn = document.createElement('button');
+        btn.id = 'debugConsoleSend';
+        btn.className = 'btn ghost';
+        btn.textContent = 'Run';
+        btn.title = 'Execute in paused frame';
+        wrapper.appendChild(input);
+        wrapper.appendChild(btn);
+        pane.appendChild(wrapper);
+
+        const run = async () => {
+            if (!currentDebugSession || !currentDebugSession.id) {
+                showToast('warn', 'Debug', 'No active debug session');
+                return;
+            }
+            const code = (input.value || '').trim();
+            if (!code) return;
+            appendDebugConsole(`> ${code}`);
+            try {
+                const res = await window.ahmadIDE.debugEval(currentDebugSession.id, code);
+                if (res && res.ok) {
+                    if (res.output) appendDebugConsole(res.output.split(/\r?\n/));
+                    if (res.locals) {
+                        currentDebugSession.locals = res.locals;
+                        renderLocals(currentDebugSession.locals);
+                    }
+                } else {
+                    const msg = res?.error || 'Eval failed';
+                    appendDebugConsole(`! ${msg}`);
+                    if (res?.output) appendDebugConsole(res.output.split(/\r?\n/));
+                    showToast('error', 'Debug', msg);
+                }
+            } catch (e) {
+                const msg = e?.message || 'Eval error';
+                appendDebugConsole(`! ${msg}`);
+                showToast('error', 'Debug', msg);
+            } finally {
+                input.value = '';
+            }
+        };
+
+        btn.addEventListener('click', run);
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                run();
+            }
+        });
+    }
+
     function logDebug(lines, termState, replace = false) {
         const host = document.getElementById('debugOutput');
         if (!host) return;
@@ -6065,6 +6133,7 @@
             const lines = rawLines.filter((line, idx) => line.length || idx < rawLines.length - 1);
             appendOutput(lines, globalTerminalState);
         }
+        appendDebugConsole(output.split(/\r?\n/));
     }
 
     async function startDebugSession(editorParam = activeEditor, dbgStateParam = dbgStateRef, terminalState = globalTerminalState, debugBarEl = document.getElementById('debugBar'), bpLinesOverride = null) {
@@ -6152,6 +6221,7 @@
         renderLocals(currentDebugSession.locals);
         renderStack(currentDebugSession.stack);
         updateDebugButtonState();
+        ensureConsoleInput();
 
         // Remember currently open bottom panel so we can restore after debug
         if (dbgStateParam) {
@@ -6319,6 +6389,7 @@
             console.log('[DEBUG] Updating variables panel with', Object.keys(currentDebugSession.locals).length, 'variables');
             renderLocals(currentDebugSession.locals);
             renderStack(currentDebugSession.stack);
+            updateDebugButtonState();
 
             // Enable all debug buttons (debugger is paused at a line)
             setDebugButtons(true);
@@ -6433,6 +6504,7 @@
         bind('dbgStepOutBtn', debugStepOut);
         bind('dbgContinueBtn', debugContinue);
         bind('dbgStopBtn', debugStop);
+        ensureConsoleInput();
 
         // Also bind the toolbar Step buttons if they exist separately?
         // In the HTML I saw specific IDs on the debug bar.

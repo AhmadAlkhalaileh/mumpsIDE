@@ -28,6 +28,8 @@ contextBridge.exposeInMainWorld('ahmadIDE', {
         ipcRenderer.invoke('debug:continue', { sessionId }),
     debugStop: (sessionId) =>
         ipcRenderer.invoke('debug:stop', { sessionId }),
+    debugEval: (sessionId, code) =>
+        ipcRenderer.invoke('debug:eval', { sessionId, code }),
 
     // Docker
     listDocker: () => ipcRenderer.invoke('docker:list'),
