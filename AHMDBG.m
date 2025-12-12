@@ -18,6 +18,7 @@ AHMDBG  ; Ahmad JSON Debugger - stdin/stdout only
         ;     OVER
         ;     OUTOF
         ;     CONTINUE
+        ;     GETVARS
         ;     HALT | EXIT | QUIT
         ;     SETBP;<routine>;<tag>;<offset>
         ;     SETBPJSON;{"routine":"TMPDBG","tag":"TAG","offset":N}
@@ -54,13 +55,22 @@ AHMDBGJSON(entryRoutine,entryTag) ;
         ;  F -> ZSTEP OUTOF  (step out)
         ;  C -> ZCONTINUE    (run / continue)
         ;  H -> HALT         (stop program)
-        SET $ZSTEP="SET %STP=$$STEPJSON^AHMDBG() ZSTEP:%STP=""I"" INTO ZSTEP:%STP=""O"" OVER ZSTEP:%STP=""F"" OUTOF ZCONTINUE:%STP=""C""  HALT:%STP=""H"""
-        ; notify debugger that we started
+        ; Capture variables before calling STEPJSON (while in user scope)
+        SET $ZSTEP="ZSHOW ""V"":^%AHMDBG($J,""VARS"") SET %STP=$$STEPJSON^AHMDBG() ZSTEP:%STP=""I"" INTO ZSTEP:%STP=""O"" OVER ZSTEP:%STP=""F"" OUTOF ZCONTINUE:%STP=""C""  HALT:%STP=""H"""
+        ; notify debugger that we are ready (waiting for first command)
         USE $PRINCIPAL
-        WRITE "{""event"":""started"",""routine"":""",ROUT,""",""tag"":""",TAG,"""}",!
-        ; begin execution with ZSTEP enabled
+        WRITE "{""event"":""ready"",""routine"":""",ROUT,""",""tag"":""",TAG,"""}",!
+        ; Wait for debugger command before starting execution
+        NEW STARTCMD
+        SET STARTCMD=$$READCMDJSON()
+        ; If user sent HALT before starting, exit
+        IF STARTCMD="H" QUIT
+        ; IMPORTANT: First command must ALWAYS use INTO to enter the routine
+        ; OVER/OUTOF only work when already executing inside a routine
+        ; So we ignore the command type and always use INTO for startup
         IF TAG'="" ZSTEP INTO DO @(TAG_"^"_ROUT) QUIT
         ELSE  ZSTEP INTO DO @("^"_ROUT) QUIT
+        QUIT
         ;
         ; -------------------------------------------------------------------
         ; $ZSTEP handler: send stopped event & wait for next command
@@ -122,6 +132,8 @@ READLP   ; loop until we get a stepping command
         IF $EXTRACT(CMD,1,6)="SETBP;" DO SETBPCMD(CMD) GOTO READLP
         ; breakpoint clear commands
         IF $EXTRACT(CMD,1,8)="CLEARBP;" DO CLEARBPJSON(CMD) GOTO READLP
+        ; variable query command
+        IF CMD="GETVARS" DO SENDVARS GOTO READLP
         ; stepping commands
         IF CMD="INTO"     QUIT "I"  ; ZSTEP INTO
         IF CMD="OVER"     QUIT "O"  ; ZSTEP OVER
@@ -214,6 +226,52 @@ CLEARBPJSON(CMD) ;
         ZBREAK @BP
         USE $PRINCIPAL
         WRITE "{""event"":""bp-cleared"",""routine"":""",R,""",""line"":",L,"}",!
+        QUIT
+        ;
+        ; -------------------------------------------------------------------
+        ; SENDVARS: Send all local variables as JSON
+        ; Uses ZSHOW "V" to capture variable state
+        ; -------------------------------------------------------------------
+        ;
+SENDVARS ;
+        NEW I,LINE,VAR,VAL,FIRST,SKIP
+        ; Use variables captured in $ZSTEP action (stored in global)
+        USE $PRINCIPAL
+        WRITE "{""event"":""vars"",""vars"":{"
+        SET I="",FIRST=1
+        FOR  SET I=$ORDER(^%AHMDBG($J,"VARS","V",I)) QUIT:I=""  DO
+        . SET LINE=^%AHMDBG($J,"VARS","V",I)
+        . ; Parse ZSHOW output: VAR=value
+        . SET VAR=$PIECE(LINE,"=",1)
+        . ; Skip system variables and debugger internal variables
+        . SET SKIP=0
+        . IF $EXTRACT(VAR,1,1)="%" SET SKIP=1
+        . IF VAR="SKIP" SET SKIP=1
+        . IF VAR="I" SET SKIP=1
+        . IF VAR="LINE" SET SKIP=1
+        . IF VAR="VAR" SET SKIP=1
+        . IF VAR="VAL" SET SKIP=1
+        . IF VAR="FIRST" SET SKIP=1
+        . IF VAR="CMD" SET SKIP=1
+        . IF VAR="CMDLINE" SET SKIP=1
+        . IF VAR="USR" SET SKIP=1
+        . IF VAR="POS" SET SKIP=1
+        . IF VAR="ROU" SET SKIP=1
+        . IF VAR="ROUT" SET SKIP=1
+        . IF VAR="TAG" SET SKIP=1
+        . IF VAR="OFF" SET SKIP=1
+        . IF VAR="LIN" SET SKIP=1
+        . IF VAR="STARTCMD" SET SKIP=1
+        . QUIT:SKIP
+        . ; Extract value (everything after first =)
+        . SET VAL=$PIECE(LINE,"=",2,999)
+        . ; Remove quotes if present
+        . IF $EXTRACT(VAL,1,1)="""" SET VAL=$EXTRACT(VAL,2,$LENGTH(VAL)-1)
+        . ; Output JSON key-value pair
+        . IF 'FIRST WRITE ","
+        . WRITE """",VAR,""":""",VAL,""""
+        . SET FIRST=0
+        WRITE "}}",!
         QUIT
         ;
         ; -------------------------------------------------------------------

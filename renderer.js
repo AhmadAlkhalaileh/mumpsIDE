@@ -4096,11 +4096,19 @@
                     const bpLines = getBpLines();
                     const debugActive = shouldDebugForRun();
 
-                    // If debug mode enabled, start debugging (even if no breakpoints)
+                    // If debug mode enabled, check if session already ready
                     if (debugActive) {
-                        debugStartBtnEl?.classList.add('active');
-                        dbgState.debugModeEnabled = true;
-                        await startDebugSession(editor, dbgState, terminalState, debugBar, bpLines);
+                        // Check if debugger is already initialized and waiting
+                        if (currentDebugSession && currentDebugSession.ready && !currentDebugSession.currentLine) {
+                            // Debugger is ready, send Continue to start execution
+                            console.log('[RUN] Debugger already ready, sending Continue command');
+                            await debugContinue();
+                        } else {
+                            // Start new debug session
+                            debugStartBtnEl?.classList.add('active');
+                            dbgState.debugModeEnabled = true;
+                            await startDebugSession(editor, dbgState, terminalState, debugBar, bpLines);
+                        }
                     } else {
                         // Normal execution (no debugging)
                         const res = await runMumpsCode(editor, terminalState);
@@ -4169,11 +4177,19 @@
                     const bpLines = getBpLines();
                     const debugActive = shouldDebugForRun();
 
-                    // If debug mode enabled, start debugging (even if no breakpoints)
+                    // If debug mode enabled, check if session already ready
                     if (debugActive) {
-                        debugStartBtnEl?.classList.add('active');
-                        dbgState.debugModeEnabled = true;
-                        await startDebugSession(editor, dbgState, terminalState, debugBar, bpLines);
+                        // Check if debugger is already initialized and waiting
+                        if (currentDebugSession && currentDebugSession.ready && !currentDebugSession.currentLine) {
+                            // Debugger is ready, send Continue to start execution
+                            console.log('[RUN] Debugger already ready, sending Continue command');
+                            await debugContinue();
+                        } else {
+                            // Start new debug session
+                            debugStartBtnEl?.classList.add('active');
+                            dbgState.debugModeEnabled = true;
+                            await startDebugSession(editor, dbgState, terminalState, debugBar, bpLines);
+                        }
                     } else {
                         // Normal execution (no debugging)
                         const res = await runMumpsCode(editor, terminalState);
@@ -6138,21 +6154,24 @@
         }
 
         console.log('debugStart response OK', res);
+        console.log('[DEBUG] Full response object:', JSON.stringify(res, null, 2));
         // alert('Debugger started! Session ID: ' + res.sessionId); // Temporary success confirmation
 
         currentDebugSession = {
             id: res.sessionId,
             engine: res.engine || 'zstep',
-            currentLine: res.currentLine || 1,
+            currentLine: res.currentLine,
             currentRoutine: res.currentRoutine || 'TMPDBG',
             stack: res.stack || [],
             locals: res.locals || {},
+            ready: res.ready || false
         };
 
         console.log('Debug Session Started:', currentDebugSession);
 
-        // Update UI
-        setDebugButtons(true);
+        // Show initial variables and stack
+        renderLocals(currentDebugSession.locals);
+        renderStack(currentDebugSession.stack);
 
         // Show debug bar if hidden
         const bar = document.getElementById('debugBar');
@@ -6171,9 +6190,53 @@
             console.log('[DEBUG UI] debugPanel button clicked');
         }
 
-        if (currentDebugSession.currentLine) {
+        // Show appropriate message
+        console.log('[DEBUG] Checking debug session state:', {
+            ready: currentDebugSession.ready,
+            currentLine: currentDebugSession.currentLine
+        });
+
+        if (currentDebugSession.ready && !currentDebugSession.currentLine) {
+            console.log('[DEBUG] Debugger in READY state - waiting for user to start');
+            // Debugger is ready but not executing yet
+            setDebugButtons(false);
+
+            const stepIntoBtn = document.getElementById('dbgStepIntoBtn');
+            const continueBtn = document.getElementById('dbgContinueBtn');
+            const stopBtn = document.getElementById('dbgStopBtn');
+
+            // Always enable Step Into and Stop
+            if (stepIntoBtn) {
+                stepIntoBtn.removeAttribute('disabled');
+                stepIntoBtn.disabled = false;
+            }
+            if (stopBtn) {
+                stopBtn.removeAttribute('disabled');
+                stopBtn.disabled = false;
+            }
+
+            // Only enable Continue if there are breakpoints
+            const hasBreakpoints = breakpoints && breakpoints.length > 0;
+            if (hasBreakpoints) {
+                console.log('[DEBUG] Breakpoints detected - enabling Continue button');
+                if (continueBtn) {
+                    continueBtn.removeAttribute('disabled');
+                    continueBtn.disabled = false;
+                }
+                showToast('success', 'Debug', 'Ready. Click Continue (▶) to run to breakpoint, or Step Into (⤵) to step line-by-line.');
+            } else {
+                console.log('[DEBUG] No breakpoints - Continue button stays disabled');
+                // Continue stays disabled - user must use Step Into
+                showToast('success', 'Debug', 'Ready. Click Step Into (⤵) to start. Set breakpoints to enable Continue button.');
+            }
+        } else if (currentDebugSession.currentLine) {
+            console.log('[DEBUG] Debugger in PAUSED state - enabling all buttons');
+            // Debugger is executing, enable all buttons
+            setDebugButtons(true);
             gotoEditorLine(currentDebugSession.currentLine);
-            showToast('success', 'Debug', 'Debugger initialized. Press Run/Continue to start.');
+            showToast('success', 'Debug', 'Debugger paused at line ' + currentDebugSession.currentLine);
+        } else {
+            console.log('[DEBUG] Unknown debug state - not ready and no currentLine');
         }
     }
 
@@ -6205,6 +6268,7 @@
     }
 
     async function debugContinue() {
+        console.log('[DEBUG] debugContinue called, session:', currentDebugSession);
         if (!currentDebugSession || !currentDebugSession.id) {
             showToast('warn', 'Debug', 'No active debug session');
             return;
@@ -6222,8 +6286,20 @@
         }
         const result = await window.ahmadIDE.debugStop(currentDebugSession.id);
         if (result && result.ok) {
+            // Show any accumulated output in the terminal
+            if (result.output && result.output.trim()) {
+                console.log('[DEBUG] Displaying final output from stopped session');
+                // Get the terminal output element
+                const terminalOutput = document.getElementById('terminalOutput');
+                if (terminalOutput) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = result.output;
+                    terminalOutput.appendChild(pre);
+                }
+            }
             currentDebugSession = null;
             resetDebugUI();
+            showToast('info', 'Debug', 'Debug session stopped');
         } else {
             showDebugError('Stop failed: ' + (result?.error || 'Unknown'));
         }
@@ -6234,23 +6310,70 @@
             const msg = result?.error || 'Unknown error';
             if (msg === 'Program finished' || msg === 'end') {
                 console.log('Program finished');
+                // Show final output when program finishes
+                if (result.output && result.output.trim()) {
+                    console.log('[DEBUG] Displaying final output from finished program');
+                    const terminalOutput = document.getElementById('terminalOutput');
+                    if (terminalOutput) {
+                        const pre = document.createElement('pre');
+                        pre.textContent = result.output;
+                        terminalOutput.appendChild(pre);
+                    }
+                }
                 currentDebugSession = null;
                 resetDebugUI();
                 showToast('success', 'Debug', 'Program finished');
             } else {
+                // Non-fatal error - show error but keep debug session active if it still exists
                 showToast('error', 'Debug', msg);
+                console.error('[DEBUG] Debug error:', msg);
+
+                // Only reset UI if error indicates session is dead
+                if (msg.includes('Session not found') || msg.includes('process error') ||
+                    msg.includes('Failed to send command') || result.output) {
+                    // Show any output before resetting
+                    if (result.output && result.output.trim()) {
+                        const terminalOutput = document.getElementById('terminalOutput');
+                        if (terminalOutput) {
+                            const pre = document.createElement('pre');
+                            pre.textContent = result.output;
+                            terminalOutput.appendChild(pre);
+                        }
+                    }
+                    currentDebugSession = null;
+                    resetDebugUI();
+                }
             }
             return;
         }
 
         if (result.currentLine) {
+            // Execution has started - transition from "ready" to "running"
+            const wasReady = currentDebugSession.ready && !currentDebugSession.currentLine;
+
             currentDebugSession.currentLine = result.currentLine;
             currentDebugSession.currentRoutine = result.currentRoutine || currentDebugSession.currentRoutine;
             currentDebugSession.stack = result.stack || currentDebugSession.stack;
-            currentDebugSession.locals = result.locals || currentDebugSession.locals || {};
+            // CRITICAL: Always update locals from result (don't use fallback to old locals)
+            currentDebugSession.locals = result.locals || {};
+            currentDebugSession.ready = false; // No longer in ready state
 
             gotoEditorLine(result.currentLine);
+
+            // Update Variables and Stack panels IMMEDIATELY
+            console.log('[DEBUG] Updating variables panel with', Object.keys(currentDebugSession.locals).length, 'variables');
+            renderLocals(currentDebugSession.locals);
+            renderStack(currentDebugSession.stack);
+
+            // Enable all debug buttons (debugger is paused at a line)
+            setDebugButtons(true);
+
+            if (wasReady) {
+                console.log('[DEBUG] Execution started (transitioned from ready to running)');
+            }
+
             console.log('Debug State Updated:', currentDebugSession);
+            console.log('[DEBUG] Current variables:', currentDebugSession.locals);
         }
     }
 
@@ -6279,9 +6402,21 @@
             'dbgStepIntoBtn', 'dbgStepOverBtn', 'dbgStepOutBtn',
             'dbgContinueBtn', 'dbgStopBtn', 'dbgRestartBtn', 'dbgPauseBtn'
         ];
+        console.log('[DEBUG] setDebugButtons called with enabled =', enabled);
         ids.forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.disabled = !enabled;
+            if (el) {
+                if (enabled) {
+                    el.removeAttribute('disabled');
+                    el.disabled = false;
+                } else {
+                    el.setAttribute('disabled', 'true');
+                    el.disabled = true;
+                }
+                console.log(`[DEBUG] Button ${id}: disabled = ${el.disabled}, hasAttribute = ${el.hasAttribute('disabled')}`);
+            } else {
+                console.log(`[DEBUG] Button ${id} not found in DOM`);
+            }
         });
     }
 
@@ -6302,7 +6437,9 @@
         };
 
         // Note: adapting to ACTUAL HTML IDs found in index.html
-        bind('debugStartBtn', startDebugSession);
+        // DEBUG BUTTON REMOVED: Debug button only toggles mode, doesn't start session
+        // Session starts when RUN button is clicked (handled in runBtn click handler)
+        // bind('debugStartBtn', startDebugSession); // REMOVED
         bind('dbgStepIntoBtn', debugStepInto);
         bind('dbgStepOverBtn', debugStepOver);
         bind('dbgStepOutBtn', debugStepOut);
@@ -7344,10 +7481,22 @@
     function registerMumpsHover() {
         monaco.languages.registerHoverProvider('mumps', {
             provideHover: function (model, position) {
-                if (!currentDebugSession || !currentDebugSession.locals) return null;
+                // Only show hover during active debug session
+                if (!currentDebugSession || !currentDebugSession.locals) {
+                    console.log('[HOVER] No debug session or locals');
+                    return null;
+                }
+                // Don't show hover in "ready" state (before execution starts)
+                if (!currentDebugSession.currentLine) {
+                    console.log('[HOVER] Debug session not started yet');
+                    return null;
+                }
 
                 const word = model.getWordAtPosition(position);
-                if (!word) return null;
+                if (!word) {
+                    console.log('[HOVER] No word at position');
+                    return null;
+                }
 
                 let varName = word.word.toUpperCase();
 
@@ -7361,19 +7510,25 @@
                     }
                 }
 
+                console.log('[HOVER] Looking up variable:', varName);
+                console.log('[HOVER] Available variables:', Object.keys(currentDebugSession.locals));
+
                 // Check locals for the variable
-                // 1. Exact match (uppercased)
-                // 2. Or if key exists with differtent case, use that
+                // 1. Exact match (as returned by debugger - should already be uppercase)
                 let val = currentDebugSession.locals[varName];
 
-                // Fallback: try to find case-insensitive match if exact fail
+                // Fallback: try to find case-insensitive match if exact fails
                 if (val === undefined) {
                     const keys = Object.keys(currentDebugSession.locals);
                     const match = keys.find(k => k.toUpperCase() === varName);
-                    if (match) val = currentDebugSession.locals[match];
+                    if (match) {
+                        console.log('[HOVER] Found case-insensitive match:', match);
+                        val = currentDebugSession.locals[match];
+                    }
                 }
 
                 if (val !== undefined && val !== null) {
+                    console.log('[HOVER] Found value for', varName, ':', val);
                     let displayValue = '';
                     if (typeof val === 'object' && val._isArray) {
                         const len = Object.keys(val._elements || {}).length;
@@ -7391,10 +7546,12 @@
                         range: new monaco.Range(position.lineNumber, word.startColumn - (varName.startsWith('%') ? 1 : 0), position.lineNumber, word.endColumn),
                         contents: [
                             { value: `**${varName}**` },
-                            { value: '```text\n' + displayValue + '\n```' }
+                            { value: '```mumps\n' + displayValue + '\n```' }
                         ]
                     };
                 }
+
+                console.log('[HOVER] No value found for variable:', varName);
                 return null;
             }
         });

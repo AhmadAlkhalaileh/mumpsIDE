@@ -1919,7 +1919,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   session.zstepUserBps = new Set(resolvedBps.map(bp => `TMPDBG#${bp.payloadLine}`));
   session.autoBps = new Set();
 
-  console.log('[DEBUG] Waiting for initial stopped event...');
+  console.log('[DEBUG] Waiting for ready event...');
 
   // Give AHMDBG some time to register breakpoints
   if (resolvedBps.length > 0) {
@@ -1927,8 +1927,8 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
 
-  // Wait for stopped event (AHMDBG sends 'started' first, then 'stopped')
-  let firstEvt = null;
+  // Wait for ready event (AHMDBG sends 'ready' and waits for command)
+  let readyEvt = null;
   const maxAttempts = 10;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const evt = await waitForZStepEvent(session);
@@ -1939,134 +1939,92 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       continue;
     }
 
-    if (evt.event === 'started') {
-      console.log('[DEBUG] Got "started" event, waiting for "stopped"...');
-      continue;
+    if (evt.event === 'ready') {
+      console.log('[DEBUG] Got "ready" event - debugger initialized and waiting for command');
+      readyEvt = evt;
+      break;
     }
 
-    if (evt.event === 'stopped' || evt.event === 'error' || evt.event === 'exit') {
-      firstEvt = evt;
+    if (evt.event === 'error' || evt.event === 'exit') {
+      readyEvt = evt;
       break;
     }
   }
 
-  console.log('[DEBUG] Final event:', JSON.stringify(firstEvt));
+  console.log('[DEBUG] Ready event:', JSON.stringify(readyEvt));
 
-  if (firstEvt) {
-    if (firstEvt.event === 'stopped') {
-      console.log('[DEBUG] Processing stopped event...');
-      await applyZStepEvent(session, firstEvt);
-      console.log('[DEBUG] Stopped event processed successfully');
+  if (readyEvt) {
+    if (readyEvt.event === 'ready') {
+      console.log('[DEBUG] Debugger ready. Setting up session without executing...');
 
-      let userLine = payloadLineToUserLine(session, session.currentLine);
-      const payloadLineText = session.sourceMap?.lines?.[session.currentLine - 1] || '(unknown)';
+      // Initialize session state without execution
+      session.currentRoutine = readyEvt.routine || 'TMPDBG';
+      session.currentTag = readyEvt.tag || '';
+      session.currentLine = 1; // Will be set when execution starts
+      session.locals = {}; // No variables yet
 
-      console.log('[DEBUG] Initial stop - Payload line:', session.currentLine, 'User line:', userLine);
-      console.log('[DEBUG] Payload line text:', payloadLineText.trim());
-      console.log('[DEBUG] Breakpoints set at payload lines:', Array.from(session.manualBreakpoints));
-      console.log('[DEBUG] Breakpoints set at user lines:', Array.from(session.userBreakpoints || []));
+      console.log('[DEBUG] ========== DEBUG SESSION READY ==========');
+      console.log('[DEBUG] Debugger initialized and waiting for Continue/Step command');
+      console.log('[DEBUG]   Routine:', session.currentRoutine);
+      console.log('[DEBUG]   Tag:', session.currentTag);
+      console.log('[DEBUG] ==============================================');
 
-      dbgLog('[runtime] Initial stop', {
-        payloadLine: session.currentLine,
-        userLine: userLine,
-        payloadLineText: payloadLineText.trim(),
-        breakpoints: Array.from(session.manualBreakpoints),
-        atBreakpoint: session.manualBreakpoints.has(session.currentLine)
-      });
-
-      console.log('[DEBUG] Line mapping (payloadToUser array first 20 entries):');
-      const mapping = session.payloadToUser || [];
-      for (let i = 0; i < Math.min(20, mapping.length); i++) {
-        console.log(`[DEBUG]   Payload line ${i + 1} -> User line ${mapping[i]}`);
-      }
-
-      // AUTO-CONTINUE LOGIC:
-      // If the initial stop (usually line 1) is NOT a breakpoint, automatically continue.
-      // This mimics standard IDE behavior "Run until breakpoint".
-      const isBreakpoint = session.manualBreakpoints.has(session.currentLine);
-      const isRunToCursor = (Number.isInteger(startLine) && startLine > 0);
-      // If it's a "Run to Cursor" launch, we stop if we are AT that line (unlikely for line 1 unless cursor is there).
-      // Otherwise, we continue.
-
-      // TEMPORARILY DISABLED: Auto-continue
-      // Issue: Breakpoints not resolving correctly, so auto-continue causes immediate exit.
-      // For now, always stop at first line so user can manually step.
-      let shouldAutoContinue = false;
-      console.log('[DEBUG] Auto-continue disabled for debugging. Breakpoint status:', {
-        isBreakpoint,
-        isRunToCursor,
-        userLine,
-        startLine,
-        manualBreakpoints: Array.from(session.manualBreakpoints || []),
-        userBreakpoints: Array.from(session.userBreakpoints || [])
-      });
-
-      if (shouldAutoContinue) {
-        console.log('[DEBUG] Initial line is not a breakpoint. Auto-continuing...');
-        dbgLog('[runtime] Auto-continuing', { fromLine: userLine });
-
-        // We must use sendZStepCommand directly or just write to stdin
-        // But we need to update session state.
-        // Calling sendZStepCommand('CONTINUE') requires the session to be fully returned?
-        // No, we can write to stdin here and wait for next stop.
-
-        // Write CONTINUE
-        session.proc.stdin.write('CONTINUE\n');
-
-        // Wait for the NEXT stop
-        const nextEvt = await waitForZStepEvent(session);
-        if (nextEvt && nextEvt.event === 'stopped') {
-          await applyZStepEvent(session, nextEvt);
-          // Update userLine for the return
-          userLine = payloadLineToUserLine(session, session.currentLine);
-        } else if (nextEvt && (nextEvt.event === 'exit' || nextEvt.event === 'error')) {
-          // Handle exit during auto-continue
-          session.procExited = true;
-          delete debugSessions[id];
-          return { ok: false, error: nextEvt.message || 'Program finished during auto-start', output: (session.output || []).join('\n') };
-        }
-      }
-
-    } else if (firstEvt.event === 'error') {
-      console.log('[DEBUG] Error event received:', firstEvt.message);
+    } else if (readyEvt.event === 'error') {
+      console.log('[DEBUG] Error event received:', readyEvt.message);
       session.procExited = true;
       delete debugSessions[id];
-      return { ok: false, error: firstEvt.message || 'Debug process error', output: (session.output || []).join('\n') };
-    } else if (firstEvt.event === 'exit') {
-      console.log('[DEBUG] Exit event received before debugger paused');
+      return { ok: false, error: readyEvt.message || 'Debug process error', output: (session.output || []).join('\n') };
+    } else if (readyEvt.event === 'exit') {
+      console.log('[DEBUG] Exit event received before debugger ready');
       session.procExited = true;
       delete debugSessions[id];
-      return { ok: false, error: 'Program finished before debugger paused', output: (session.output || []).join('\n') };
+      return { ok: false, error: 'Program finished before debugger ready', output: (session.output || []).join('\n') };
     }
   }
 
-  // Map TMPDBG payload line back to user's editor coordinates
-  const finalUserLine = payloadLineToUserLine(session, session.currentLine);
-  const clientCallStack = (session.callStack || []).map((frame) => ({
-    ...frame,
-    line: payloadLineToUserLine(session, frame.line || frame.returnLine || 1),
-    returnLine: payloadLineToUserLine(session, frame.returnLine || null)
-  }));
-
-  console.log('[DEBUG] ========== DEBUG SESSION STARTED ==========');
-  console.log('[DEBUG] Returning to frontend:');
-  console.log('[DEBUG]   Payload line:', session.currentLine);
-  console.log('[DEBUG]   User line:', finalUserLine);
-  console.log('[DEBUG]   Routine:', session.currentRoutine);
-  console.log('[DEBUG]   Tag:', session.currentTag);
-  console.log('[DEBUG] ==============================================');
-
-  return {
+  // Return without executing - user must click Continue or Step to start
+  const returnValue = {
     ok: true,
     sessionId: id,
-    currentLine: finalUserLine,
+    currentLine: null, // Not executing yet
     currentRoutine: session.currentRoutine,
-    callStack: clientCallStack,
-    stack: formatCallStackForClient(clientCallStack),
-    engine: 'zstep'
+    currentTag: session.currentTag,
+    callStack: [],
+    stack: [],
+    locals: {},
+    engine: 'zstep',
+    ready: true // Indicate debugger is ready but not running
   };
+
+  console.log('[DEBUG] Returning from startZStepSession:', JSON.stringify(returnValue, null, 2));
+  return returnValue;
 }
 
+
+async function fetchZStepVariables(session) {
+  if (!session || session.engine !== 'zstep') return {};
+  if (session.procExited) return {};
+
+  try {
+    console.log('[DEBUG] Fetching variables via GETVARS...');
+    session.proc.stdin.write('GETVARS\n');
+
+    // Wait for vars event
+    const evt = await waitForZStepEvent(session);
+    console.log('[DEBUG] GETVARS response:', JSON.stringify(evt));
+
+    if (evt.event === 'vars' && evt.vars) {
+      console.log('[DEBUG] Variables fetched:', Object.keys(evt.vars).length, 'variables');
+      return evt.vars;
+    }
+
+    console.log('[DEBUG] No variables returned from GETVARS');
+    return {};
+  } catch (err) {
+    console.log('[DEBUG] Error fetching variables:', err.message);
+    return {};
+  }
+}
 
 async function sendZStepCommand(sessionId, command) {
   const session = debugSessions[sessionId];
@@ -2123,12 +2081,17 @@ async function sendZStepCommand(sessionId, command) {
   }
   if (evt.event === 'stopped') {
     await applyZStepEvent(session, evt);
+
+    // Fetch current variables from GT.M
+    session.locals = await fetchZStepVariables(session);
+
     dbgLog('[runtime] Stopped after command', {
       command,
       currentLine: session.currentLine,
       currentRoutine: session.currentRoutine,
       currentTag: session.currentTag,
-      atBreakpoint: session.manualBreakpoints?.has(session.currentLine)
+      atBreakpoint: session.manualBreakpoints?.has(session.currentLine),
+      localsCount: Object.keys(session.locals || {}).length
     });
   }
 
@@ -2837,16 +2800,19 @@ module.exports = {
         }
         console.log('[DEBUG] ZSTEP engine started successfully');
         dbgLog('[adapter] ZSTEP engine started', { sessionId: zres.sessionId, currentLine: zres.currentLine });
+        console.log('[DEBUG] startZStepSession returned zres:', JSON.stringify(zres, null, 2));
         return {
           ok: true,
           sessionId: zres.sessionId,
           currentLine: zres.currentLine,
           currentRoutine: zres.currentRoutine || 'TMPDBG',
-          locals: {},
-          callStack: zres.callStack,
-          stack: zres.stack || formatCallStackForClient(zres.callStack),
-          output: '',
-          engine: 'zstep'
+          currentTag: zres.currentTag,
+          locals: zres.locals || {},
+          callStack: zres.callStack || [],
+          stack: zres.stack || formatCallStackForClient(zres.callStack || []),
+          output: zres.output || '',
+          engine: 'zstep',
+          ready: zres.ready || false  // CRITICAL FIX: Include ready flag
         };
       }
 
@@ -3102,10 +3068,23 @@ module.exports = {
     const session = debugSessions[sessionId];
     if (session && session.engine === 'zstep') {
       try {
-        session.proc?.kill('SIGTERM');
+        // Send HALT command to allow clean exit and capture final output
+        if (session.proc && !session.procExited && session.proc.stdin.writable) {
+          session.proc.stdin.write('HALT\n');
+          // Wait a bit for process to exit cleanly
+          await new Promise(r => setTimeout(r, 300));
+        }
+        // Force kill if still running
+        if (session.proc && !session.procExited) {
+          session.proc.kill('SIGTERM');
+        }
       } catch (e) {
-        // ignore
+        console.log('[DEBUG] Error during stop:', e.message);
       }
+      // Return accumulated output to show in terminal
+      const output = (session.output || []).join('\n');
+      delete debugSessions[sessionId];
+      return { ok: true, output };
     }
     delete debugSessions[sessionId];
     return { ok: true };
