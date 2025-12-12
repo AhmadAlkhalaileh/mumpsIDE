@@ -1210,6 +1210,12 @@ function tryParseDebuggerEvent(line) {
 
   const attempts = [line];
 
+  // If stdout had leading noise before the JSON, try parsing from the first brace onward
+  const braceIdx = line.indexOf('{');
+  if (braceIdx > 0) {
+    attempts.push(line.slice(braceIdx));
+  }
+
   // Attempt to strip non-printable control chars that can break JSON.parse
   const noControl = line.replace(/[\u0000-\u001F]+/g, '');
   if (noControl !== line) attempts.push(noControl);
@@ -1312,37 +1318,36 @@ function waitForZStepEvent(session, timeoutMs = 10000) {
 }
 
 async function applyZStepEvent(session, evt) {
-  const depth = evt.depth || session.callStack.length;
-  const currentDepth = session.callStack.length;
+  // Depth from AHMDBG is $STACK-1 (0-based). Treat 0 as a real frame and normalize the stack to this depth.
+  const reportedDepth = Number.isInteger(evt.depth) ? evt.depth : null;
+  const targetDepth = reportedDepth !== null
+    ? Math.max(1, reportedDepth)
+    : (session.callStack.length || 1);
+  const currentDepth = session.callStack.length || 0;
   const posInfo = parseZPos(evt.pos || '');
   const routine = (evt.routine || posInfo.routine || (session.callStack[currentDepth - 1] || {}).routine || '').toUpperCase();
   const tag = (evt.tag || posInfo.tag || '').toUpperCase();
   const offset = Number.isInteger(evt.offset) ? evt.offset : posInfo.offset;
 
-  if (depth > currentDepth) {
-    const caller = session.callStack[currentDepth - 1] || {};
-    const retLine = nextExecutableLine(session.sourceMap || sourceMapCache[caller.routine], caller.line + 1);
+  // Normalize call stack length to reported depth
+  while (session.callStack.length > targetDepth) session.callStack.pop();
+
+  const pushFrame = () => {
+    const caller = session.callStack[session.callStack.length - 1] || {};
+    const callerSmap = caller.routine === 'TMPDBG' ? session.sourceMap : sourceMapCache[caller.routine];
+    const retLine = nextExecutableLine(callerSmap, (caller.line || 0) + 1);
     session.callStack.push({
-      routine,
+      routine: routine || caller.routine || 'TMPDBG',
       line: evt.line || 1,
       tag,
-      returnRoutine: caller.routine,
+      returnRoutine: caller.routine || null,
       returnLine: retLine,
       returnTag: caller.tag || ''
     });
-  } else if (depth < currentDepth) {
-    while (session.callStack.length > depth) session.callStack.pop();
-  } else if (session.callStack.length && session.callStack[session.callStack.length - 1].routine !== routine) {
-    const caller = session.callStack[currentDepth - 1] || {};
-    const retLine = nextExecutableLine(session.sourceMap || sourceMapCache[caller.routine], caller.line + 1);
-    session.callStack.push({
-      routine,
-      line: evt.line || 1,
-      tag,
-      returnRoutine: caller.routine,
-      returnLine: retLine,
-      returnTag: caller.tag || ''
-    });
+  };
+
+  while (session.callStack.length < targetDepth) {
+    pushFrame();
   }
 
   const top = session.callStack[session.callStack.length - 1] || {};

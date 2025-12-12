@@ -6467,13 +6467,19 @@
             }
 
             // Line display logic:
-            // After fixing tag+offset computation in bridge.js, the backend now ALWAYS reports
-            // the correct "next line to execute" (already skipping comments, computing from tag+offset).
-            // We should just display it directly without any offset adjustments.
-            // This ensures we never highlight comment lines or wrong lines.
+            // The backend computes lines using tag+offset, which gives us the "next line to execute".
+            // For breakpoints and external routine entry: show exact line (not executed yet)
+            // For normal steps in same routine: show exact line (backend already handles this correctly)
+            const bpLines = (window.editorBreakpoints && Array.isArray(window.editorBreakpoints))
+                ? window.editorBreakpoints
+                : [];
+            const isUserBreakpoint = bpLines.includes(result.currentLine);
+
+            // Always show the exact line from the backend (no offset adjustments)
+            // The tag+offset fix in bridge.js ensures this is always correct
             const displayLine = result.currentLine;
 
-            console.log(`[DEBUG] Line display: currentLine=${result.currentLine}, displayLine=${displayLine}, routineChanged=${routineJustChanged}`);
+            console.log(`[DEBUG] Line display: currentLine=${result.currentLine}, isBreakpoint=${isUserBreakpoint}, routineChanged=${routineJustChanged}, displayLine=${displayLine}`);
             gotoEditorLine(displayLine);
 
             // Update Variables and Stack panels IMMEDIATELY
