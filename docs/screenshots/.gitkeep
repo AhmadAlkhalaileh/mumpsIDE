@@ -1,0 +1,10 @@
+# Screenshots Directory
+
+Place screenshot files here following the guide in SCREENSHOT_GUIDE.md
+
+Expected files:
+- 01-main-window.png
+- 02-menu-bar.png
+- ... (30 total)
+
+See ../SCREENSHOT_GUIDE.md for capture instructions.

@@ -988,12 +988,21 @@ function buildSourceMapFromCode(routineName, code = '') {
   const map = lines.map((raw, idx) => {
     const trimmed = raw.trim();
     const startsAtColumn1 = raw && !/^[\t ]/.test(raw);
-    const tagMatch = startsAtColumn1 ? trimmed.match(/^([A-Za-z%][A-Za-z0-9]*)(\([^)]*\))?/) : null;
+    const tagMatch = startsAtColumn1 ? trimmed.match(/^([A-Za-z%][A-Za-z0-9]*)(\([^)]*\))?(.*)$/) : null;
+    let isComment = trimmed.startsWith(';') || trimmed === '';
+
     if (tagMatch) {
       currentTag = tagMatch[1];
       currentLabelText = tagMatch[1] + (tagMatch[2] || '');
+      // Check if there's code after the tag (not just a comment)
+      const afterTag = (tagMatch[3] || '').trim();
+      const hasCode = afterTag && !afterTag.startsWith(';');
+      // Tag-only lines (no code) are non-executable
+      if (!hasCode) {
+        isComment = true;
+      }
     }
-    const isComment = trimmed.startsWith(';') || trimmed === '';
+
     return {
       routine: routineName.toUpperCase(),
       line: idx + 1,
@@ -1347,26 +1356,39 @@ async function applyZStepEvent(session, evt) {
   }
 
   let targetLine = evt.line || 0;
-  if (smap) {
-    // Always map to an executable line using source map to skip comment-only lines
-    if (targetLine <= 0) {
-      // Compute from tag/offset when line not provided
-      if (tag || Number.isInteger(offset)) {
-        let tagLine = 1;
-        if (tag) {
-          for (const entry of smap.map) {
-            if (entry.tag && entry.tag.toUpperCase() === tag) {
-              tagLine = entry.line;
-              break;
-            }
-          }
+  let computedFromTagOffset = false;
+
+  // LINE COMPUTATION FIX:
+  // ALWAYS prefer tag+offset from $ZPOSITION over evt.line when available,
+  // because tag+offset is the authoritative source from the runtime.
+  // evt.line from AHMDBG's LINENUM can be incorrect when:
+  // - Returning from external calls
+  // - Stepping through routines with complex control flow
+  // - Source file differs from compiled routine
+  if (smap && (tag || Number.isInteger(offset))) {
+    let tagLine = 1;
+    if (tag) {
+      // Find the tag definition line in the source map
+      for (const entry of smap.map) {
+        if (entry.tag && entry.tag.toUpperCase() === tag.toUpperCase()) {
+          tagLine = entry.line;
+          break;
         }
-        targetLine = tagLine + (Number.isInteger(offset) ? offset : 0);
       }
     }
+    // Compute line from tag+offset
+    // offset is relative to the tag line (tag+0 = tag definition line)
+    targetLine = tagLine + offset;
+    computedFromTagOffset = true;
+    console.log(`[DEBUG] Computed line from tag+offset: routine=${top.routine}, tag=${tag}, offset=${offset}, tagLine=${tagLine}, targetLine=${targetLine}`);
+
+    // Skip comment-only lines to find the next executable line
     targetLine = nextExecutableLine(smap, targetLine || 1);
+    console.log(`[DEBUG] After skipping comments: targetLine=${targetLine}`);
   }
-  if (!targetLine) targetLine = top.line || 1;
+
+  // Fallback to evt.line if tag+offset not available
+  if (!targetLine) targetLine = evt.line || top.line || 1;
 
   top.line = targetLine;
   session.currentRoutine = top.routine;
@@ -1471,12 +1493,20 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       const raw = line.replace(/\r/g, '');
       const trimmed = raw.trim();
       if (trimmed === '') return '';
+
+      // If it looks like a label but is indented, normalize to column 1 so GT.M sees it.
+      const firstToken = trimmed.split(/\s+/)[0];
+      const tokenName = firstToken.replace(/\(.*/, '').toUpperCase();
+      const isLabelCandidate = /^[A-Za-z%][A-Za-z0-9]*/.test(firstToken) && !mCommands.has(tokenName);
+      const hasLeadingSpace = /^[\t ]/.test(raw);
+      if (isLabelCandidate && hasLeadingSpace) {
+        return trimmed;
+      }
+
       if (/^[\t ]/.test(raw)) return raw;
       if (/^;/.test(trimmed)) return raw;
 
-      const firstToken = trimmed.split(/\s+/)[0];
-      const tokenName = firstToken.replace(/\(.*/, '').toUpperCase();
-      const isLabel = /^[A-Za-z%][A-Za-z0-9]*/.test(firstToken) && !mCommands.has(tokenName);
+      const isLabel = isLabelCandidate;
       if (isLabel) return raw;
 
       return `\t${trimmed}`;
@@ -1529,21 +1559,49 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   const firstTag = firstTagMatch ? firstTagMatch[1] : '';
   const hasParams = firstTagMatch && firstTagMatch[2];
 
+  // Add () to first tag definition if missing (required for extrinsic calls)
+  let finalUserCode = guardedUserCode;
+  if (firstTag && !hasParams) {
+    // Add () to the label definition: "AAAA ; comment" becomes "AAAA() ; comment"
+    const tagRegex = new RegExp(`^(${firstTag})([\\s;])`, 'm');
+    finalUserCode = guardedUserCode.replace(tagRegex, `$1()$2`);
+    console.log('[DEBUG] Added () to label definition for extrinsic call compatibility');
+  }
+
   // Build the full code payload with TMPDBG tag, QUIT, and optionally a START tag
   let codePayload;
   let headerLines;
+  let hasStartWrapper = false;
 
-  if (hasParams && firstTag) {
-    // If first tag has parameters, create a START tag that calls it with dummy values
-    // Extract parameter count
-    const paramList = firstTagMatch[2].slice(1, -1).split(',').map(p => p.trim()).filter(Boolean);
-    const dummyArgs = paramList.map(() => '0').join(',');
+  if (firstTag) {
+    hasStartWrapper = true;
 
-    codePayload = `TMPDBG ; Debug temp routine\n QUIT\nSTART ; Entry point for debugging\n DO ${firstTag}(${dummyArgs})\n QUIT\n${guardedUserCode}`;
-    headerLines = 5; // TMPDBG, QUIT, START, DO line, QUIT
+    if (hasParams) {
+      // If first tag has parameters, create entry that calls it with dummy values
+      // Extract parameter count
+      const paramList = firstTagMatch[2].slice(1, -1).split(',').map(p => p.trim()).filter(Boolean);
+      const dummyArgs = paramList.map(() => '0').join(',');
+
+      codePayload = [
+        'TMPDBG ; Debug temp routine',
+        ` NEW RET SET RET=$$${firstTag}(${dummyArgs})`,
+        ' QUIT:$QUIT RET  QUIT',
+        finalUserCode
+      ].join('\n');
+      headerLines = 3; // TMPDBG, SET RET=$$..., QUIT
+    } else {
+      // No parameters - use extrinsic call with () (we added () to definition above)
+      codePayload = [
+        'TMPDBG ; Debug temp routine',
+        ` NEW RET SET RET=$$${firstTag}()`,
+        ' QUIT:$QUIT RET  QUIT',
+        finalUserCode
+      ].join('\n');
+      headerLines = 3; // TMPDBG, SET RET=$$..., QUIT
+    }
   } else {
-    // No parameters or no first tag, use simple structure
-    codePayload = `TMPDBG ; Debug temp routine\n QUIT\n${guardedUserCode}`;
+    // No tags found, use simple structure
+    codePayload = `TMPDBG ; Debug temp routine\n QUIT:$QUIT 0  QUIT\n${finalUserCode}`;
     headerLines = 2; // TMPDBG, QUIT
   }
 
@@ -1578,21 +1636,44 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       const entry = map[targetLine - 1];
       entryTag = (entry?.tag || '').toUpperCase();
     }
-  } else if (hasParams && firstTag) {
-    // If no explicit start line and first tag has parameters, use START tag
-    entryTag = 'START';
-    console.log(`[DEBUG] No start line provided, using START tag (parameterized first tag)`);
-    dbgLog('[runtime] Using START tag for parameterized entry', { firstTag });
-  } else if (firstTag) {
-    // If first tag has no parameters, we can call it directly
-    entryTag = firstTag.toUpperCase();
-    console.log(`[DEBUG] No start line provided, using first tag: ${entryTag}`);
-    dbgLog('[runtime] Using first tag as entry', { entryTag });
+  } else if (hasStartWrapper) {
+    // Always use routine entry when we have a wrapper (no START tag anymore)
+    entryTag = '';
+    console.log('[DEBUG] No start line provided, using routine entry (wrapper handles first tag call)');
+    dbgLog('[runtime] Using wrapper for entry', { firstTag, hasParams });
   } else {
     // No tags found, start at routine entry
     entryTag = '';
     console.log(`[DEBUG] No tags found, starting at routine entry`);
     dbgLog('[runtime] No tags, starting at routine entry');
+  }
+
+  // If the first tag is parameterized but we ended up targeting it directly (e.g. because a start line was provided),
+  // force routine entry so the wrapper handles the call with dummy arguments.
+  if (hasParams && firstTag && entryTag && entryTag === firstTag.toUpperCase()) {
+    console.log('[DEBUG] First tag is parameterized; forcing routine entry to use wrapper');
+    dbgLog('[runtime] Forcing routine entry for parameterized label', { entryTag, firstTag });
+    entryTag = '';
+  }
+
+  // Validate entryTag exists; if missing, fall back to the first label or routine entry
+  if (entryTag) {
+    const hasEntry = map.some((m) => m.isLabel && (m.tag || '').toUpperCase() === entryTag);
+    if (!hasEntry) {
+      const firstLabel = (map.find((m) => m.isLabel && m.tag) || {}).tag || '';
+      console.log(`[DEBUG] Entry tag "${entryTag}" not found; falling back to`, firstLabel || '(routine entry)');
+      dbgLog('[runtime] Entry tag missing, applying fallback', { requested: entryTag, fallback: firstLabel || '(routine)' });
+      entryTag = (firstLabel || '').toUpperCase();
+    }
+  }
+  // As a final guard, if we still don't have a valid label in the payload, clear the entry tag so we start at routine entry
+  if (entryTag) {
+    const stillMissing = !map.some((m) => m.isLabel && (m.tag || '').toUpperCase() === entryTag);
+    if (stillMissing) {
+      console.log(`[DEBUG] Entry tag "${entryTag}" still not found after fallback; starting at routine entry`);
+      dbgLog('[runtime] Entry tag missing after fallback', { entryTag });
+      entryTag = '';
+    }
   }
 
   console.log('[DEBUG] TMPDBG structure created:');
@@ -1658,7 +1739,18 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
 
   if (!compileRes.ok) {
     console.log(`[DEBUG] Compilation failed: ${compileRes.error || compileRes.stderr}`);
-    return { ok: false, error: `AHMDBG compilation failed: ${compileRes.error || compileRes.stderr}` };
+    const friendlyError = summarizeCompileError(
+      compileRes.error,
+      compileRes.stdout,
+      compileRes.stderr
+    );
+    const output = [compileRes.stderr, compileRes.stdout].filter(Boolean).join('\n');
+    return {
+      ok: false,
+      error: `AHMDBG compilation failed`,
+      friendlyError,
+      output
+    };
   } else {
     console.log('[DEBUG] AHMDBG.m compiled successfully');
     if (compileRes.stdout) console.log('[DEBUG] Compile output:', compileRes.stdout);
@@ -1762,7 +1854,18 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
 
   if (!compileTmpRes.ok) {
     console.log(`[DEBUG] TMPDBG compilation failed: ${compileTmpRes.error}`);
-    return { ok: false, error: `TMPDBG compilation failed: ${compileTmpRes.stderr || compileTmpRes.error}` };
+    const friendlyError = summarizeCompileError(
+      compileTmpRes.error,
+      compileTmpRes.stdout,
+      compileTmpRes.stderr
+    );
+    const output = [compileTmpRes.stderr, compileTmpRes.stdout].filter(Boolean).join('\n');
+    return {
+      ok: false,
+      error: 'TMPDBG compilation failed',
+      friendlyError,
+      output
+    };
   }
   console.log('[DEBUG] TMPDBG.m compiled successfully');
 
@@ -1838,13 +1941,15 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     // Look for map entries where isLabel is true
     let labelLine = -1;
     let labelTag = '';
+    let labelFullText = '';
 
     for (let i = idx; i >= 0; i -= 1) {
       const entry = map[i];
       if (entry && entry.isLabel) {
         labelLine = entry.line; // 1-indexed
-        labelTag = (entry.labelText || entry.tag || '').split('(')[0].toUpperCase(); // Remove params
-        console.log('[DEBUG] tagOffsetForLine: Found label', labelTag, 'at line', labelLine);
+        labelFullText = (entry.labelText || entry.tag || '');
+        labelTag = labelFullText.split('(')[0].toUpperCase(); // Tag without params
+        console.log('[DEBUG] tagOffsetForLine: Found label', labelTag, '(full:', labelFullText, ') at line', labelLine);
         break;
       }
     }
@@ -1862,8 +1967,26 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     }
 
     // Calculate offset from label line
-    const offset = payloadLine - labelLine;
-    console.log('[DEBUG] tagOffsetForLine: Label', labelTag, 'at line', labelLine, ', target line', payloadLine, ', offset:', offset);
+    let offset = payloadLine - labelLine;
+    const rawOffset = offset; // keep the raw offset for potential fallback attempts
+
+    // CRITICAL FIX: If the label line itself is non-executable (tag-only line),
+    // MUMPS counts offsets from the NEXT line, so we subtract 1
+    const labelEntry = map[labelLine - 1];
+    const labelIsNonExecutable = labelEntry && labelEntry.isComment;
+
+    if (labelIsNonExecutable) {
+      offset -= 1;
+      console.log('[DEBUG] tagOffsetForLine: Label line is non-executable, adjusting offset:', {
+        labelTag,
+        labelLine,
+        targetLine: payloadLine,
+        rawOffset: payloadLine - labelLine,
+        adjustedOffset: offset
+      });
+    } else {
+      console.log('[DEBUG] tagOffsetForLine: Label', labelTag, 'at line', labelLine, ', target line', payloadLine, ', offset:', offset);
+    }
 
     // VALIDATION: Ensure offset is not negative
     if (offset < 0) {
@@ -1871,14 +1994,26 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       return null;
     }
 
-    // VALIDATION: Ensure the target line exists
-    const targetAbsoluteLine = labelLine + offset;
-    if (targetAbsoluteLine > lines.length) {
+    // VALIDATION: Ensure the breakpoint makes sense
+    // If label is non-executable, the first line after it is at offset 0
+    const expectedTargetLine = labelIsNonExecutable ? (labelLine + 1 + offset) : (labelLine + offset);
+    if (expectedTargetLine !== payloadLine) {
+      console.log('[DEBUG] tagOffsetForLine: WARNING Calculated offset mismatch!', {
+        tag: labelTag,
+        tagLine: labelLine,
+        offset,
+        expectedTargetLine,
+        actualPayloadLine: payloadLine,
+        labelIsNonExecutable
+      });
+    }
+
+    if (expectedTargetLine > lines.length) {
       console.log('[DEBUG] tagOffsetForLine: WARNING Target exceeds bounds!', {
         tag: labelTag,
         tagLine: labelLine,
         offset,
-        targetLine: targetAbsoluteLine,
+        targetLine: expectedTargetLine,
         maxLines: lines.length
       });
       return null;
@@ -1887,7 +2022,9 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     return {
       tag: labelTag,
       offset,
-      tagLine: labelLine
+      tagLine: labelLine,
+      rawOffset,
+      labelIsNonExecutable
     };
   };
 
@@ -1966,13 +2103,17 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       ')'
     );
 
-    try {
-      session.proc.stdin.write(bpCmd);
-      resolvedBps.push({ userLine: n, payloadLine: adjustedLine, tag: tagInfo.tag, offset: tagInfo.offset });
-    } catch (err) {
-      console.log('[DEBUG] ERROR writing breakpoint command:', err.message);
-      dbgLog('[editor] Breakpoint write error', { userLine: n, error: err.message });
-    }
+    // Don't send breakpoint yet - save for later (after entering user code)
+    resolvedBps.push({
+      userLine: n,
+      payloadLine: adjustedLine,
+      tag: tagInfo.tag,
+      offset: tagInfo.offset,
+      rawOffset: tagInfo.rawOffset,
+      labelIsNonExecutable: tagInfo.labelIsNonExecutable,
+      tagLine: tagInfo.tagLine,
+      command: bpCmd.trim()
+    });
   });
 
   // Check if any breakpoints were successfully resolved
@@ -1986,6 +2127,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     });
   } else {
     console.log('[DEBUG] Successfully resolved', resolvedBps.length, 'of', breakpoints?.length || 0, 'breakpoints');
+    console.log('[DEBUG] Breakpoints will be set AFTER entering user code to avoid timing issues');
     dbgLog('[editor] Breakpoints resolved', {
       requested: breakpoints?.length || 0,
       resolved: resolvedBps.length,
@@ -2002,13 +2144,11 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   session.zstepUserBps = new Set(resolvedBps.map(bp => `TMPDBG#${bp.payloadLine}`));
   session.autoBps = new Set();
 
-  console.log('[DEBUG] Waiting for ready event...');
+  // IMPORTANT: Store pending breakpoints to set after entering user code
+  session.pendingBreakpoints = resolvedBps;
+  session.breakpointsInstalled = false;
 
-  // Give AHMDBG some time to register breakpoints
-  if (resolvedBps.length > 0) {
-    console.log('[DEBUG] Waiting 100ms for breakpoints to be processed...');
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
+  console.log('[DEBUG] Waiting for ready event...');
 
   // Wait for ready event (AHMDBG sends 'ready' and waits for command)
   let readyEvt = null;
@@ -2101,6 +2241,18 @@ function decodeMString(val) {
   return out;
 }
 
+function summarizeCompileError(err = '', stdout = '', stderr = '') {
+  const collected = [];
+  [err, stderr, stdout].forEach((src) => {
+    if (!src) return;
+    const lines = `${src}`.split('\n').map(l => l.trim()).filter(Boolean);
+    collected.push(...lines);
+  });
+  if (!collected.length) return 'Compilation failed';
+  const first = collected.find(Boolean) || 'Compilation failed';
+  return first.length > 220 ? `${first.slice(0, 220)}…` : first;
+}
+
 function normalizeDebuggerVars(rawVars = {}) {
   const locals = {};
   Object.entries(rawVars || {}).forEach(([rawKey, value]) => {
@@ -2155,7 +2307,11 @@ async function sendZStepCommand(sessionId, command) {
   }
 
   // Show what line we're currently at in the source code
-  const currentLineText = session.sourceMap?.lines?.[session.currentLine - 1] || '(unknown)';
+  // Use the correct source map based on the current routine
+  const currentRoutineSmap = session.currentRoutine === 'TMPDBG'
+    ? session.sourceMap
+    : sourceMapCache[session.currentRoutine];
+  const currentLineText = currentRoutineSmap?.lines?.[session.currentLine - 1] || '(unknown)';
   console.log('[DEBUG] Current position before step:', {
     line: session.currentLine,
     routine: session.currentRoutine,
@@ -2222,21 +2378,229 @@ async function sendZStepCommand(sessionId, command) {
     session.headerLines > 0 &&
     session.currentLine <= session.headerLines;
 
-  let userLine = payloadLineToUserLine(session, session.currentLine);
-  if (isHeaderPos && session.lastUserLine) {
-    // Stay on the last real user line instead of bouncing to TMPDBG header
-    userLine = session.lastUserLine;
+  // Auto-step over header lines for any step command (CONTINUE, INTO, OVER, OUTOF)
+  // BUT: Only during initial startup (before breakpoints are installed).
+  // Once breakpoints are installed, we're in user code and shouldn't auto-step.
+  // This prevents the "double step" bug where the first step from a breakpoint doesn't advance.
+  console.log('[DEBUG] Checking auto-step: isHeaderPos=', isHeaderPos, 'command=', command, 'currentLine=', session.currentLine, 'headerLines=', session.headerLines, 'breakpointsInstalled=', session.breakpointsInstalled);
+  if (isHeaderPos && !session.breakpointsInstalled && (command === 'CONTINUE' || command === 'INTO' || command === 'OVER' || command === 'OUTOF')) {
+    console.log('[DEBUG] *** AUTO-STEPPING ACTIVATED *** Stopped in header at line', session.currentLine, '- auto-stepping to reach user code');
+
+    const installPendingBreakpoints = async () => {
+      if (!session.pendingBreakpoints || session.pendingBreakpoints.length === 0 || session.breakpointsInstalled) return;
+      console.log('[DEBUG] Installing', session.pendingBreakpoints.length, 'breakpoints now (after header reach)...');
+      let installedCount = 0;
+      for (const bp of session.pendingBreakpoints) {
+        const sendBpCmd = async (cmd, label) => {
+          try {
+            session.proc.stdin.write(`${cmd}\n`);
+            const cmdParts = cmd.split(';');
+            const offForLog = cmdParts.length >= 4 ? cmdParts[3] : '(unknown)';
+            console.log('[DEBUG] Pre-installed breakpoint', label, ':', cmd.trim(), `(line ${bp.payloadLine} tag ${bp.tag} offset ${offForLog})`);
+            // Wait briefly for bp-set/bp-error so we can retry if needed
+            const evt = await waitForEvent(session, ['bp-set', 'bp-error', 'error', 'exit'], 800);
+            if (evt && (evt.event === 'bp-set' || evt.event === 'bp-error' || evt.event === 'error' || evt.event === 'exit')) {
+              return evt;
+            }
+          } catch (err) {
+            console.log('[DEBUG] ERROR pre-installing breakpoint:', err.message);
+          }
+          return null;
+        };
+
+        // Try multiple candidates to maximize compatibility with GT.M offset rules.
+        // Prefer routine-based offsets first because they are always valid, then tag-based forms.
+        const candidates = [];
+        const routineOffset = Math.max(0, bp.payloadLine - 1); // payload line N => TMPDBG+(N-1)
+        candidates.push({ cmd: `SETBP;TMPDBG;TMPDBG;${routineOffset}`, label: 'primary-routine' });
+
+        // Tag-based command computed from mapping (may fail on param labels)
+        const primaryCmd = bp.command || `SETBP;TMPDBG;${bp.tag};${bp.offset}`;
+        candidates.push({ cmd: primaryCmd, label: 'tag-mapped' });
+
+        if (bp.labelIsNonExecutable && Number.isInteger(bp.rawOffset) && bp.rawOffset !== bp.offset) {
+          candidates.push({ cmd: `SETBP;TMPDBG;${bp.tag};${bp.rawOffset}`, label: 'tag-raw' });
+        }
+
+        // Some GT.M builds only accept offset 0 after a tag-only line; try it explicitly
+        if (bp.labelIsNonExecutable && bp.offset !== 0) {
+          candidates.push({ cmd: `SETBP;TMPDBG;${bp.tag};0`, label: 'tag-zero' });
+        }
+
+        let success = false;
+        for (const cand of candidates) {
+          const evt = await sendBpCmd(cand.cmd, cand.label);
+          if (!evt) continue;
+          if (evt.event === 'bp-set') {
+            success = true;
+            installedCount += 1;
+            break;
+          }
+          if (evt.event === 'error' || evt.event === 'exit') {
+            console.log('[DEBUG] Breakpoint install aborted due to process state:', evt.event);
+            break;
+          }
+          // bp-error -> try next candidate
+        }
+
+        if (!success) {
+          console.log('[DEBUG] Breakpoint still failed after trying all strategies:', bp);
+        }
+      }
+      session.breakpointsInstalled = true;
+      session.breakpointsSetCount = installedCount;
+      // Give AHMDBG time to process breakpoints
+      await new Promise(resolve => setTimeout(resolve, 100));
+    };
+
+    let stepCount = 0;
+    const maxSteps = 20; // Prevent infinite loops
+
+    while (session.currentLine <= session.headerLines && stepCount < maxSteps) {
+      console.log('[DEBUG] Auto-step', stepCount + 1, ': stepping from header line', session.currentLine);
+      try {
+        session.proc.stdin.write('INTO\n');
+        const nextEvt = await waitForZStepEvent(session);
+        console.log('[DEBUG] Auto-step received event:', nextEvt.event, 'line:', nextEvt.line);
+
+        if (nextEvt.event === 'stopped') {
+          await applyZStepEvent(session, nextEvt);
+          session.locals = await fetchZStepVariables(session);
+          stepCount++;
+
+          // Check if we're now past the header
+          if (session.currentLine > session.headerLines) {
+            console.log('[DEBUG] *** AUTO-STEP COMPLETE *** Reached user code at line', session.currentLine);
+            break;
+          }
+        } else if (nextEvt.event === 'exit') {
+          session.procExited = true;
+          return { ok: false, error: 'Program finished', output: consumeSessionOutput(session) };
+        } else if (nextEvt.event === 'error') {
+          return { ok: false, error: nextEvt.message || 'Runtime error', output: consumeSessionOutput(session) };
+        } else {
+          break; // Unknown event, stop stepping
+        }
+      } catch (err) {
+        console.log('[DEBUG] Error auto-stepping over header:', err.message);
+        break;
+      }
+    }
+
+    if (stepCount >= maxSteps) {
+      console.log('[DEBUG] WARNING: Reached max auto-step limit, still in header');
+    }
+
+    // Now that we're at user code, install breakpoints (after header) before continuing
+    if (session.currentLine > session.headerLines && session.pendingBreakpoints && session.pendingBreakpoints.length > 0 && !session.breakpointsInstalled) {
+      await installPendingBreakpoints();
+    }
+
+    // If user clicked CONTINUE and we have breakpoints, continue to the first breakpoint
+    if (command === 'CONTINUE' && session.breakpointsInstalled && session.pendingBreakpoints && session.pendingBreakpoints.length > 0) {
+      if (session.breakpointsSetCount && session.breakpointsSetCount > 0) {
+        console.log('[DEBUG] Continuing to first breakpoint...');
+        session.proc.stdin.write('CONTINUE\n');
+        const bpEvt = await waitForZStepEvent(session);
+
+        if (bpEvt.event === 'stopped') {
+          await applyZStepEvent(session, bpEvt);
+          session.locals = await fetchZStepVariables(session);
+          console.log('[DEBUG] Stopped at breakpoint, line:', session.currentLine);
+        } else if (bpEvt.event === 'exit') {
+          session.procExited = true;
+          return { ok: false, error: 'Program finished', output: consumeSessionOutput(session) };
+        } else if (bpEvt.event === 'error') {
+          return { ok: false, error: bpEvt.message || 'Runtime error', output: consumeSessionOutput(session) };
+        }
+      } else {
+        console.log('[DEBUG] No breakpoints were installed (all attempts failed); performing manual run-to-line fallback.');
+        const targetPayload = (session.pendingBreakpoints[0] || {}).payloadLine;
+        if (Number.isInteger(targetPayload) && targetPayload > session.currentLine) {
+          const maxSteps = Math.max(50, (targetPayload - session.currentLine) + 10);
+          let steps = 0;
+          let done = false;
+          while (steps < maxSteps && !done) {
+            try {
+              session.proc.stdin.write('INTO\n');
+              const stepEvt = await waitForZStepEvent(session);
+              if (stepEvt.event === 'stopped') {
+                await applyZStepEvent(session, stepEvt);
+                session.locals = await fetchZStepVariables(session);
+                steps += 1;
+                if (session.currentLine >= targetPayload) {
+                  console.log('[DEBUG] Manual run-to-line reached target payload line', targetPayload, 'after', steps, 'steps');
+                  done = true;
+                  break;
+                }
+              } else if (stepEvt.event === 'exit' || stepEvt.event === 'error') {
+                console.log('[DEBUG] Manual run-to-line aborted due to event:', stepEvt.event);
+                done = true;
+                break;
+              } else {
+                break;
+              }
+            } catch (err) {
+              console.log('[DEBUG] Manual run-to-line error:', err.message);
+              break;
+            }
+          }
+          if (!done) {
+            console.log('[DEBUG] Manual run-to-line fallback did not reach target (steps:', steps, 'target:', targetPayload, ')');
+          }
+        } else {
+          console.log('[DEBUG] No valid target payload line for manual run-to-line fallback.');
+        }
+      }
+    }
   } else {
-    session.lastUserLine = userLine;
+    console.log('[DEBUG] Auto-step NOT triggered');
   }
 
-  const clientCallStack = (session.callStack || []).map((frame) => ({
-    ...frame,
-    line: payloadLineToUserLine(session, frame.line || frame.returnLine || 1),
-    returnLine: payloadLineToUserLine(session, frame.returnLine || null)
-  }));
+  // Recalculate isHeaderPos after potential auto-stepping
+  let stillInHeader = session.currentRoutine === 'TMPDBG' &&
+    Number.isInteger(session.headerLines) &&
+    session.headerLines > 0 &&
+    session.currentLine <= session.headerLines;
 
-  console.log('[DEBUG] Command', command, 'completed. User line:', userLine, ', payload line:', session.currentLine);
+  // EXTERNAL ROUTINE FIX:
+  // Only convert payload line to user line for TMPDBG, not for external routines
+  // External routines already have the correct line numbers from the source map
+  let userLine;
+  if (session.currentRoutine === 'TMPDBG') {
+    // For TMPDBG, convert payload line to user line
+    userLine = payloadLineToUserLine(session, session.currentLine);
+    if (stillInHeader && session.lastUserLine) {
+      // Stay on the last real user line instead of bouncing to TMPDBG header
+      userLine = session.lastUserLine;
+    }
+    // Update last user line
+    if (stillInHeader && session.lastUserLine) {
+      userLine = session.lastUserLine;
+    } else {
+      session.lastUserLine = userLine;
+    }
+  } else {
+    // For external routines, use the line number as-is (already correct from applyZStepEvent)
+    userLine = session.currentLine;
+    console.log(`[DEBUG] External routine ${session.currentRoutine}: using line ${userLine} directly (no payload mapping)`);
+  }
+
+  const clientCallStack = (session.callStack || []).map((frame) => {
+    // Only convert TMPDBG lines, leave external routine lines as-is
+    const frameRoutine = frame.routine || 'TMPDBG';
+    return {
+      ...frame,
+      line: frameRoutine === 'TMPDBG'
+        ? payloadLineToUserLine(session, frame.line || frame.returnLine || 1)
+        : (frame.line || frame.returnLine || 1),
+      returnLine: frameRoutine === 'TMPDBG'
+        ? payloadLineToUserLine(session, frame.returnLine || null)
+        : (frame.returnLine || null)
+    };
+  });
+
+  console.log(`[DEBUG] Command ${command} completed. Routine: ${session.currentRoutine}, Line: ${userLine} (raw: ${session.currentLine})`);
 
   return {
     ok: true,
@@ -2256,6 +2620,9 @@ async function sendZStepEval(sessionId, code = '') {
   if (session.procExited) {
     return { ok: false, error: 'Program finished', output: consumeSessionOutput(session) };
   }
+
+  const prevPayloadLine = session.currentLine || 0;
+  const prevUserLine = payloadLineToUserLine(session, prevPayloadLine);
   const safeCode = (code || '').replace(/\r/g, '');
   try {
     session.proc.stdin.write(`EVAL;${safeCode}\n`);

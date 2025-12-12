@@ -68,8 +68,20 @@ AHMDBGJSON(entryRoutine,entryTag) ;
         ; IMPORTANT: First command must ALWAYS use INTO to enter the routine
         ; OVER/OUTOF only work when already executing inside a routine
         ; So we ignore the command type and always use INTO for startup
-        IF TAG'="" ZSTEP INTO DO @(TAG_"^"_ROUT) QUIT
-        ELSE  ZSTEP INTO DO @("^"_ROUT) QUIT
+        ; Validate entry tag exists; if missing, report a friendly error and fall back to routine entry
+        IF TAG'="",($TEXT(@(TAG_"^"_ROUT))="") DO
+        . USE $PRINCIPAL
+        . WRITE "{""event"":""error"",""message"":""Entry label not found: ",TAG,"^",ROUT,". Falling back to routine entry.""}",!
+        . SET TAG=""
+        ; Build call: use extrinsic $$ for tags (may return value), DO for routine entry
+        NEW CALL
+        IF TAG'="" DO
+        . SET CALL=TAG_"^"_ROUT_"()"
+        . ZSTEP INTO SET ^%AHMDBG($J,"JSON","RET")=$$@CALL
+        ELSE  DO
+        . SET CALL="^"_ROUT
+        . ZSTEP INTO DO @CALL
+        QUIT
         QUIT
         ;
         ; -------------------------------------------------------------------

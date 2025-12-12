@@ -5273,7 +5273,7 @@
             const tab = state.tabs.find(t => t.id === tabId);
             if (!tab) return;
             if (tab.term) {
-                tab.term.write(payload.data || '');
+                writeAndFollow(tab, payload.data || '');
             } else {
                 tab.buffer = tab.buffer || [];
                 tab.buffer.push(payload.data || '');
@@ -5287,7 +5287,7 @@
             tab.sessionId = null;
             delete state.sessionMap[payload.id];
             const message = `\r\n[Process exited with code ${payload.code ?? ''}]`;
-            if (tab.term) tab.term.write(message);
+            if (tab.term) writeAndFollow(tab, message);
             if (tab.container) tab.container.classList.add('exited');
             renderTerminalTabs(state);
         });
@@ -5320,6 +5320,7 @@
         if (!state) return;
         state.active = tabId;
         renderTerminalTabs(state);
+        const tab = state.tabs.find(t => t.id === tabId);
         const viewport = document.getElementById('terminalViewport');
         if (viewport) {
             viewport.querySelectorAll('.terminal-instance').forEach(el => {
@@ -5327,7 +5328,11 @@
             });
         }
         refreshTerminalLayout(state);
-        setTimeout(() => focusTerminal(), 30);
+        autoScrollTerminal(tab);
+        setTimeout(() => {
+            focusTerminal();
+            autoScrollTerminal(tab);
+        }, 30);
     }
 
     function createTerminalContainer(tabId) {
@@ -5418,10 +5423,54 @@
         terminalResizeObserver.observe(viewport);
     }
 
+    function autoScrollTerminal(tab) {
+        if (!tab) return;
+        if (tab._scrollTimer) clearTimeout(tab._scrollTimer);
+        tab._scrollTimer = setTimeout(() => {
+            // xterm terminals - wait a tick so the write buffer flushes before scrolling
+            if (tab.term && typeof tab.term.scrollToBottom === 'function') {
+                tab.term.scrollToBottom();
+                const viewportEl = tab.container?.querySelector?.('.xterm-viewport');
+                if (viewportEl) viewportEl.scrollTop = viewportEl.scrollHeight;
+            } else if (tab._plain && tab.container) {
+                // plain renderer
+                const out = tab.container.querySelector('.plain-terminal-output');
+                if (out) out.scrollTop = out.scrollHeight;
+            }
+            if (tab.container) {
+                tab.container.scrollTop = tab.container.scrollHeight;
+            }
+            tab._scrollTimer = null;
+        }, 0);
+    }
+
+    function writeAndFollow(tab, text, { newline = false } = {}) {
+        if (!tab?.term) return;
+        const writer = newline ? tab.term.writeln : tab.term.write;
+        const doScroll = () => {
+            if (typeof requestAnimationFrame === 'function') {
+                requestAnimationFrame(() => autoScrollTerminal(tab));
+            } else {
+                autoScrollTerminal(tab);
+            }
+        };
+        if (typeof writer === 'function') {
+            try {
+                writer.call(tab.term, text ?? '', doScroll);
+            } catch (e) {
+                writer.call(tab.term, text ?? '');
+                doScroll();
+            }
+        } else {
+            doScroll();
+        }
+    }
+
     function flushBufferedOutput(tab) {
         if (!tab?.term || !tab?.buffer || !tab.buffer.length) return;
-        tab.buffer.forEach(chunk => tab.term.write(chunk));
-        tab.buffer = [];
+        const chunks = Array.isArray(tab.buffer) ? tab.buffer : [tab.buffer];
+        chunks.forEach(chunk => writeAndFollow(tab, chunk));
+        tab.buffer = Array.isArray(tab.buffer) ? [] : '';
     }
 
     async function startTerminalSession(tab, state) {
@@ -5434,7 +5483,7 @@
             rows: dims?.rows
         };
         if (!window.ahmadIDE.terminalCreate) {
-            tab.term?.writeln('Terminal backend unavailable.');
+            writeAndFollow(tab, 'Terminal backend unavailable.', { newline: true });
             return;
         }
         const res = await window.ahmadIDE.terminalCreate(sessionOptions);
@@ -5447,11 +5496,11 @@
             flushBufferedOutput(tab);
             setTerminalError(null);
             if (tab._plain) {
-                tab.term?.writeln('Running with basic renderer. Install xterm for full TUI/ANSI support.');
+                writeAndFollow(tab, 'Running with basic renderer. Install xterm for full TUI/ANSI support.', { newline: true });
             }
         } else {
             const msg = res?.error || 'Unknown error starting terminal';
-            tab.term?.writeln(`\x1b[31m✗ Failed to start terminal: ${msg}\x1b[0m`);
+            writeAndFollow(tab, `\x1b[31m✗ Failed to start terminal: ${msg}\x1b[0m`, { newline: true });
             setTerminalError(msg);
         }
     }
@@ -5651,7 +5700,7 @@
         if (!tab) return;
         const lines = Array.isArray(text) ? text : [text];
         if (tab.term) {
-            lines.forEach(line => tab.term.writeln(line || ''));
+            lines.forEach(line => writeAndFollow(tab, line || '', { newline: true }));
         } else {
             tab.buffer = tab.buffer || [];
             lines.forEach(line => tab.buffer.push((line || '') + '\n'));
@@ -5673,7 +5722,7 @@
         const tab = getActiveTerminalTab(state);
         if (!tab || !tab.sessionId || !window.ahmadIDE.terminalWrite) return;
         await window.ahmadIDE.terminalWrite(tab.sessionId, '\u0003');
-        tab.term?.write('^C\r\n');
+        writeAndFollow(tab, '^C\r\n');
     }
 
     async function execTerminalCommand(cmd, state) {
@@ -6172,19 +6221,23 @@
 
         if (!res || !res.ok) {
             const rawError = res?.error || 'Unknown error';
+            const friendlyError = res?.friendlyError && res.friendlyError.trim();
             const outputText = (res && res.output) ? res.output.trim() : '';
+
+            const primary = friendlyError || rawError;
             const firstLine = outputText
-                ? (outputText.split(/\r?\n/).find(Boolean) || rawError)
-                : rawError;
+                ? (outputText.split(/\r?\n/).find(Boolean) || primary)
+                : primary;
             const shortMsg = firstLine.length > 140 ? `${firstLine.slice(0, 140)}…` : firstLine;
             const toastMsg = outputText ? `${shortMsg} (see Terminal for details)` : shortMsg;
-            console.error('Start failed:', rawError, outputText);
+
+            console.error('Start failed:', rawError, friendlyError, outputText);
 
             if (outputText) {
                 ensureBottomPanel('terminalPanel');
                 appendOutput([
                     '--- Debug start failed ---',
-                    rawError,
+                    friendlyError || rawError,
                     outputText,
                     '--- end ---'
                 ], globalTerminalState);
@@ -6205,7 +6258,9 @@
             currentRoutine: res.currentRoutine || 'TMPDBG',
             stack: res.stack || [],
             locals: res.locals || {},
-            ready: res.ready || false
+            ready: res.ready || false,
+            // Remember the original user routine so we can switch back when returning from external calls
+            originalRoutine: routineStateRef?.current || null
         };
         if (dbgStateParam) {
             dbgStateParam.sessionId = res.sessionId;
@@ -6246,7 +6301,7 @@
                 const initialResult = (breakpoints && breakpoints.length)
                     ? await window.ahmadIDE.debugContinue(currentDebugSession.id)
                     : await window.ahmadIDE.debugStep(currentDebugSession.id, 'into');
-                handleDebugResult(initialResult);
+                await handleDebugResult(initialResult);
                 return;
             } catch (err) {
                 showToast('error', 'Debug', 'Failed to start execution: ' + err.message);
@@ -6272,7 +6327,7 @@
             return;
         }
         const result = await window.ahmadIDE.debugStep(currentDebugSession.id, 'into');
-        handleDebugResult(result);
+        await handleDebugResult(result);
     }
 
     async function debugStepOver() {
@@ -6281,7 +6336,7 @@
             return;
         }
         const result = await window.ahmadIDE.debugStep(currentDebugSession.id, 'over');
-        handleDebugResult(result);
+        await handleDebugResult(result);
     }
 
     async function debugStepOut() {
@@ -6290,7 +6345,7 @@
             return;
         }
         const result = await window.ahmadIDE.debugStep(currentDebugSession.id, 'out');
-        handleDebugResult(result);
+        await handleDebugResult(result);
     }
 
     async function debugContinue() {
@@ -6300,7 +6355,7 @@
             return;
         }
         const result = await window.ahmadIDE.debugContinue(currentDebugSession.id);
-        handleDebugResult(result);
+        await handleDebugResult(result);
     }
 
     async function debugStop() {
@@ -6325,7 +6380,7 @@
         }
     }
 
-    function handleDebugResult(result) {
+    async function handleDebugResult(result) {
         if (!result) {
             showToast('error', 'Debug', 'No response from debugger');
             return;
@@ -6335,13 +6390,15 @@
 
         if (!result.ok) {
             const msg = result?.error || 'Unknown error';
+            const friendly = result?.friendlyError || '';
+            const displayMsg = friendly || msg;
             if (msg === 'Program finished' || msg === 'end') {
                 resetDebugUI(true, true); // keep armed so Run will debug again
                 showToast('success', 'Debug', 'Program finished');
             } else {
                 // Non-fatal error - show error but keep debug session active if it still exists
-                showToast('error', 'Debug', msg);
-                console.error('[DEBUG] Debug error:', msg);
+                showToast('error', 'Debug', displayMsg);
+                console.error('[DEBUG] Debug error:', msg, friendly);
 
                 // Only reset UI if error indicates session is dead
                 if (msg.includes('Session not found') || msg.includes('process error') ||
@@ -6357,7 +6414,11 @@
             const wasReady = currentDebugSession?.ready && !currentDebugSession?.currentLine;
 
             if (!currentDebugSession) {
-                currentDebugSession = { id: result.sessionId || null, engine: 'zstep' };
+                currentDebugSession = {
+                    id: result.sessionId || null,
+                    engine: 'zstep',
+                    originalRoutine: routineStateRef?.current || null
+                };
             }
 
             currentDebugSession.currentLine = result.currentLine;
@@ -6374,15 +6435,45 @@
                 dbgStateRef.currentRoutine = currentDebugSession.currentRoutine;
             }
 
-            // If we stopped on a user breakpoint, show that exact line.
-            // Otherwise (step/continue), show the previously executed line so locals feel in-sync.
-            const bpLines = (window.editorBreakpoints && Array.isArray(window.editorBreakpoints))
-                ? window.editorBreakpoints
-                : [];
-            const isUserBreakpoint = bpLines.includes(result.currentLine);
-            const displayLine = isUserBreakpoint
-                ? result.currentLine
-                : (result.currentLine > 1 ? result.currentLine - 1 : result.currentLine);
+            // EXTERNAL ROUTINE STEP INTO FIX:
+            // Check if the routine changed (e.g., stepped into ADD^DBGTEST2 from AAAA)
+            // If changed, load the new routine's source file before highlighting the line
+            const newRoutine = result.currentRoutine;
+            const currentlyLoadedRoutine = routineStateRef?.current;
+            let routineJustChanged = false;
+
+            // Determine which file to load based on the routine
+            let fileToLoad = newRoutine;
+            if (newRoutine === 'TMPDBG') {
+                // Returning to TMPDBG means returning to the original user routine
+                fileToLoad = currentDebugSession?.originalRoutine;
+                console.log(`[DEBUG] Returning to TMPDBG from external routine, will load original routine: ${fileToLoad}`);
+            } else if (newRoutine !== 'TMPDBG' && newRoutine !== currentlyLoadedRoutine) {
+                console.log(`[DEBUG] Stepping into external routine ${newRoutine}`);
+            }
+
+            if (newRoutine && fileToLoad && fileToLoad !== currentlyLoadedRoutine) {
+                console.log(`[DEBUG] Routine changed from ${currentlyLoadedRoutine} to ${newRoutine} (file: ${fileToLoad}) - loading source`);
+                routineJustChanged = true;
+                try {
+                    // Load the routine's source file
+                    await loadRoutineByName(fileToLoad, routineStateRef, activeEditor, routinesCache, globalTerminalState);
+                    console.log(`[DEBUG] Successfully loaded routine ${fileToLoad}`);
+                } catch (err) {
+                    console.error(`[DEBUG] Failed to load routine ${fileToLoad}:`, err);
+                    showToast('warn', 'Debug', `Could not load routine ${fileToLoad}: ${err.message}`);
+                    // Continue anyway - we'll highlight in the old routine (might be wrong but better than crashing)
+                }
+            }
+
+            // Line display logic:
+            // After fixing tag+offset computation in bridge.js, the backend now ALWAYS reports
+            // the correct "next line to execute" (already skipping comments, computing from tag+offset).
+            // We should just display it directly without any offset adjustments.
+            // This ensures we never highlight comment lines or wrong lines.
+            const displayLine = result.currentLine;
+
+            console.log(`[DEBUG] Line display: currentLine=${result.currentLine}, displayLine=${displayLine}, routineChanged=${routineJustChanged}`);
             gotoEditorLine(displayLine);
 
             // Update Variables and Stack panels IMMEDIATELY
