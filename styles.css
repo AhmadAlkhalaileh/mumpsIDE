@@ -1807,6 +1807,31 @@ textarea {
     background: var(--editor-bg);
 }
 
+#debugStartBtn {
+    position: relative;
+    overflow: visible;
+}
+
+#debugStartBtn.armed::after,
+#debugStartBtn.live::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+#debugStartBtn.armed::after {
+    background: #5fb865; /* green indicator when armed */
+}
+
+#debugStartBtn.live::after {
+    background: #d67f3c; /* orange indicator when a session is live */
+}
+
 .monaco-editor,
 .monaco-editor .margin {
     background: #2b2b2b !important;
@@ -1830,7 +1855,9 @@ textarea {
 }
 
 .monaco-editor .overflow-guard {
-    contain: strict !important;
+    /* Allow hover tooltips to float outside the editor without being clipped */
+    contain: content !important;
+    overflow: visible !important;
 }
 
 .monaco-editor .margin {

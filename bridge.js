@@ -1186,31 +1186,25 @@ function resolvePending(session, evt) {
   }
 }
 
-function waitForZStepEvent(session, timeoutMs = 10000) {
+function waitForEvent(session, allowedEvents = ['stopped', 'exit', 'error'], timeoutMs = 10000) {
   return new Promise((resolve) => {
-    // Helper to find and return a step-relevant event from queue
-    const findStepEvent = () => {
-      if (!session.eventQueue || session.eventQueue.length === 0) return null;
+    const allowed = new Set(allowedEvents || []);
+    const isAllowed = (evt) => allowed.size === 0 || allowed.has(evt.event);
 
-      // Find first step-relevant event (stopped, exit, error)
+    const findMatchingQueuedEvent = () => {
+      if (!session.eventQueue || session.eventQueue.length === 0) return null;
       for (let i = 0; i < session.eventQueue.length; i++) {
         const evt = session.eventQueue[i];
-        if (evt.event === 'stopped' || evt.event === 'exit' || evt.event === 'error') {
+        if (isAllowed(evt)) {
           session.eventQueue.splice(i, 1);
-          console.log('[DEBUG] waitForZStepEvent: returning queued event:', evt.event);
           return evt;
-        } else {
-          // Log and discard non-step events like bp-set, bp-error, started
-          console.log('[DEBUG] waitForZStepEvent: skipping non-step event:', evt.event);
         }
       }
-      // Only non-step events in queue, clear them
-      session.eventQueue = [];
       return null;
     };
 
     // Check queue first
-    const queuedEvt = findStepEvent();
+    const queuedEvt = findMatchingQueuedEvent();
     if (queuedEvt) {
       resolve(queuedEvt);
       return;
@@ -1218,26 +1212,44 @@ function waitForZStepEvent(session, timeoutMs = 10000) {
 
     // No queued event, so wait for one to arrive via resolvePending
     const timer = setTimeout(() => {
-      console.log('[DEBUG] waitForZStepEvent TIMEOUT after', timeoutMs, 'ms');
-      session.pending = (session.pending || []).filter(r => r !== resolve);
+      console.log('[DEBUG] waitForEvent TIMEOUT after', timeoutMs, 'ms');
+      session.pending = (session.pending || []).filter(r => r !== resolver);
       resolve({ event: 'error', message: 'Timeout waiting for debugger event' });
     }, timeoutMs);
 
+    const resolver = (evt) => {
+      if (isAllowed(evt)) {
+        clearTimeout(timer);
+        session.pending = (session.pending || []).filter(r => r !== resolver);
+        resolve(evt);
+        return;
+      }
+      // Not for us: keep it queued and keep waiting
+      session.eventQueue = session.eventQueue || [];
+      session.eventQueue.push(evt);
+      session.pending = session.pending || [];
+      session.pending.push(resolver);
+    };
+
     // Register this resolver as pending
     session.pending = session.pending || [];
-    session.pending.push(resolve);
-    console.log('[DEBUG] waitForZStepEvent: registered pending callback, queue depth:', session.pending.length);
+    session.pending.push(resolver);
+    console.log('[DEBUG] waitForEvent: registered pending callback, queue depth:', session.pending.length);
 
     // CRITICAL: Check queue again AFTER registering - event might have arrived in between
-    const lateEvt = findStepEvent();
+    const lateEvt = findMatchingQueuedEvent();
     if (lateEvt) {
       clearTimeout(timer);
-      session.pending = session.pending.filter(r => r !== resolve);
-      console.log('[DEBUG] waitForZStepEvent: found late-arriving event in queue:', lateEvt.event);
+      session.pending = session.pending.filter(r => r !== resolver);
+      console.log('[DEBUG] waitForEvent: found late-arriving event in queue:', lateEvt.event);
       resolve(lateEvt);
       return;
     }
   });
+}
+
+function waitForZStepEvent(session, timeoutMs = 10000) {
+  return waitForEvent(session, ['stopped', 'exit', 'error'], timeoutMs);
 }
 
 async function applyZStepEvent(session, evt) {
@@ -1334,6 +1346,20 @@ function handleZStepStdout(session) {
       }
     }
   };
+}
+
+function consumeSessionOutput(session) {
+  if (!session) return '';
+  if (session.buffer && session.buffer.trim().length) {
+    session.output = session.output || [];
+    session.output.push(session.buffer.trim());
+    session.buffer = '';
+  }
+  const outArr = Array.isArray(session.output) ? session.output : [];
+  const start = Number.isInteger(session.outputCursor) ? session.outputCursor : 0;
+  const slice = outArr.slice(start);
+  session.outputCursor = outArr.length;
+  return slice.join('\n');
 }
 
 
@@ -1698,6 +1724,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     sourceMap: { map, lines },
     breakpoints: breakpoints || [],
     output: [],
+    outputCursor: 0,
     procExited: false,
     headerLines: headerLines,  // Track header lines for this session (2 or 5 depending on whether first tag has params)
     payloadToUser,
@@ -1931,7 +1958,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   let readyEvt = null;
   const maxAttempts = 10;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const evt = await waitForZStepEvent(session);
+    const evt = await waitForEvent(session, ['ready', 'stopped', 'exit', 'error'], 10000);
     console.log(`[DEBUG] Received event attempt ${attempt + 1}:`, JSON.stringify(evt));
 
     if (!evt) {
@@ -1949,6 +1976,8 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       readyEvt = evt;
       break;
     }
+
+    // Ignore other events (e.g., bp-set/bp-error) here
   }
 
   console.log('[DEBUG] Ready event:', JSON.stringify(readyEvt));
@@ -2001,6 +2030,26 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
 }
 
 
+function normalizeDebuggerVars(rawVars = {}) {
+  const locals = {};
+  Object.entries(rawVars || {}).forEach(([rawKey, value]) => {
+    if (!rawKey) return;
+    const key = `${rawKey}`.toUpperCase();
+    const arrMatch = key.match(/^([A-Z%][A-Z0-9]*)(\(.+\))$/);
+    if (arrMatch) {
+      const base = arrMatch[1];
+      const sub = arrMatch[2];
+      if (!locals[base] || typeof locals[base] !== 'object' || !locals[base]._isArray) {
+        locals[base] = { _isArray: true, _elements: {} };
+      }
+      locals[base]._elements[sub] = value;
+    } else {
+      locals[key] = value;
+    }
+  });
+  return locals;
+}
+
 async function fetchZStepVariables(session) {
   if (!session || session.engine !== 'zstep') return {};
   if (session.procExited) return {};
@@ -2009,13 +2058,13 @@ async function fetchZStepVariables(session) {
     console.log('[DEBUG] Fetching variables via GETVARS...');
     session.proc.stdin.write('GETVARS\n');
 
-    // Wait for vars event
-    const evt = await waitForZStepEvent(session);
+    // Wait for vars event (or exit/error)
+    const evt = await waitForEvent(session, ['vars', 'exit', 'error'], 4000);
     console.log('[DEBUG] GETVARS response:', JSON.stringify(evt));
 
     if (evt.event === 'vars' && evt.vars) {
       console.log('[DEBUG] Variables fetched:', Object.keys(evt.vars).length, 'variables');
-      return evt.vars;
+      return normalizeDebuggerVars(evt.vars);
     }
 
     console.log('[DEBUG] No variables returned from GETVARS');
@@ -2072,12 +2121,12 @@ async function sendZStepCommand(sessionId, command) {
 
   if (evt.event === 'error') {
     dbgLog('[runtime] Error event', { error: evt.message });
-    return { ok: false, error: evt.message || 'Runtime error' };
+    return { ok: false, error: evt.message || 'Runtime error', output: consumeSessionOutput(session) };
   }
   if (evt.event === 'exit') {
     session.procExited = true;
     dbgLog('[runtime] Program exited', { output: session.output });
-    return { ok: false, error: 'Program finished', output: (session.output || []).join('\n') };
+    return { ok: false, error: 'Program finished', output: consumeSessionOutput(session) };
   }
   if (evt.event === 'stopped') {
     await applyZStepEvent(session, evt);
@@ -2113,7 +2162,7 @@ async function sendZStepCommand(sessionId, command) {
     callStack: clientCallStack,
     stack: formatCallStackForClient(clientCallStack),
     locals: session.locals || {},
-    output: (session.output || []).join('\n')
+    output: consumeSessionOutput(session)
   };
 }
 
@@ -3077,12 +3126,17 @@ module.exports = {
         // Force kill if still running
         if (session.proc && !session.procExited) {
           session.proc.kill('SIGTERM');
+          await new Promise(r => setTimeout(r, 150));
+          if (!session.procExited) {
+            session.proc.kill('SIGKILL');
+          }
         }
       } catch (e) {
         console.log('[DEBUG] Error during stop:', e.message);
       }
       // Return accumulated output to show in terminal
-      const output = (session.output || []).join('\n');
+      const output = consumeSessionOutput(session);
+      session.procExited = true;
       delete debugSessions[sessionId];
       return { ok: true, output };
     }

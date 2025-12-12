@@ -3165,6 +3165,13 @@
         bottom: { visible: true, activePanel: 'terminalPanel' }
     };
 
+    function ensureBottomPanel(panelId) {
+        const state = toolWindowState.bottom;
+        if (!state) return;
+        if (state.visible && state.activePanel === panelId) return;
+        toggleToolWindowPanel(panelId, 'bottom');
+    }
+
     function setActiveToolWindow(panelId) {
         // Legacy support - map to new structure
         const btn = document.querySelector(`.tool-window-stripe-btn[data-panel="${panelId}"]`);
@@ -3416,7 +3423,7 @@
                 colorDecorators: false,  // Disable color decorators
                 codeLens: false,  // Disable code lens
                 lightbulb: { enabled: 'off' },  // Disable lightbulb suggestions
-                hover: { enabled: false },  // Disable hover (we handle it manually)
+                hover: { enabled: true },  // Enable hover so debugger tooltips work
                 inlayHints: { enabled: 'off' },  // Disable inlay hints
                 stickyScroll: { enabled: false },  // Disable sticky scroll
                 guides: { indentation: false, bracketPairs: false },  // Disable guides
@@ -3584,67 +3591,6 @@
             };
             const debugBar = document.getElementById('debugBar');
             dbgStateRef = dbgState;
-
-            // Register hover provider for variable inspection during debug
-            monaco.languages.registerHoverProvider('mumps', {
-                provideHover: (model, position) => {
-                    // Only provide hover if debug session is active
-                    if (!dbgState.sessionId) return null;
-
-                    // Get the word at the cursor position
-                    const word = model.getWordAtPosition(position);
-                    if (!word) return null;
-
-                    const varName = word.word.toUpperCase(); // MUMPS vars are case-insensitive
-
-                    // Check if variable exists in locals
-                    if (!dbgState.locals) return null;
-
-                    const varData = dbgState.locals[varName];
-
-                    if (!varData) {
-                        // Variable not found - show helpful message
-                        return {
-                            contents: [
-                                { value: `**${varName}**` },
-                                { value: `_Not evaluated yet_` }
-                            ]
-                        };
-                    }
-
-                    // Check if it's an array
-                    if (typeof varData === 'object' && varData._isArray) {
-                        const elements = varData._elements || {};
-                        const elementCount = Object.keys(elements).length;
-                        const sortedKeys = Object.keys(elements).sort();
-                        const previewKeys = sortedKeys.slice(0, 8);
-
-                        let arrayDisplay = `**${varName}** (Array - ${elementCount} elements)\n\n`;
-                        if (previewKeys.length) {
-                            arrayDisplay += '```mumps\n';
-                            previewKeys.forEach(key => {
-                                arrayDisplay += `${varName}${key}="${elements[key]}"\n`;
-                            });
-                            if (sortedKeys.length > previewKeys.length) {
-                                arrayDisplay += `... +${sortedKeys.length - previewKeys.length} more\n`;
-                            }
-                            arrayDisplay += '```';
-                        }
-                        arrayDisplay += `\nUse Locals (+) to expand the full array.`;
-
-                        return {
-                            contents: [{ value: arrayDisplay }]
-                        };
-                    } else {
-                        // Simple variable
-                        return {
-                            contents: [
-                                { value: `**${varName}** = \`"${varData}"\`` }
-                            ]
-                        };
-                    }
-                }
-            });
 
             applyCodeTheme(currentCodeTheme || defaultCodeTheme);
             bindThemeSelectors(editor);
@@ -4049,9 +3995,13 @@
             });
 
             const shouldDebugForRun = () => {
-                // Auto-enable debug if breakpoints exist OR debug mode is enabled
                 const bps = getBpLines();
-                return dbgState.debugModeEnabled || runConfigState.active === 'debug-current' || bps.length > 0;
+                const hasBps = bps.length > 0;
+                const debugArmed = dbgState.debugModeEnabled;
+                const explicitDebugCfg = runConfigState.active === 'debug-current';
+                // Only start debugger when it's armed (Debug button) AND a breakpoint exists,
+                // or when explicitly selecting the debug run config with at least one breakpoint.
+                return (debugArmed && hasBps) || (explicitDebugCfg && hasBps);
             };
 
             // Initialize defaults
@@ -4118,25 +4068,26 @@
                     }
                 });
 
-                // DEBUG BUTTON: toggles debug mode and validates breakpoints
+            // DEBUG BUTTON: arm/disarm debugger (Run starts it)
                 $('#debugStartBtn').on('click', () => {
-                    dbgState.debugModeEnabled = !dbgState.debugModeEnabled;
                     const $btn = $('#debugStartBtn');
-
+                    // If a session is active, stop it
+                    if (currentDebugSession && currentDebugSession.id) {
+                        debugStop();
+                        return;
+                    }
+                    dbgState.debugModeEnabled = !dbgState.debugModeEnabled;
                     if (dbgState.debugModeEnabled) {
-                        // Debug mode activated
-                        $btn.addClass('active');
                         const bpLines = getBpLines();
                         if (bpLines.length === 0) {
-                            appendOutput('⚠️  Debug mode enabled but NO breakpoints set. Add breakpoints then click Run.', terminalState);
+                            appendOutput('⚠️  Debug armed, but no breakpoints set. Run will execute normally.', terminalState);
                         } else {
-                            appendOutput(`✅ Debug mode enabled with ${bpLines.length} breakpoint(s). Click Run to start debugging.`, terminalState);
+                            appendOutput('✅ Debug armed. Click Run to start debugging.', terminalState);
                         }
                     } else {
-                        // Debug mode deactivated
-                        $btn.removeClass('active');
-                        appendOutput('🛑 Debug mode disabled. Run will execute normally.', terminalState);
+                        appendOutput('🛑 Debug disarmed. Run will execute normally.', terminalState);
                     }
+                    updateDebugButtonState();
                 });
             } else {
                 const runBtn = document.getElementById('runBtn');
@@ -4201,22 +4152,25 @@
 
                 const debugStartBtn = document.getElementById('debugStartBtn');
                 debugStartBtn?.addEventListener('click', () => {
+                    // If a session is active, stop it
+                    if (currentDebugSession && currentDebugSession.id) {
+                        debugStop();
+                        return;
+                    }
+
                     dbgState.debugModeEnabled = !dbgState.debugModeEnabled;
 
                     if (dbgState.debugModeEnabled) {
-                        // Debug mode activated
-                        debugStartBtn.classList.add('active');
                         const bpLines = getBpLines();
                         if (bpLines.length === 0) {
-                            appendOutput('⚠️  Debug mode enabled but NO breakpoints set. Add breakpoints then click Run.', terminalState);
+                            appendOutput('⚠️  Debug armed, but no breakpoints set. Run will execute normally.', terminalState);
                         } else {
-                            appendOutput(`✅ Debug mode enabled with ${bpLines.length} breakpoint(s). Click Run to start debugging.`, terminalState);
+                            appendOutput('✅ Debug armed. Click Run to start debugging.', terminalState);
                         }
                     } else {
-                        // Debug mode deactivated
-                        debugStartBtn.classList.remove('active');
-                        appendOutput('🛑 Debug mode disabled. Run will execute normally.', terminalState);
+                        appendOutput('🛑 Debug disarmed. Run will execute normally.', terminalState);
                     }
+                    updateDebugButtonState();
                 });
             }
 
@@ -6104,41 +6058,43 @@
         highlightLine(activeEditor, lineNumber);
     }
 
-    async function startDebugSession() {
-        if (!activeEditor) return;
-        const code = activeEditor.getValue();
+    function showDebugOutput(output) {
+        if (!output || !output.trim()) return;
+        if (globalTerminalState) {
+            const rawLines = Array.isArray(output) ? output : output.split(/\r?\n/);
+            const lines = rawLines.filter((line, idx) => line.length || idx < rawLines.length - 1);
+            appendOutput(lines, globalTerminalState);
+        }
+    }
 
-        // 1. Build real breakpoints from global window.editorBreakpoints
-        // Assumes window.editorBreakpoints is an array of line numbers [2, 5, 10...]
-        const rawBps = (window.editorBreakpoints && Array.isArray(window.editorBreakpoints))
+    async function startDebugSession(editorParam = activeEditor, dbgStateParam = dbgStateRef, terminalState = globalTerminalState, debugBarEl = document.getElementById('debugBar'), bpLinesOverride = null) {
+        const editorInstance = editorParam || activeEditor;
+        if (!editorInstance) return;
+        const code = editorInstance.getValue();
+
+        // Use real breakpoints from the current UI state (fall back to legacy global if present)
+        const inferredBps = Array.isArray(bpLinesOverride)
+            ? bpLinesOverride
+            : (typeof getBpLines === 'function' ? getBpLines() : []);
+        const legacyBps = (window.editorBreakpoints && Array.isArray(window.editorBreakpoints))
             ? window.editorBreakpoints
             : [];
+        const bpLines = Array.from(new Set([...(inferredBps || []), ...(legacyBps || [])]))
+            .map(n => parseInt(n, 10))
+            .filter(n => Number.isInteger(n) && n > 0);
+        window.editorBreakpoints = bpLines; // keep legacy helpers in sync
+        const breakpoints = bpLines.map(line => ({ line }));
 
-        const breakpoints = rawBps.map(line => ({ line: line }));
+        // Reset UI before starting to ensure clean state, but keep debug mode toggle untouched
+        resetDebugUI(false);
 
-        // 2. Determine startLine from current cursor position
-        let startLine = null;
-        /* // DISABLED: Don't assume "Run to Cursor" for generic Debug button.
-           // User should explicitly set breakpoints.
-        const position = activeEditor.getPosition();
-        if (position && position.lineNumber) {
-            startLine = position.lineNumber;
-            if (!breakpoints.some(bp => bp.line === startLine)) {
-                breakpoints.push({ line: startLine });
-            }
-        }
-        */
-
-        // Reset UI before starting to ensure clean state
-        resetDebugUI();
-
-        console.log('Starting debug session...', { breakpoints, startLine });
+        console.log('Starting debug session...', { breakpoints });
 
         showToast('info', 'Debug', 'Initializing debug session...');
 
         let res;
         try {
-            res = await window.ahmadIDE.debugStart(code, breakpoints, startLine);
+            res = await window.ahmadIDE.debugStart(code, breakpoints, null);
         } catch (e) {
             showToast('error', 'Debug', 'Start exception: ' + e.message);
             console.error(e);
@@ -6146,16 +6102,32 @@
         }
 
         if (!res || !res.ok) {
-            const errorMsg = 'Start failed: ' + (res?.error || 'Unknown error');
-            showToast('error', 'Debug', errorMsg);
-            console.error(errorMsg);
-            alert(errorMsg); // Temporary: ensure user sees this
+            const rawError = res?.error || 'Unknown error';
+            const outputText = (res && res.output) ? res.output.trim() : '';
+            const firstLine = outputText
+                ? (outputText.split(/\r?\n/).find(Boolean) || rawError)
+                : rawError;
+            const shortMsg = firstLine.length > 140 ? `${firstLine.slice(0, 140)}…` : firstLine;
+            const toastMsg = outputText ? `${shortMsg} (see Terminal for details)` : shortMsg;
+            console.error('Start failed:', rawError, outputText);
+
+            if (outputText) {
+                ensureBottomPanel('terminalPanel');
+                appendOutput([
+                    '--- Debug start failed ---',
+                    rawError,
+                    outputText,
+                    '--- end ---'
+                ], globalTerminalState);
+            }
+
+            showToast('error', 'Debug', toastMsg);
+            resetDebugUI(true, true); // keep armed so user can fix and retry
             return;
         }
 
         console.log('debugStart response OK', res);
         console.log('[DEBUG] Full response object:', JSON.stringify(res, null, 2));
-        // alert('Debugger started! Session ID: ' + res.sessionId); // Temporary success confirmation
 
         currentDebugSession = {
             id: res.sessionId,
@@ -6166,15 +6138,28 @@
             locals: res.locals || {},
             ready: res.ready || false
         };
+        if (dbgStateParam) {
+            dbgStateParam.sessionId = res.sessionId;
+            dbgStateParam.locals = currentDebugSession.locals;
+            dbgStateParam.state = currentDebugSession.ready ? 'ready' : 'paused';
+            dbgStateParam.currentLine = currentDebugSession.currentLine || null;
+            dbgStateParam.currentRoutine = currentDebugSession.currentRoutine;
+        }
 
         console.log('Debug Session Started:', currentDebugSession);
 
         // Show initial variables and stack
         renderLocals(currentDebugSession.locals);
         renderStack(currentDebugSession.stack);
+        updateDebugButtonState();
+
+        // Remember currently open bottom panel so we can restore after debug
+        if (dbgStateParam) {
+            dbgStateParam.previousBottomPanel = toolWindowState?.bottom?.activePanel || null;
+        }
 
         // Show debug bar if hidden
-        const bar = document.getElementById('debugBar');
+        const bar = debugBarEl || document.getElementById('debugBar');
         console.log('[DEBUG UI] debugBar element:', bar);
         if (bar) {
             bar.classList.remove('hidden');
@@ -6182,62 +6167,33 @@
             console.log('[DEBUG UI] debugBar shown');
         }
 
-        // Auto-open Debug panel (click the Debug tab button)
-        const debugPanelBtn = document.querySelector('[data-panel="debugPanel"]');
-        console.log('[DEBUG UI] debugPanel button:', debugPanelBtn);
-        if (debugPanelBtn) {
-            debugPanelBtn.click();
-            console.log('[DEBUG UI] debugPanel button clicked');
+        // Auto-open Debug panel without hiding the terminal permanently
+        ensureBottomPanel('debugPanel');
+
+        // If the engine is ready but not executing, automatically run to first breakpoint (or stop on entry if none)
+        if (currentDebugSession.ready && !currentDebugSession.currentLine) {
+            try {
+                const initialResult = (breakpoints && breakpoints.length)
+                    ? await window.ahmadIDE.debugContinue(currentDebugSession.id)
+                    : await window.ahmadIDE.debugStep(currentDebugSession.id, 'into');
+                handleDebugResult(initialResult);
+                return;
+            } catch (err) {
+                showToast('error', 'Debug', 'Failed to start execution: ' + err.message);
+                return;
+            }
         }
 
-        // Show appropriate message
-        console.log('[DEBUG] Checking debug session state:', {
-            ready: currentDebugSession.ready,
-            currentLine: currentDebugSession.currentLine
-        });
-
-        if (currentDebugSession.ready && !currentDebugSession.currentLine) {
-            console.log('[DEBUG] Debugger in READY state - waiting for user to start');
-            // Debugger is ready but not executing yet
-            setDebugButtons(false);
-
-            const stepIntoBtn = document.getElementById('dbgStepIntoBtn');
-            const continueBtn = document.getElementById('dbgContinueBtn');
-            const stopBtn = document.getElementById('dbgStopBtn');
-
-            // Always enable Step Into and Stop
-            if (stepIntoBtn) {
-                stepIntoBtn.removeAttribute('disabled');
-                stepIntoBtn.disabled = false;
-            }
-            if (stopBtn) {
-                stopBtn.removeAttribute('disabled');
-                stopBtn.disabled = false;
-            }
-
-            // Only enable Continue if there are breakpoints
-            const hasBreakpoints = breakpoints && breakpoints.length > 0;
-            if (hasBreakpoints) {
-                console.log('[DEBUG] Breakpoints detected - enabling Continue button');
-                if (continueBtn) {
-                    continueBtn.removeAttribute('disabled');
-                    continueBtn.disabled = false;
-                }
-                showToast('success', 'Debug', 'Ready. Click Continue (▶) to run to breakpoint, or Step Into (⤵) to step line-by-line.');
-            } else {
-                console.log('[DEBUG] No breakpoints - Continue button stays disabled');
-                // Continue stays disabled - user must use Step Into
-                showToast('success', 'Debug', 'Ready. Click Step Into (⤵) to start. Set breakpoints to enable Continue button.');
-            }
-        } else if (currentDebugSession.currentLine) {
+        // If the backend already paused us somewhere, reflect that immediately
+        if (currentDebugSession.currentLine) {
             console.log('[DEBUG] Debugger in PAUSED state - enabling all buttons');
-            // Debugger is executing, enable all buttons
             setDebugButtons(true);
             gotoEditorLine(currentDebugSession.currentLine);
             showToast('success', 'Debug', 'Debugger paused at line ' + currentDebugSession.currentLine);
-        } else {
-            console.log('[DEBUG] Unknown debug state - not ready and no currentLine');
+            return;
         }
+
+        console.log('[DEBUG] Debugger initialized without a pause location (unexpected).');
     }
 
     async function debugStepInto() {
@@ -6280,48 +6236,37 @@
     async function debugStop() {
         if (!currentDebugSession || !currentDebugSession.id) {
             // Just reset UI if no session
-            currentDebugSession = null;
-            resetDebugUI();
+            resetDebugUI(true);
             return;
         }
-        const result = await window.ahmadIDE.debugStop(currentDebugSession.id);
-        if (result && result.ok) {
-            // Show any accumulated output in the terminal
-            if (result.output && result.output.trim()) {
-                console.log('[DEBUG] Displaying final output from stopped session');
-                // Get the terminal output element
-                const terminalOutput = document.getElementById('terminalOutput');
-                if (terminalOutput) {
-                    const pre = document.createElement('pre');
-                    pre.textContent = result.output;
-                    terminalOutput.appendChild(pre);
-                }
+        try {
+            const result = await window.ahmadIDE.debugStop(currentDebugSession.id);
+            if (result && result.ok) {
+                showDebugOutput(result.output || '');
+                resetDebugUI(true, true); // keep armed so next Run still debugs
+                showToast('info', 'Debug', 'Debug session stopped');
+            } else {
+                showDebugError('Stop failed: ' + (result?.error || 'Unknown'));
             }
-            currentDebugSession = null;
-            resetDebugUI();
-            showToast('info', 'Debug', 'Debug session stopped');
-        } else {
-            showDebugError('Stop failed: ' + (result?.error || 'Unknown'));
+        } catch (err) {
+            showDebugError('Stop failed: ' + (err?.message || 'Unknown'));
+        } finally {
+            updateDebugButtonState();
         }
     }
 
     function handleDebugResult(result) {
-        if (!result || !result.ok) {
+        if (!result) {
+            showToast('error', 'Debug', 'No response from debugger');
+            return;
+        }
+
+        showDebugOutput(result.output || '');
+
+        if (!result.ok) {
             const msg = result?.error || 'Unknown error';
             if (msg === 'Program finished' || msg === 'end') {
-                console.log('Program finished');
-                // Show final output when program finishes
-                if (result.output && result.output.trim()) {
-                    console.log('[DEBUG] Displaying final output from finished program');
-                    const terminalOutput = document.getElementById('terminalOutput');
-                    if (terminalOutput) {
-                        const pre = document.createElement('pre');
-                        pre.textContent = result.output;
-                        terminalOutput.appendChild(pre);
-                    }
-                }
-                currentDebugSession = null;
-                resetDebugUI();
+                resetDebugUI(true, true); // keep armed so Run will debug again
                 showToast('success', 'Debug', 'Program finished');
             } else {
                 // Non-fatal error - show error but keep debug session active if it still exists
@@ -6331,17 +6276,7 @@
                 // Only reset UI if error indicates session is dead
                 if (msg.includes('Session not found') || msg.includes('process error') ||
                     msg.includes('Failed to send command') || result.output) {
-                    // Show any output before resetting
-                    if (result.output && result.output.trim()) {
-                        const terminalOutput = document.getElementById('terminalOutput');
-                        if (terminalOutput) {
-                            const pre = document.createElement('pre');
-                            pre.textContent = result.output;
-                            terminalOutput.appendChild(pre);
-                        }
-                    }
-                    currentDebugSession = null;
-                    resetDebugUI();
+                    resetDebugUI(true, true); // keep armed for retry
                 }
             }
             return;
@@ -6349,16 +6284,36 @@
 
         if (result.currentLine) {
             // Execution has started - transition from "ready" to "running"
-            const wasReady = currentDebugSession.ready && !currentDebugSession.currentLine;
+            const wasReady = currentDebugSession?.ready && !currentDebugSession?.currentLine;
+
+            if (!currentDebugSession) {
+                currentDebugSession = { id: result.sessionId || null, engine: 'zstep' };
+            }
 
             currentDebugSession.currentLine = result.currentLine;
             currentDebugSession.currentRoutine = result.currentRoutine || currentDebugSession.currentRoutine;
-            currentDebugSession.stack = result.stack || currentDebugSession.stack;
+            currentDebugSession.stack = result.stack || currentDebugSession.stack || [];
             // CRITICAL: Always update locals from result (don't use fallback to old locals)
             currentDebugSession.locals = result.locals || {};
             currentDebugSession.ready = false; // No longer in ready state
 
-            gotoEditorLine(result.currentLine);
+            if (dbgStateRef) {
+                dbgStateRef.locals = currentDebugSession.locals;
+                dbgStateRef.currentLine = result.currentLine;
+                dbgStateRef.state = 'paused';
+                dbgStateRef.currentRoutine = currentDebugSession.currentRoutine;
+            }
+
+            // If we stopped on a user breakpoint, show that exact line.
+            // Otherwise (step/continue), show the previously executed line so locals feel in-sync.
+            const bpLines = (window.editorBreakpoints && Array.isArray(window.editorBreakpoints))
+                ? window.editorBreakpoints
+                : [];
+            const isUserBreakpoint = bpLines.includes(result.currentLine);
+            const displayLine = isUserBreakpoint
+                ? result.currentLine
+                : (result.currentLine > 1 ? result.currentLine - 1 : result.currentLine);
+            gotoEditorLine(displayLine);
 
             // Update Variables and Stack panels IMMEDIATELY
             console.log('[DEBUG] Updating variables panel with', Object.keys(currentDebugSession.locals).length, 'variables');
@@ -6377,10 +6332,27 @@
         }
     }
 
-    function resetDebugUI() {
+    function updateDebugButtonState() {
+        const btn = document.getElementById('debugStartBtn');
+        if (!btn) return;
+        const armed = !!(dbgStateRef && dbgStateRef.debugModeEnabled);
+        const live = !!(currentDebugSession && currentDebugSession.id);
+        btn.classList.toggle('armed', armed);
+        btn.classList.toggle('live', live);
+        btn.title = live
+            ? 'Debugging (session active)'
+            : armed
+                ? 'Debug armed (Run to start)'
+                : 'Debug (Shift+F9)';
+    }
+
+    function resetDebugUI(clearSession = false, keepArmed = false) {
         setDebugButtons(false);
         const bar = document.getElementById('debugBar');
-        if (bar) bar.classList.add('hidden');
+        if (bar) {
+            bar.classList.add('hidden');
+            bar.style.display = 'none';
+        }
 
         // Clear editor decorations
         if (activeEditor) {
@@ -6393,7 +6365,23 @@
         renderLocals({});
 
         // Reset session
-        // currentDebugSession = null; // Do not nullify here if called during start, but okay if called from stop
+        if (clearSession) {
+            currentDebugSession = null;
+            if (dbgStateRef) {
+                dbgStateRef.sessionId = null;
+                dbgStateRef.locals = {};
+                dbgStateRef.state = 'stopped';
+                dbgStateRef.currentLine = null;
+                if (dbgStateRef.previousBottomPanel) {
+                    ensureBottomPanel(dbgStateRef.previousBottomPanel);
+                    dbgStateRef.previousBottomPanel = null;
+                }
+            }
+            if (!keepArmed && dbgStateRef) {
+                dbgStateRef.debugModeEnabled = false;
+            }
+        }
+        updateDebugButtonState();
     }
 
     // Helper to toggle button states
@@ -6579,6 +6567,7 @@
         } catch (e) {
             // ignore storage errors
         }
+        updateDebugButtonState();
     }
 
     function persistExtensionState() {
@@ -7488,13 +7477,11 @@
                 }
                 // Don't show hover in "ready" state (before execution starts)
                 if (!currentDebugSession.currentLine) {
-                    console.log('[HOVER] Debug session not started yet');
                     return null;
                 }
 
                 const word = model.getWordAtPosition(position);
                 if (!word) {
-                    console.log('[HOVER] No word at position');
                     return null;
                 }
 
@@ -7510,8 +7497,9 @@
                     }
                 }
 
-                console.log('[HOVER] Looking up variable:', varName);
-                console.log('[HOVER] Available variables:', Object.keys(currentDebugSession.locals));
+                const subMatch = varName.match(/^([A-Z%][A-Z0-9]*)(\(.+\))$/);
+                const baseName = subMatch ? subMatch[1] : null;
+                const subscriptKey = subMatch ? subMatch[2] : null;
 
                 // Check locals for the variable
                 // 1. Exact match (as returned by debugger - should already be uppercase)
@@ -7522,36 +7510,53 @@
                     const keys = Object.keys(currentDebugSession.locals);
                     const match = keys.find(k => k.toUpperCase() === varName);
                     if (match) {
-                        console.log('[HOVER] Found case-insensitive match:', match);
                         val = currentDebugSession.locals[match];
                     }
                 }
 
+                // If hovering an array element (ARR(1)), show that specific value when available
+                if (val === undefined && baseName && currentDebugSession.locals[baseName]) {
+                    const arrVal = currentDebugSession.locals[baseName];
+                    if (arrVal && typeof arrVal === 'object' && arrVal._isArray && subscriptKey) {
+                        const elementVal = arrVal._elements ? arrVal._elements[subscriptKey] : undefined;
+                        if (elementVal !== undefined) {
+                            return {
+                                contents: [
+                                    { value: `**${baseName}${subscriptKey}**` },
+                                    { value: '`' + String(elementVal) + '`' }
+                                ]
+                            };
+                        }
+                        val = arrVal;
+                    }
+                }
+
                 if (val !== undefined && val !== null) {
-                    console.log('[HOVER] Found value for', varName, ':', val);
-                    let displayValue = '';
+                    let contents = [];
                     if (typeof val === 'object' && val._isArray) {
                         const len = Object.keys(val._elements || {}).length;
-                        displayValue = `Array (${len} element${len === 1 ? '' : 's'})`;
-                        const keys = Object.keys(val._elements || {}).slice(0, 10);
-                        keys.forEach(k => {
-                            displayValue += `\n  ${k}: ${val._elements[k]}`;
-                        });
-                        if (len > 10) displayValue += '\n  ...';
+                        const keys = Object.keys(val._elements || {}).slice(0, 6);
+                        const preview = keys.map(k => `• ${baseName || varName}${k} = \`${val._elements[k]}\``).join('\n');
+                        contents = [
+                            { value: `**${baseName || varName}** (Array, ${len} item${len === 1 ? '' : 's'})` },
+                            { value: preview || '_No elements_' }
+                        ];
+                        if (len > keys.length) {
+                            contents.push({ value: `_…${len - keys.length} more_` });
+                        }
                     } else {
-                        displayValue = String(val);
+                        contents = [
+                            { value: `**${varName}**` },
+                            { value: '`' + String(val) + '`' }
+                        ];
                     }
 
                     return {
                         range: new monaco.Range(position.lineNumber, word.startColumn - (varName.startsWith('%') ? 1 : 0), position.lineNumber, word.endColumn),
-                        contents: [
-                            { value: `**${varName}**` },
-                            { value: '```mumps\n' + displayValue + '\n```' }
-                        ]
+                        contents
                     };
                 }
 
-                console.log('[HOVER] No value found for variable:', varName);
                 return null;
             }
         });
