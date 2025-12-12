@@ -1164,20 +1164,20 @@ function spawnZStepProcess(entryRoutine, entryTag = '') {
   // Run the AHMDBGJSON entry point in the AHMDBG routine (tag^routine)
   const runCmd = `${envExports} && ${cdCmd} && ${cfg.ydbPath}/mumps -run AHMDBGJSON^AHMDBG ${entryRoutine}${tagArg}`;
 
-  console.log('[DEBUG] spawnZStepProcess environment:');
-  console.log('[DEBUG] envExports:', envExports);
-  console.log('[DEBUG] runCmd:', runCmd);
+  dbgLog('[DEBUG] spawnZStepProcess environment:');
+  dbgLog('[DEBUG] envExports:', envExports);
+  dbgLog('[DEBUG] runCmd:', runCmd);
 
   if (useDocker) {
     const cmd = wrapDockerCmd(
       `docker exec -i ${cfg.containerId} bash -c "${runCmd.replace(/"/g, '\\"')}"`
     );
-    console.log('[DEBUG] Final spawn command:', cmd);
+    dbgLog('[DEBUG] Final spawn command:', cmd);
     return spawn('bash', ['-lc', cmd], { stdio: ['pipe', 'pipe', 'pipe'] });
   }
   const sshPass = cfg.password ? `sshpass -p '${cfg.password}'` : '';
   const cmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "${runCmd.replace(/"/g, '\\"')}"`;
-  console.log('[DEBUG] Final spawn command:', cmd);
+  dbgLog('[DEBUG] Final spawn command:', cmd);
   return spawn('bash', ['-lc', cmd], { stdio: ['pipe', 'pipe', 'pipe'] });
 }
 
@@ -1185,13 +1185,13 @@ function resolvePending(session, evt) {
   // If someone is waiting, resolve ONE pending callback
   if (session.pending && session.pending.length > 0) {
     const resolver = session.pending.shift();
-    console.log('[DEBUG] resolvePending: resolving pending callback with event:', evt.event);
+    dbgLog('[DEBUG] resolvePending: resolving pending callback with event:', evt.event);
     resolver(evt);
   } else {
     // No one waiting - queue the event for later
     session.eventQueue = session.eventQueue || [];
     session.eventQueue.push(evt);
-    console.log('[DEBUG] resolvePending: queued event (no pending callbacks):', evt.event, 'queue length:', session.eventQueue.length);
+    dbgLog('[DEBUG] resolvePending: queued event (no pending callbacks):', evt.event, 'queue length:', session.eventQueue.length);
   }
 }
 
@@ -1277,7 +1277,7 @@ function waitForEvent(session, allowedEvents = ['stopped', 'exit', 'error'], tim
 
     // No queued event, so wait for one to arrive via resolvePending
     const timer = setTimeout(() => {
-      console.log('[DEBUG] waitForEvent TIMEOUT after', timeoutMs, 'ms');
+      dbgLog('[DEBUG] waitForEvent TIMEOUT after', timeoutMs, 'ms');
       session.pending = (session.pending || []).filter(r => r !== resolver);
       resolve({ event: 'error', message: 'Timeout waiting for debugger event' });
     }, timeoutMs);
@@ -1299,14 +1299,14 @@ function waitForEvent(session, allowedEvents = ['stopped', 'exit', 'error'], tim
     // Register this resolver as pending
     session.pending = session.pending || [];
     session.pending.push(resolver);
-    console.log('[DEBUG] waitForEvent: registered pending callback, queue depth:', session.pending.length);
+    dbgLog('[DEBUG] waitForEvent: registered pending callback, queue depth:', session.pending.length);
 
     // CRITICAL: Check queue again AFTER registering - event might have arrived in between
     const lateEvt = findMatchingQueuedEvent();
     if (lateEvt) {
       clearTimeout(timer);
       session.pending = session.pending.filter(r => r !== resolver);
-      console.log('[DEBUG] waitForEvent: found late-arriving event in queue:', lateEvt.event);
+      dbgLog('[DEBUG] waitForEvent: found late-arriving event in queue:', lateEvt.event);
       resolve(lateEvt);
       return;
     }
@@ -1385,11 +1385,11 @@ async function applyZStepEvent(session, evt) {
     // offset is relative to the tag line (tag+0 = tag definition line)
     targetLine = tagLine + offset;
     computedFromTagOffset = true;
-    console.log(`[DEBUG] Computed line from tag+offset: routine=${top.routine}, tag=${tag}, offset=${offset}, tagLine=${tagLine}, targetLine=${targetLine}`);
+    dbgLog(`[DEBUG] Computed line from tag+offset: routine=${top.routine}, tag=${tag}, offset=${offset}, tagLine=${tagLine}, targetLine=${targetLine}`);
 
     // Skip comment-only lines to find the next executable line
     targetLine = nextExecutableLine(smap, targetLine || 1);
-    console.log(`[DEBUG] After skipping comments: targetLine=${targetLine}`);
+    dbgLog(`[DEBUG] After skipping comments: targetLine=${targetLine}`);
   }
 
   // Fallback to evt.line if tag+offset not available
@@ -1404,26 +1404,26 @@ async function applyZStepEvent(session, evt) {
 function handleZStepStdout(session) {
   return (chunk) => {
     const chunkStr = chunk.toString();
-    console.log('[DEBUG] AHMDBG stdout chunk received, length:', chunkStr.length);
-    console.log('[DEBUG] AHMDBG stdout raw:', chunkStr.substring(0, 200));
+    dbgLog('[DEBUG] AHMDBG stdout chunk received, length:', chunkStr.length);
+    dbgLog('[DEBUG] AHMDBG stdout raw:', chunkStr.substring(0, 200));
     session.buffer += chunkStr;
     let idx;
     while ((idx = session.buffer.indexOf('\n')) >= 0) {
       const line = session.buffer.slice(0, idx).trim();
       session.buffer = session.buffer.slice(idx + 1);
       if (!line) continue;
-      console.log('[DEBUG] AHMDBG stdout line:', line);
+      dbgLog('[DEBUG] AHMDBG stdout line:', line);
       try {
         const evt = tryParseDebuggerEvent(line);
         if (evt) {
-          console.log('[DEBUG] AHMDBG parsed event:', evt.event);
+          dbgLog('[DEBUG] AHMDBG parsed event:', evt.event);
           resolvePending(session, evt);
         } else {
-          console.log('[DEBUG] AHMDBG output (unparsed):', line);
+          dbgLog('[DEBUG] AHMDBG output (unparsed):', line);
           session.output.push(line);
         }
       } catch (e) {
-        console.log('[DEBUG] AHMDBG output (non-JSON):', line);
+        dbgLog('[DEBUG] AHMDBG output (non-JSON):', line);
         session.output.push(line);
       }
     }
@@ -1452,7 +1452,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   // Clean up any existing debug sessions first
   for (const [sessionId, session] of Object.entries(debugSessions)) {
     if (session && session.engine === 'zstep') {
-      console.log('[DEBUG] Cleaning up existing session:', sessionId);
+      dbgLog('[DEBUG] Cleaning up existing session:', sessionId);
       try {
         if (session.proc && !session.procExited) {
           session.proc.kill('SIGTERM');
@@ -1460,14 +1460,14 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
           await new Promise(r => setTimeout(r, 200));
         }
       } catch (e) {
-        console.log('[DEBUG] Error killing old session:', e.message);
+        dbgLog('[DEBUG] Error killing old session:', e.message);
       }
       delete debugSessions[sessionId];
     }
   }
 
   // Remove old TMPDBG files to force clean state
-  console.log('[DEBUG] Removing old TMPDBG files...');
+  dbgLog('[DEBUG] Removing old TMPDBG files...');
   let rmTmpCmd;
   if (useDocker) {
     rmTmpCmd = wrapDockerCmd(`docker exec ${cfg.containerId} bash -c "rm -f /tmp/ahmad_dbg/TMPDBG.m /tmp/ahmad_dbg/TMPDBG.o"`);
@@ -1481,7 +1481,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       exec(rmTmpCmd, { timeout: 5000 }, resolve);
     });
   } catch (e) {
-    console.log('[DEBUG] Warning: Failed to remove old TMPDBG files:', e.message);
+    dbgLog('[DEBUG] Warning: Failed to remove old TMPDBG files:', e.message);
   }
 
   const sanitizeDebugCode = (src = '') => {
@@ -1570,7 +1570,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     // Add () to the label definition: "AAAA ; comment" becomes "AAAA() ; comment"
     const tagRegex = new RegExp(`^(${firstTag})([\\s;])`, 'm');
     finalUserCode = guardedUserCode.replace(tagRegex, `$1()$2`);
-    console.log('[DEBUG] Added () to label definition for extrinsic call compatibility');
+    dbgLog('[DEBUG] Added () to label definition for extrinsic call compatibility');
   }
 
   // Build the full code payload with TMPDBG tag, QUIT, and optionally a START tag
@@ -1623,16 +1623,16 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   // CRITICAL: If caller provided a starting line, adjust for the header and any inserted guard lines
   // This is where we determine WHERE to start debugging (NOT defaulting to line 1)
   if (Number.isInteger(startLine) && startLine > 0) {
-    console.log(`[DEBUG] User requested start at line ${startLine}`);
+    dbgLog(`[DEBUG] User requested start at line ${startLine}`);
     dbgLog('[runtime] User requested start line', { startLine });
     const mappedStart = (userToTransformed.get(startLine) || startLine) + headerLines;
     const adjustedLine = mappedStart;
     const targetLine = nextExecutableLine({ map, lines }, adjustedLine);
-    console.log(`[DEBUG] Mapped user line ${startLine} -> payload line ${targetLine}`);
+    dbgLog(`[DEBUG] Mapped user line ${startLine} -> payload line ${targetLine}`);
     dbgLog('[runtime] Mapped start line', { userLine: startLine, mappedStart, targetLine });
 
     if (targetLine < 1 || targetLine > lines.length) {
-      console.log(`[DEBUG] WARNING: Target line ${targetLine} is out of range, falling back to first executable line`);
+      dbgLog(`[DEBUG] WARNING: Target line ${targetLine} is out of range, falling back to first executable line`);
       dbgLog('[runtime] Start line out of range, using first executable', { targetLine, linesCount: lines.length });
       // Don't use line 1; find first executable line instead
       const firstExec = nextExecutableLine({ map, lines }, headerLines + 1);
@@ -1644,19 +1644,19 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   } else if (hasStartWrapper) {
     // Always use routine entry when we have a wrapper (no START tag anymore)
     entryTag = '';
-    console.log('[DEBUG] No start line provided, using routine entry (wrapper handles first tag call)');
+    dbgLog('[DEBUG] No start line provided, using routine entry (wrapper handles first tag call)');
     dbgLog('[runtime] Using wrapper for entry', { firstTag, hasParams });
   } else {
     // No tags found, start at routine entry
     entryTag = '';
-    console.log(`[DEBUG] No tags found, starting at routine entry`);
+    dbgLog(`[DEBUG] No tags found, starting at routine entry`);
     dbgLog('[runtime] No tags, starting at routine entry');
   }
 
   // If the first tag is parameterized but we ended up targeting it directly (e.g. because a start line was provided),
   // force routine entry so the wrapper handles the call with dummy arguments.
   if (hasParams && firstTag && entryTag && entryTag === firstTag.toUpperCase()) {
-    console.log('[DEBUG] First tag is parameterized; forcing routine entry to use wrapper');
+    dbgLog('[DEBUG] First tag is parameterized; forcing routine entry to use wrapper');
     dbgLog('[runtime] Forcing routine entry for parameterized label', { entryTag, firstTag });
     entryTag = '';
   }
@@ -1666,7 +1666,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     const hasEntry = map.some((m) => m.isLabel && (m.tag || '').toUpperCase() === entryTag);
     if (!hasEntry) {
       const firstLabel = (map.find((m) => m.isLabel && m.tag) || {}).tag || '';
-      console.log(`[DEBUG] Entry tag "${entryTag}" not found; falling back to`, firstLabel || '(routine entry)');
+      dbgLog(`[DEBUG] Entry tag "${entryTag}" not found; falling back to`, firstLabel || '(routine entry)');
       dbgLog('[runtime] Entry tag missing, applying fallback', { requested: entryTag, fallback: firstLabel || '(routine)' });
       entryTag = (firstLabel || '').toUpperCase();
     }
@@ -1675,44 +1675,44 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   if (entryTag) {
     const stillMissing = !map.some((m) => m.isLabel && (m.tag || '').toUpperCase() === entryTag);
     if (stillMissing) {
-      console.log(`[DEBUG] Entry tag "${entryTag}" still not found after fallback; starting at routine entry`);
+      dbgLog(`[DEBUG] Entry tag "${entryTag}" still not found after fallback; starting at routine entry`);
       dbgLog('[runtime] Entry tag missing after fallback', { entryTag });
       entryTag = '';
     }
   }
 
-  console.log('[DEBUG] TMPDBG structure created:');
-  console.log('[DEBUG] - Header lines:', headerLines);
-  console.log('[DEBUG] - Entry tag:', entryTag || '(none - routine entry)');
-  console.log('[DEBUG] - First tag:', firstTag || '(none)');
-  console.log('[DEBUG] - Has params:', hasParams ? 'yes' : 'no');
-  console.log('[DEBUG] - Total lines (in-memory):', lines.length);
+  dbgLog('[DEBUG] TMPDBG structure created:');
+  dbgLog('[DEBUG] - Header lines:', headerLines);
+  dbgLog('[DEBUG] - Entry tag:', entryTag || '(none - routine entry)');
+  dbgLog('[DEBUG] - First tag:', firstTag || '(none)');
+  dbgLog('[DEBUG] - Has params:', hasParams ? 'yes' : 'no');
+  dbgLog('[DEBUG] - Total lines (in-memory):', lines.length);
 
   // CRITICAL: Show first 15 lines to understand structure
-  console.log('[DEBUG] - TMPDBG preview (first 15 lines):');
+  dbgLog('[DEBUG] - TMPDBG preview (first 15 lines):');
   codePayload.split('\n').slice(0, 15).forEach((line, i) => {
-    console.log(`[DEBUG]   Line ${i + 1}: ${line}`);
+    dbgLog(`[DEBUG]   Line ${i + 1}: ${line}`);
   });
 
   // Show where entryTag will start execution
   if (entryTag) {
     for (let i = 0; i < map.length; i++) {
       if (map[i].tag && map[i].tag.toUpperCase() === entryTag) {
-        console.log(`[DEBUG] - Entry tag "${entryTag}" found at line ${map[i].line}, text: "${lines[i]}"`);
+        dbgLog(`[DEBUG] - Entry tag "${entryTag}" found at line ${map[i].line}, text: "${lines[i]}"`);
         const nextLine = i + 1 < lines.length ? lines[i + 1] : '(end)';
-        console.log(`[DEBUG] - Next line after entry: "${nextLine}"`);
+        dbgLog(`[DEBUG] - Next line after entry: "${nextLine}"`);
         break;
       }
     }
   }
 
-  console.log('[DEBUG] Ensuring AHMDBG.m harness...');
+  dbgLog('[DEBUG] Ensuring AHMDBG.m harness...');
   const harnessRes = await ensureHarness();
   if (!harnessRes.ok) {
-    console.log(`[DEBUG] Harness installation failed: ${harnessRes.error || harnessRes.stderr}`);
+    dbgLog(`[DEBUG] Harness installation failed: ${harnessRes.error || harnessRes.stderr}`);
     return { ok: false, error: harnessRes.error || harnessRes.stderr || 'Failed to install harness' };
   }
-  console.log('[DEBUG] AHMDBG.m harness installed successfully');
+  dbgLog('[DEBUG] AHMDBG.m harness installed successfully');
 
   // Compile AHMDBG.m to ensure it's available
   const envExports = buildYdbEnv(cfg, { tmpDebugDir: '/tmp/ahmad_dbg' });
@@ -1727,15 +1727,15 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     compileCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "${envExports} && cd /tmp/ahmad_dbg && ${cfg.ydbPath}/mumps AHMDBG.m"`;
   }
 
-  console.log('[DEBUG] Compiling AHMDBG.m...');
-  console.log('[DEBUG] Compile command:', compileCmd);
+  dbgLog('[DEBUG] Compiling AHMDBG.m...');
+  dbgLog('[DEBUG] Compile command:', compileCmd);
 
   const compileRes = await new Promise((resolve) => {
     exec(compileCmd, { timeout: 10000, maxBuffer: 5 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
-        console.log(`[DEBUG] Compilation error: ${err.message}`);
-        console.log(`[DEBUG] stderr: ${stderr}`);
-        console.log(`[DEBUG] stdout: ${stdout}`);
+        dbgLog(`[DEBUG] Compilation error: ${err.message}`);
+        dbgLog(`[DEBUG] stderr: ${stderr}`);
+        dbgLog(`[DEBUG] stdout: ${stdout}`);
         return resolve({ ok: false, error: err.message, stdout, stderr });
       }
       resolve({ ok: true, stdout, stderr });
@@ -1743,7 +1743,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   });
 
   if (!compileRes.ok) {
-    console.log(`[DEBUG] Compilation failed: ${compileRes.error || compileRes.stderr}`);
+    dbgLog(`[DEBUG] Compilation failed: ${compileRes.error || compileRes.stderr}`);
     const friendlyError = summarizeCompileError(
       compileRes.error,
       compileRes.stdout,
@@ -1757,9 +1757,9 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       output
     };
   } else {
-    console.log('[DEBUG] AHMDBG.m compiled successfully');
-    if (compileRes.stdout) console.log('[DEBUG] Compile output:', compileRes.stdout);
-    if (compileRes.stderr) console.log('[DEBUG] Compile stderr:', compileRes.stderr);
+    dbgLog('[DEBUG] AHMDBG.m compiled successfully');
+    if (compileRes.stdout) dbgLog('[DEBUG] Compile output:', compileRes.stdout);
+    if (compileRes.stderr) dbgLog('[DEBUG] Compile stderr:', compileRes.stderr);
   }
 
   // Verify AHMDBG.o exists
@@ -1767,7 +1767,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   const verifyCmd = `test -f /tmp/ahmad_dbg/AHMDBG.o && echo OK || echo MISSING`;
 
   const verifyRes = await runHostCommand(verifyCmd);
-  console.log('[DEBUG] AHMDBG.o verification:', verifyRes.ok ? verifyRes.stdout.trim() : verifyRes.error);
+  dbgLog('[DEBUG] AHMDBG.o verification:', verifyRes.ok ? verifyRes.stdout.trim() : verifyRes.error);
 
   if (!verifyRes.ok || verifyRes.stdout.trim() !== 'OK') {
     console.log('[ERROR] AHMDBG.o file not found after compilation!');
@@ -1775,28 +1775,28 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     // List directory contents for debugging
     const lsCmd = `ls -la /tmp/ahmad_dbg/`;
     const lsRes = await runHostCommand(lsCmd);
-    console.log('[DEBUG] Directory contents:', lsRes.ok ? lsRes.stdout : lsRes.error);
+    dbgLog('[DEBUG] Directory contents:', lsRes.ok ? lsRes.stdout : lsRes.error);
 
     return { ok: false, error: 'AHMDBG.o file not found after compilation' };
   }
 
   // Test if MUMPS can actually access files in /tmp/ahmad_dbg
-  console.log('[DEBUG] Testing MUMPS access to /tmp/ahmad_dbg...');
+  dbgLog('[DEBUG] Testing MUMPS access to /tmp/ahmad_dbg...');
 
   // First, verify we can list the directory and see both .m and .o files
   const listCmd = `ls -lh /tmp/ahmad_dbg/AHMDBG.*`;
   const listRes = await runHostCommand(listCmd);
-  console.log('[DEBUG] AHMDBG files:', listRes.ok ? listRes.stdout : listRes.error);
+  dbgLog('[DEBUG] AHMDBG files:', listRes.ok ? listRes.stdout : listRes.error);
 
   // Check file permissions and ownership
   const statCmd = `stat -c '%a %U:%G %s %n' /tmp/ahmad_dbg/AHMDBG.* 2>&1 || ls -l /tmp/ahmad_dbg/AHMDBG.*`;
   const statRes = await runHostCommand(statCmd);
-  console.log('[DEBUG] File permissions:', statRes.ok ? statRes.stdout : statRes.error);
+  dbgLog('[DEBUG] File permissions:', statRes.ok ? statRes.stdout : statRes.error);
 
   // Try to read the compiled object file to see if it's readable
   const readTestCmd = `test -r /tmp/ahmad_dbg/AHMDBG.o && echo 'READABLE' || echo 'NOT READABLE'`;
   const readRes = await runHostCommand(readTestCmd);
-  console.log('[DEBUG] AHMDBG.o readable:', readRes.ok ? readRes.stdout.trim() : readRes.error);
+  dbgLog('[DEBUG] AHMDBG.o readable:', readRes.ok ? readRes.stdout.trim() : readRes.error);
 
   if (!readRes.ok || readRes.stdout.trim() !== 'READABLE') {
     console.log('[ERROR] AHMDBG.o is not readable!');
@@ -1806,35 +1806,35 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   // Check what user we're running as vs file ownership
   const whoamiCmd = `whoami`;
   const whoamiRes = await runHostCommand(whoamiCmd);
-  console.log('[DEBUG] Running as user:', whoamiRes.ok ? whoamiRes.stdout.trim() : whoamiRes.error);
+  dbgLog('[DEBUG] Running as user:', whoamiRes.ok ? whoamiRes.stdout.trim() : whoamiRes.error);
 
   // Try to dump the first few bytes of AHMDBG.o to verify it's a valid object file
   const hexdumpCmd = `hexdump -C /tmp/ahmad_dbg/AHMDBG.o | head -3`;
   const hexRes = await runHostCommand(hexdumpCmd);
-  console.log('[DEBUG] AHMDBG.o header:', hexRes.ok ? hexRes.stdout.split('\n')[0] : hexRes.error);
+  dbgLog('[DEBUG] AHMDBG.o header:', hexRes.ok ? hexRes.stdout.split('\n')[0] : hexRes.error);
 
   const destDir = '/tmp/ahmad_dbg';
   const destFile = `${destDir}/TMPDBG.m`;
 
   // Debug: Log the exact payload being written
-  console.log('[DEBUG] TMPDBG.m payload:');
-  console.log('--- START ---');
-  console.log(codePayload);
-  console.log('--- END ---');
+  dbgLog('[DEBUG] TMPDBG.m payload:');
+  dbgLog('--- START ---');
+  dbgLog(codePayload);
+  dbgLog('--- END ---');
 
   const writeRes = await writeRemoteFile(destFile, codePayload);
   if (!writeRes.ok) return { ok: false, error: writeRes.error || writeRes.stderr || 'Failed to write debug code' };
 
   // Verify the file was written correctly (line count matches expected)
   const expectedLineCount = codePayload.split('\n').length;
-  console.log('[DEBUG] TMPDBG.m written. Expected lines:', expectedLineCount, ', In-memory lines array:', lines.length);
+  dbgLog('[DEBUG] TMPDBG.m written. Expected lines:', expectedLineCount, ', In-memory lines array:', lines.length);
   if (expectedLineCount !== lines.length) {
-    console.log('[DEBUG] WARNING: Line count mismatch! File has', expectedLineCount, 'lines but in-memory array has', lines.length);
+    dbgLog('[DEBUG] WARNING: Line count mismatch! File has', expectedLineCount, 'lines but in-memory array has', lines.length);
     dbgLog('[runtime] TMPDBG line count mismatch', { fileLines: expectedLineCount, memoryLines: lines.length });
   }
 
   // Compile TMPDBG.m to ensure it can be loaded
-  console.log('[DEBUG] Compiling TMPDBG.m...');
+  dbgLog('[DEBUG] Compiling TMPDBG.m...');
   let compileTmpCmd;
   if (useDocker) {
     compileTmpCmd = wrapDockerCmd(
@@ -1848,9 +1848,9 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   const compileTmpRes = await new Promise((resolve) => {
     exec(compileTmpCmd, { timeout: 10000, maxBuffer: 5 * 1024 * 1024 }, (err, stdout, stderr) => {
       if (err) {
-        console.log(`[DEBUG] TMPDBG compilation error: ${err.message}`);
-        console.log(`[DEBUG] stderr: ${stderr}`);
-        console.log(`[DEBUG] stdout: ${stdout}`);
+        dbgLog(`[DEBUG] TMPDBG compilation error: ${err.message}`);
+        dbgLog(`[DEBUG] stderr: ${stderr}`);
+        dbgLog(`[DEBUG] stdout: ${stdout}`);
         return resolve({ ok: false, error: err.message, stdout, stderr });
       }
       resolve({ ok: true, stdout, stderr });
@@ -1858,7 +1858,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   });
 
   if (!compileTmpRes.ok) {
-    console.log(`[DEBUG] TMPDBG compilation failed: ${compileTmpRes.error}`);
+    dbgLog(`[DEBUG] TMPDBG compilation failed: ${compileTmpRes.error}`);
     const friendlyError = summarizeCompileError(
       compileTmpRes.error,
       compileTmpRes.stdout,
@@ -1872,7 +1872,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       output
     };
   }
-  console.log('[DEBUG] TMPDBG.m compiled successfully');
+  dbgLog('[DEBUG] TMPDBG.m compiled successfully');
 
   const proc = spawnZStepProcess('TMPDBG', entryTag);
   const session = {
@@ -1899,18 +1899,18 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   proc.stderr.on('data', (chunk) => {
     const errMsg = chunk.toString();
     session.output.push(errMsg);
-    console.log('[DEBUG] ZSTEP stderr:', errMsg);
+    dbgLog('[DEBUG] ZSTEP stderr:', errMsg);
   });
   proc.stdin.on('error', (err) => {
-    console.log('[DEBUG] ZSTEP stdin error:', err.message);
+    dbgLog('[DEBUG] ZSTEP stdin error:', err.message);
   });
   proc.on('error', (err) => {
-    console.log('[DEBUG] ZSTEP process error:', err.message);
+    dbgLog('[DEBUG] ZSTEP process error:', err.message);
   });
   proc.on('exit', (code, signal) => {
-    console.log('[DEBUG] ZSTEP process exited with code:', code, 'signal:', signal);
+    dbgLog('[DEBUG] ZSTEP process exited with code:', code, 'signal:', signal);
     if (session.output && session.output.length > 0) {
-      console.log('[DEBUG] Full ZSTEP error output:');
+      dbgLog('[DEBUG] Full ZSTEP error output:');
       console.log(session.output.join(''));
     }
     session.procExited = true;
@@ -1923,22 +1923,22 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     proc.kill();
     return { ok: false, error: 'Failed to create writable stdin for debug process' };
   }
-  console.log('[DEBUG] ZSTEP process spawned, stdin is writable');
+  dbgLog('[DEBUG] ZSTEP process spawned, stdin is writable');
 
   debugSessions[id] = session;
 
   // -------------------------
   // Send breakpoints to runtime (SETBP;<routine>;<tag>;<offset>)
   // -------------------------
-  console.log('[DEBUG] Setting', breakpoints?.length || 0, 'breakpoints...');
-  console.log('[DEBUG] TMPDBG has', lines.length, 'lines total');
+  dbgLog('[DEBUG] Setting', breakpoints?.length || 0, 'breakpoints...');
+  dbgLog('[DEBUG] TMPDBG has', lines.length, 'lines total');
   dbgLog('[editor] TMPDBG structure', { totalLines: lines.length, headerLines });
 
   const resolvedBps = [];
   const tagOffsetForLine = (payloadLine) => {
     const idx = payloadLine - 1;
     if (!Number.isInteger(idx) || idx < 0 || idx >= lines.length) {
-      console.log('[DEBUG] tagOffsetForLine: payloadLine out of bounds', { payloadLine, idx, maxLines: lines.length });
+      dbgLog('[DEBUG] tagOffsetForLine: payloadLine out of bounds', { payloadLine, idx, maxLines: lines.length });
       return null;
     }
 
@@ -1954,7 +1954,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
         labelLine = entry.line; // 1-indexed
         labelFullText = (entry.labelText || entry.tag || '');
         labelTag = labelFullText.split('(')[0].toUpperCase(); // Tag without params
-        console.log('[DEBUG] tagOffsetForLine: Found label', labelTag, '(full:', labelFullText, ') at line', labelLine);
+        dbgLog('[DEBUG] tagOffsetForLine: Found label', labelTag, '(full:', labelFullText, ') at line', labelLine);
         break;
       }
     }
@@ -1963,7 +1963,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       // No label found - use routine entry point (TMPDBG)
       // Fallback: offset from line 1
       const offset = payloadLine - 1; // 0-based offset from routine start
-      console.log('[DEBUG] tagOffsetForLine: No label found, using TMPDBG with offset', offset);
+      dbgLog('[DEBUG] tagOffsetForLine: No label found, using TMPDBG with offset', offset);
       return {
         tag: 'TMPDBG',
         offset: Math.max(0, offset),
@@ -1982,7 +1982,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
 
     if (labelIsNonExecutable) {
       offset -= 1;
-      console.log('[DEBUG] tagOffsetForLine: Label line is non-executable, adjusting offset:', {
+      dbgLog('[DEBUG] tagOffsetForLine: Label line is non-executable, adjusting offset:', {
         labelTag,
         labelLine,
         targetLine: payloadLine,
@@ -1990,12 +1990,12 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
         adjustedOffset: offset
       });
     } else {
-      console.log('[DEBUG] tagOffsetForLine: Label', labelTag, 'at line', labelLine, ', target line', payloadLine, ', offset:', offset);
+      dbgLog('[DEBUG] tagOffsetForLine: Label', labelTag, 'at line', labelLine, ', target line', payloadLine, ', offset:', offset);
     }
 
     // VALIDATION: Ensure offset is not negative
     if (offset < 0) {
-      console.log('[DEBUG] tagOffsetForLine: WARNING Negative offset!', { payloadLine, labelLine, offset });
+      dbgLog('[DEBUG] tagOffsetForLine: WARNING Negative offset!', { payloadLine, labelLine, offset });
       return null;
     }
 
@@ -2003,7 +2003,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     // If label is non-executable, the first line after it is at offset 0
     const expectedTargetLine = labelIsNonExecutable ? (labelLine + 1 + offset) : (labelLine + offset);
     if (expectedTargetLine !== payloadLine) {
-      console.log('[DEBUG] tagOffsetForLine: WARNING Calculated offset mismatch!', {
+      dbgLog('[DEBUG] tagOffsetForLine: WARNING Calculated offset mismatch!', {
         tag: labelTag,
         tagLine: labelLine,
         offset,
@@ -2014,7 +2014,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     }
 
     if (expectedTargetLine > lines.length) {
-      console.log('[DEBUG] tagOffsetForLine: WARNING Target exceeds bounds!', {
+      dbgLog('[DEBUG] tagOffsetForLine: WARNING Target exceeds bounds!', {
         tag: labelTag,
         tagLine: labelLine,
         offset,
@@ -2037,14 +2037,14 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     // Handle both { line: N } objects and raw numbers
     const rawLine = (typeof ln === 'object' && ln !== null && ln.line !== undefined) ? ln.line : ln;
     const n = parseInt(rawLine, 10);
-    console.log('[DEBUG] Processing breakpoint:', { original: ln, rawLine, parsed: n });
+    dbgLog('[DEBUG] Processing breakpoint:', { original: ln, rawLine, parsed: n });
     if (!Number.isInteger(n) || n <= 0) {
-      console.log('[DEBUG] Skipping breakpoint: invalid line number', { ln, rawLine, n });
+      dbgLog('[DEBUG] Skipping breakpoint: invalid line number', { ln, rawLine, n });
       return;
     }
     const transformedLine = userToTransformed.get(n);
     const mappedUserLine = (transformedLine || n) + headerLines;
-    console.log('[DEBUG] Breakpoint mapping:', {
+    dbgLog('[DEBUG] Breakpoint mapping:', {
       userLine: n,
       transformedLine,
       headerLines,
@@ -2052,7 +2052,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       totalLines: lines.length
     });
     const adjustedLine = nextExecutableLine({ map, lines }, mappedUserLine);
-    console.log('[DEBUG] After nextExecutableLine:', { mappedUserLine, adjustedLine });
+    dbgLog('[DEBUG] After nextExecutableLine:', { mappedUserLine, adjustedLine });
 
     if (!Number.isInteger(adjustedLine) || adjustedLine < 1 || adjustedLine > lines.length) {
       dbgLog('[editor] Breakpoint INVALID', {
@@ -2061,20 +2061,20 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
         adjustedLine,
         reason: 'outside valid range'
       });
-      console.log('[DEBUG] Skipping breakpoint: mapped line outside TMPDBG range', { userLine: n, payloadLine: adjustedLine });
+      dbgLog('[DEBUG] Skipping breakpoint: mapped line outside TMPDBG range', { userLine: n, payloadLine: adjustedLine });
       return;
     }
 
     const tagInfo = tagOffsetForLine(adjustedLine);
     if (!tagInfo) {
       dbgLog('[editor] Breakpoint UNVERIFIED', { userLine: n, adjustedLine, reason: 'no tag info' });
-      console.log('[DEBUG] Skipping breakpoint: unable to resolve tag info', { userLine: n, payloadLine: adjustedLine });
+      dbgLog('[DEBUG] Skipping breakpoint: unable to resolve tag info', { userLine: n, payloadLine: adjustedLine });
       return;
     }
 
     // FINAL VALIDATION: Double-check offset is reasonable (max 1000 lines from tag)
     if (tagInfo.offset > 1000) {
-      console.log('[DEBUG] WARNING: Breakpoint offset is suspiciously large!', {
+      dbgLog('[DEBUG] WARNING: Breakpoint offset is suspiciously large!', {
         userLine: n,
         tag: tagInfo.tag,
         offset: tagInfo.offset,
@@ -2097,14 +2097,19 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       targetAbsoluteLine: tagInfo.tagLine + tagInfo.offset,
       command: bpCmd.trim()
     });
-    console.log(
+    dbgLog(
       '[DEBUG] Writing breakpoint command:',
       bpCmd.trim(),
-      '(user line', n,
-      '-> payload line', adjustedLine,
-      'tag', tagInfo.tag,
-      'offset', tagInfo.offset,
-      'tagLine', tagInfo.tagLine,
+      '(user line',
+      n,
+      '-> payload line',
+      adjustedLine,
+      'tag',
+      tagInfo.tag,
+      'offset',
+      tagInfo.offset,
+      'tagLine',
+      tagInfo.tagLine,
       ')'
     );
 
@@ -2123,7 +2128,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
 
   // Check if any breakpoints were successfully resolved
   if (breakpoints && breakpoints.length > 0 && resolvedBps.length === 0) {
-    console.log('[DEBUG] WARNING: No breakpoints could be resolved! User requested', breakpoints.length, 'breakpoints but none were valid.');
+    dbgLog('[DEBUG] WARNING: No breakpoints could be resolved! User requested', breakpoints.length, 'breakpoints but none were valid.');
     dbgLog('[editor] Breakpoint resolution failed', {
       requested: breakpoints,
       resolved: 0,
@@ -2131,8 +2136,8 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       headerLines
     });
   } else {
-    console.log('[DEBUG] Successfully resolved', resolvedBps.length, 'of', breakpoints?.length || 0, 'breakpoints');
-    console.log('[DEBUG] Breakpoints will be set AFTER entering user code to avoid timing issues');
+    dbgLog('[DEBUG] Successfully resolved', resolvedBps.length, 'of', breakpoints?.length || 0, 'breakpoints');
+    dbgLog('[DEBUG] Breakpoints will be set AFTER entering user code to avoid timing issues');
     dbgLog('[editor] Breakpoints resolved', {
       requested: breakpoints?.length || 0,
       resolved: resolvedBps.length,
@@ -2153,22 +2158,22 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   session.pendingBreakpoints = resolvedBps;
   session.breakpointsInstalled = false;
 
-  console.log('[DEBUG] Waiting for ready event...');
+  dbgLog('[DEBUG] Waiting for ready event...');
 
   // Wait for ready event (AHMDBG sends 'ready' and waits for command)
   let readyEvt = null;
   const maxAttempts = 10;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const evt = await waitForEvent(session, ['ready', 'stopped', 'exit', 'error'], 10000);
-    console.log(`[DEBUG] Received event attempt ${attempt + 1}:`, JSON.stringify(evt));
+    dbgLog(`[DEBUG] Received event attempt ${attempt + 1}:`, JSON.stringify(evt));
 
     if (!evt) {
-      console.log('[DEBUG] No event received, continuing to wait...');
+      dbgLog('[DEBUG] No event received, continuing to wait...');
       continue;
     }
 
     if (evt.event === 'ready') {
-      console.log('[DEBUG] Got "ready" event - debugger initialized and waiting for command');
+      dbgLog('[DEBUG] Got "ready" event - debugger initialized and waiting for command');
       readyEvt = evt;
       break;
     }
@@ -2181,11 +2186,11 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     // Ignore other events (e.g., bp-set/bp-error) here
   }
 
-  console.log('[DEBUG] Ready event:', JSON.stringify(readyEvt));
+  dbgLog('[DEBUG] Ready event:', JSON.stringify(readyEvt));
 
   if (readyEvt) {
     if (readyEvt.event === 'ready') {
-      console.log('[DEBUG] Debugger ready. Setting up session without executing...');
+      dbgLog('[DEBUG] Debugger ready. Setting up session without executing...');
 
       // Initialize session state without execution
       session.currentRoutine = readyEvt.routine || 'TMPDBG';
@@ -2193,19 +2198,19 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
       session.currentLine = 1; // Will be set when execution starts
       session.locals = {}; // No variables yet
 
-      console.log('[DEBUG] ========== DEBUG SESSION READY ==========');
-      console.log('[DEBUG] Debugger initialized and waiting for Continue/Step command');
-      console.log('[DEBUG]   Routine:', session.currentRoutine);
-      console.log('[DEBUG]   Tag:', session.currentTag);
-      console.log('[DEBUG] ==============================================');
+      dbgLog('[DEBUG] ========== DEBUG SESSION READY ==========');
+      dbgLog('[DEBUG] Debugger initialized and waiting for Continue/Step command');
+      dbgLog('[DEBUG]   Routine:', session.currentRoutine);
+      dbgLog('[DEBUG]   Tag:', session.currentTag);
+      dbgLog('[DEBUG] ==============================================');
 
     } else if (readyEvt.event === 'error') {
-      console.log('[DEBUG] Error event received:', readyEvt.message);
+      dbgLog('[DEBUG] Error event received:', readyEvt.message);
       session.procExited = true;
       delete debugSessions[id];
       return { ok: false, error: readyEvt.message || 'Debug process error', output: (session.output || []).join('\n') };
     } else if (readyEvt.event === 'exit') {
-      console.log('[DEBUG] Exit event received before debugger ready');
+      dbgLog('[DEBUG] Exit event received before debugger ready');
       session.procExited = true;
       delete debugSessions[id];
       return { ok: false, error: 'Program finished before debugger ready', output: (session.output || []).join('\n') };
@@ -2226,7 +2231,7 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     ready: true // Indicate debugger is ready but not running
   };
 
-  console.log('[DEBUG] Returning from startZStepSession:', JSON.stringify(returnValue, null, 2));
+  dbgLog('[DEBUG] Returning from startZStepSession:', JSON.stringify(returnValue, null, 2));
   return returnValue;
 }
 function decodeMString(val) {
@@ -2284,22 +2289,22 @@ async function fetchZStepVariables(session) {
   if (session.procExited) return {};
 
   try {
-    console.log('[DEBUG] Fetching variables via GETVARS...');
+    dbgLog('[DEBUG] Fetching variables via GETVARS...');
     session.proc.stdin.write('GETVARS\n');
 
     // Wait for vars event (or exit/error)
     const evt = await waitForEvent(session, ['vars', 'exit', 'error'], 4000);
-    console.log('[DEBUG] GETVARS response:', JSON.stringify(evt));
+    dbgLog('[DEBUG] GETVARS response:', JSON.stringify(evt));
 
     if (evt.event === 'vars' && evt.vars) {
-      console.log('[DEBUG] Variables fetched:', Object.keys(evt.vars).length, 'variables');
+      dbgLog('[DEBUG] Variables fetched:', Object.keys(evt.vars).length, 'variables');
       return normalizeDebuggerVars(evt.vars);
     }
 
-    console.log('[DEBUG] No variables returned from GETVARS');
+    dbgLog('[DEBUG] No variables returned from GETVARS');
     return {};
   } catch (err) {
-    console.log('[DEBUG] Error fetching variables:', err.message);
+    dbgLog('[DEBUG] Error fetching variables:', err.message);
     return {};
   }
 }
@@ -2317,14 +2322,14 @@ async function sendZStepCommand(sessionId, command) {
     ? session.sourceMap
     : sourceMapCache[session.currentRoutine];
   const currentLineText = currentRoutineSmap?.lines?.[session.currentLine - 1] || '(unknown)';
-  console.log('[DEBUG] Current position before step:', {
+  dbgLog('[DEBUG] Current position before step:', {
     line: session.currentLine,
     routine: session.currentRoutine,
     tag: session.currentTag,
     text: currentLineText.trim()
   });
 
-  console.log('[DEBUG] Sending step command:', command);
+  dbgLog('[DEBUG] Sending step command:', command);
   dbgLog('[runtime] Sending command', {
     command,
     currentLine: session.currentLine,
@@ -2336,13 +2341,13 @@ async function sendZStepCommand(sessionId, command) {
   try {
     session.proc.stdin.write(`${command}\n`);
   } catch (err) {
-    console.log('[DEBUG] ERROR writing to stdin:', err.message);
+    dbgLog('[DEBUG] ERROR writing to stdin:', err.message);
     return { ok: false, error: 'Failed to send command: ' + err.message };
   }
 
-  console.log('[DEBUG] Waiting for response to:', command);
+  dbgLog('[DEBUG] Waiting for response to:', command);
   const evt = await waitForZStepEvent(session);
-  console.log('[DEBUG] Received event for', command, ':', JSON.stringify(evt));
+  dbgLog('[DEBUG] Received event for', command, ':', JSON.stringify(evt));
 
   dbgLog('[runtime] Received event', {
     command,
@@ -2387,13 +2392,13 @@ async function sendZStepCommand(sessionId, command) {
   // BUT: Only during initial startup (before breakpoints are installed).
   // Once breakpoints are installed, we're in user code and shouldn't auto-step.
   // This prevents the "double step" bug where the first step from a breakpoint doesn't advance.
-  console.log('[DEBUG] Checking auto-step: isHeaderPos=', isHeaderPos, 'command=', command, 'currentLine=', session.currentLine, 'headerLines=', session.headerLines, 'breakpointsInstalled=', session.breakpointsInstalled);
+  dbgLog('[DEBUG] Checking auto-step: isHeaderPos=', isHeaderPos, 'command=', command, 'currentLine=', session.currentLine, 'headerLines=', session.headerLines, 'breakpointsInstalled=', session.breakpointsInstalled);
   if (isHeaderPos && !session.breakpointsInstalled && (command === 'CONTINUE' || command === 'INTO' || command === 'OVER' || command === 'OUTOF')) {
-    console.log('[DEBUG] *** AUTO-STEPPING ACTIVATED *** Stopped in header at line', session.currentLine, '- auto-stepping to reach user code');
+    dbgLog('[DEBUG] *** AUTO-STEPPING ACTIVATED *** Stopped in header at line', session.currentLine, '- auto-stepping to reach user code');
 
     const installPendingBreakpoints = async () => {
       if (!session.pendingBreakpoints || session.pendingBreakpoints.length === 0 || session.breakpointsInstalled) return;
-      console.log('[DEBUG] Installing', session.pendingBreakpoints.length, 'breakpoints now (after header reach)...');
+      dbgLog('[DEBUG] Installing', session.pendingBreakpoints.length, 'breakpoints now (after header reach)...');
       let installedCount = 0;
       for (const bp of session.pendingBreakpoints) {
         const sendBpCmd = async (cmd, label) => {
@@ -2401,14 +2406,14 @@ async function sendZStepCommand(sessionId, command) {
             session.proc.stdin.write(`${cmd}\n`);
             const cmdParts = cmd.split(';');
             const offForLog = cmdParts.length >= 4 ? cmdParts[3] : '(unknown)';
-            console.log('[DEBUG] Pre-installed breakpoint', label, ':', cmd.trim(), `(line ${bp.payloadLine} tag ${bp.tag} offset ${offForLog})`);
+            dbgLog('[DEBUG] Pre-installed breakpoint', label, ':', cmd.trim(), `(line ${bp.payloadLine} tag ${bp.tag} offset ${offForLog})`);
             // Wait briefly for bp-set/bp-error so we can retry if needed
             const evt = await waitForEvent(session, ['bp-set', 'bp-error', 'error', 'exit'], 800);
             if (evt && (evt.event === 'bp-set' || evt.event === 'bp-error' || evt.event === 'error' || evt.event === 'exit')) {
               return evt;
             }
           } catch (err) {
-            console.log('[DEBUG] ERROR pre-installing breakpoint:', err.message);
+            dbgLog('[DEBUG] ERROR pre-installing breakpoint:', err.message);
           }
           return null;
         };
@@ -2442,14 +2447,14 @@ async function sendZStepCommand(sessionId, command) {
             break;
           }
           if (evt.event === 'error' || evt.event === 'exit') {
-            console.log('[DEBUG] Breakpoint install aborted due to process state:', evt.event);
+            dbgLog('[DEBUG] Breakpoint install aborted due to process state:', evt.event);
             break;
           }
           // bp-error -> try next candidate
         }
 
         if (!success) {
-          console.log('[DEBUG] Breakpoint still failed after trying all strategies:', bp);
+          dbgLog('[DEBUG] Breakpoint still failed after trying all strategies:', bp);
         }
       }
       session.breakpointsInstalled = true;
@@ -2462,11 +2467,11 @@ async function sendZStepCommand(sessionId, command) {
     const maxSteps = 20; // Prevent infinite loops
 
     while (session.currentLine <= session.headerLines && stepCount < maxSteps) {
-      console.log('[DEBUG] Auto-step', stepCount + 1, ': stepping from header line', session.currentLine);
+      dbgLog('[DEBUG] Auto-step', stepCount + 1, ': stepping from header line', session.currentLine);
       try {
         session.proc.stdin.write('INTO\n');
         const nextEvt = await waitForZStepEvent(session);
-        console.log('[DEBUG] Auto-step received event:', nextEvt.event, 'line:', nextEvt.line);
+        dbgLog('[DEBUG] Auto-step received event:', nextEvt.event, 'line:', nextEvt.line);
 
         if (nextEvt.event === 'stopped') {
           await applyZStepEvent(session, nextEvt);
@@ -2475,7 +2480,7 @@ async function sendZStepCommand(sessionId, command) {
 
           // Check if we're now past the header
           if (session.currentLine > session.headerLines) {
-            console.log('[DEBUG] *** AUTO-STEP COMPLETE *** Reached user code at line', session.currentLine);
+            dbgLog('[DEBUG] *** AUTO-STEP COMPLETE *** Reached user code at line', session.currentLine);
             break;
           }
         } else if (nextEvt.event === 'exit') {
@@ -2487,13 +2492,13 @@ async function sendZStepCommand(sessionId, command) {
           break; // Unknown event, stop stepping
         }
       } catch (err) {
-        console.log('[DEBUG] Error auto-stepping over header:', err.message);
+        dbgLog('[DEBUG] Error auto-stepping over header:', err.message);
         break;
       }
     }
 
     if (stepCount >= maxSteps) {
-      console.log('[DEBUG] WARNING: Reached max auto-step limit, still in header');
+      dbgLog('[DEBUG] WARNING: Reached max auto-step limit, still in header');
     }
 
     // Now that we're at user code, install breakpoints (after header) before continuing
@@ -2504,14 +2509,14 @@ async function sendZStepCommand(sessionId, command) {
     // If user clicked CONTINUE and we have breakpoints, continue to the first breakpoint
     if (command === 'CONTINUE' && session.breakpointsInstalled && session.pendingBreakpoints && session.pendingBreakpoints.length > 0) {
       if (session.breakpointsSetCount && session.breakpointsSetCount > 0) {
-        console.log('[DEBUG] Continuing to first breakpoint...');
+        dbgLog('[DEBUG] Continuing to first breakpoint...');
         session.proc.stdin.write('CONTINUE\n');
         const bpEvt = await waitForZStepEvent(session);
 
         if (bpEvt.event === 'stopped') {
           await applyZStepEvent(session, bpEvt);
           session.locals = await fetchZStepVariables(session);
-          console.log('[DEBUG] Stopped at breakpoint, line:', session.currentLine);
+          dbgLog('[DEBUG] Stopped at breakpoint, line:', session.currentLine);
         } else if (bpEvt.event === 'exit') {
           session.procExited = true;
           return { ok: false, error: 'Program finished', output: consumeSessionOutput(session) };
@@ -2519,7 +2524,7 @@ async function sendZStepCommand(sessionId, command) {
           return { ok: false, error: bpEvt.message || 'Runtime error', output: consumeSessionOutput(session) };
         }
       } else {
-        console.log('[DEBUG] No breakpoints were installed (all attempts failed); performing manual run-to-line fallback.');
+        dbgLog('[DEBUG] No breakpoints were installed (all attempts failed); performing manual run-to-line fallback.');
         const targetPayload = (session.pendingBreakpoints[0] || {}).payloadLine;
         if (Number.isInteger(targetPayload) && targetPayload > session.currentLine) {
           const maxSteps = Math.max(50, (targetPayload - session.currentLine) + 10);
@@ -2534,32 +2539,32 @@ async function sendZStepCommand(sessionId, command) {
                 session.locals = await fetchZStepVariables(session);
                 steps += 1;
                 if (session.currentLine >= targetPayload) {
-                  console.log('[DEBUG] Manual run-to-line reached target payload line', targetPayload, 'after', steps, 'steps');
+                  dbgLog('[DEBUG] Manual run-to-line reached target payload line', targetPayload, 'after', steps, 'steps');
                   done = true;
                   break;
                 }
               } else if (stepEvt.event === 'exit' || stepEvt.event === 'error') {
-                console.log('[DEBUG] Manual run-to-line aborted due to event:', stepEvt.event);
+                dbgLog('[DEBUG] Manual run-to-line aborted due to event:', stepEvt.event);
                 done = true;
                 break;
               } else {
                 break;
               }
             } catch (err) {
-              console.log('[DEBUG] Manual run-to-line error:', err.message);
+              dbgLog('[DEBUG] Manual run-to-line error:', err.message);
               break;
             }
           }
           if (!done) {
-            console.log('[DEBUG] Manual run-to-line fallback did not reach target (steps:', steps, 'target:', targetPayload, ')');
+            dbgLog('[DEBUG] Manual run-to-line fallback did not reach target (steps:', steps, 'target:', targetPayload, ')');
           }
         } else {
-          console.log('[DEBUG] No valid target payload line for manual run-to-line fallback.');
+          dbgLog('[DEBUG] No valid target payload line for manual run-to-line fallback.');
         }
       }
     }
   } else {
-    console.log('[DEBUG] Auto-step NOT triggered');
+    dbgLog('[DEBUG] Auto-step NOT triggered');
   }
 
   // Recalculate isHeaderPos after potential auto-stepping
@@ -2588,7 +2593,7 @@ async function sendZStepCommand(sessionId, command) {
   } else {
     // For external routines, use the line number as-is (already correct from applyZStepEvent)
     userLine = session.currentLine;
-    console.log(`[DEBUG] External routine ${session.currentRoutine}: using line ${userLine} directly (no payload mapping)`);
+    dbgLog(`[DEBUG] External routine ${session.currentRoutine}: using line ${userLine} directly (no payload mapping)`);
   }
 
   const clientCallStack = (session.callStack || []).map((frame) => {
@@ -2605,7 +2610,7 @@ async function sendZStepCommand(sessionId, command) {
     };
   });
 
-  console.log(`[DEBUG] Command ${command} completed. Routine: ${session.currentRoutine}, Line: ${userLine} (raw: ${session.currentLine})`);
+  dbgLog(`[DEBUG] Command ${command} completed. Routine: ${session.currentRoutine}, Line: ${userLine} (raw: ${session.currentLine})`);
 
   return {
     ok: true,
@@ -3338,21 +3343,21 @@ module.exports = {
   async debugStart(code, breakpoints = [], startLine = null) {
     try {
       const validStartLine = (Number.isInteger(startLine) && startLine > 0) ? startLine : null;
-      console.log(`[DEBUG] debugStart called. USE_ZSTEP_ENGINE=${USE_ZSTEP_ENGINE}, startLine=${startLine}, validStartLine=${validStartLine}`);
+      dbgLog(`[DEBUG] debugStart called. USE_ZSTEP_ENGINE=${USE_ZSTEP_ENGINE}, startLine=${startLine}, validStartLine=${validStartLine}`);
       dbgLog('[adapter] debugStart', { USE_ZSTEP_ENGINE, startLine, validStartLine, bpCount: breakpoints?.length });
 
       if (USE_ZSTEP_ENGINE) {
-        console.log('[DEBUG] Starting ZSTEP engine...');
+        dbgLog('[DEBUG] Starting ZSTEP engine...');
         dbgLog('[adapter] Starting ZSTEP engine', { startLine: validStartLine });
         const zres = await startZStepSession(code, breakpoints, validStartLine);
         if (!zres.ok) {
-          console.log(`[DEBUG] ZSTEP engine failed: ${zres.error}`);
+          dbgLog(`[DEBUG] ZSTEP engine failed: ${zres.error}`);
           dbgLog('[adapter] ZSTEP engine failed', { error: zres.error });
           return { ok: false, error: zres.error || 'zstep engine unavailable', output: zres.output || '' };
         }
-        console.log('[DEBUG] ZSTEP engine started successfully');
+        dbgLog('[DEBUG] ZSTEP engine started successfully');
         dbgLog('[adapter] ZSTEP engine started', { sessionId: zres.sessionId, currentLine: zres.currentLine });
-        console.log('[DEBUG] startZStepSession returned zres:', JSON.stringify(zres, null, 2));
+        dbgLog('[DEBUG] startZStepSession returned zres:', JSON.stringify(zres, null, 2));
         return {
           ok: true,
           sessionId: zres.sessionId,
@@ -3408,7 +3413,7 @@ module.exports = {
         output: ''
       };
     } catch (err) {
-      console.error('[DEBUG] CRITICAL ERROR caused by debugStart:', err);
+      dbgLog('[DEBUG] CRITICAL ERROR caused by debugStart:', err);
       return { ok: false, error: 'Internal debugger error: ' + err.message };
     }
   },
@@ -3644,7 +3649,7 @@ module.exports = {
           }
         }
       } catch (e) {
-        console.log('[DEBUG] Error during stop:', e.message);
+        dbgLog('[DEBUG] Error during stop:', e.message);
       }
       // Return accumulated output to show in terminal
       const output = consumeSessionOutput(session);

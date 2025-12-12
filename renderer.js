@@ -868,13 +868,15 @@
         logger.info('TAB_CLOSED', { tabId, path: closing?.path });
     }
 
-    function markTabDirty(tabId, isDirty = true) {
-        const tab = openTabs.find(t => t.id === tabId);
-        if (tab && tab.isDirty !== isDirty) {
-            tab.isDirty = isDirty;
-            renderTabs();
+function markTabDirty(tabId, isDirty = true, opts = {}) {
+    const tab = openTabs.find(t => t.id === tabId);
+    if (tab && tab.isDirty !== isDirty) {
+        tab.isDirty = isDirty;
+        if (!opts.deferRender) {
+            debouncedRenderTabs(); // avoid reflow on every keystroke
         }
     }
+}
 
     function markCurrentTabClean() {
         if (activeTabId) {
@@ -921,6 +923,43 @@
         renderTabsTimer = setTimeout(() => renderTabs(), 16); // ~60fps
     };
 
+    function buildTabElement(tab, isActive) {
+        const el = $('<div class="tab"></div>');
+        if (isActive) el.addClass('active');
+        if (tab.isDirty) el.addClass('modified');
+        el.attr('title', tab.path || tab.name || 'Untitled');
+
+        const iconSpan = $('<span class="tab-icon"></span>').html(tab.icon || tabMumpsIcon);
+        const nameSpan = $('<span class="tab-name"></span>').text(tab.name || 'Untitled');
+        const closeBtn = $('<span class="tab-close">×</span>');
+
+        closeBtn.on('click', (e) => {
+            e.stopPropagation();
+            closeTab(tab.id);
+        });
+
+        el.on('click', (e) => {
+            if (!$(e.target).hasClass('tab-close')) {
+                switchTab(tab.id);
+            }
+        });
+
+        el.on('mousedown', (e) => {
+            if (e.which === 2) { // Middle button closes
+                e.preventDefault();
+                closeTab(tab.id);
+            }
+        });
+
+        el.on('contextmenu', (e) => {
+            e.preventDefault();
+            showTabContextMenu(e.clientX, e.clientY, tab.id);
+        });
+
+        el.append(iconSpan, nameSpan, closeBtn);
+        return el;
+    }
+
     function renderTabs() {
         const tabBar = $('#tabBar');
         if (!tabBar.length) return;
@@ -928,53 +967,7 @@
         tabBar.empty();
 
         openTabs.forEach(tab => {
-            const isActive = tab.id === activeTabId;
-            const tabElement = $('<div class="tab"></div>');
-            if (isActive) tabElement.addClass('active');
-            if (tab.isDirty) tabElement.addClass('modified');
-            const tabTooltip = tab.path || tab.name || 'Untitled';
-            tabElement.attr('title', tabTooltip);
-
-            // File icon (PhpStorm style)
-            const iconSpan = $('<span class="tab-icon"></span>');
-            iconSpan.html(tab.icon || tabMumpsIcon);
-            tabElement.append(iconSpan);
-
-            // File name
-            const nameSpan = $('<span class="tab-name"></span>');
-            nameSpan.text(tab.name || 'Untitled');
-            tabElement.append(nameSpan);
-
-            // Close button
-            const closeBtn = $('<span class="tab-close">×</span>');
-            closeBtn.on('click', (e) => {
-                e.stopPropagation();
-                closeTab(tab.id);
-            });
-            tabElement.append(closeBtn);
-
-            // Click to switch
-            tabElement.on('click', (e) => {
-                if (!$(e.target).hasClass('tab-close')) {
-                    switchTab(tab.id);
-                }
-            });
-
-            // Middle-click to close (PhpStorm behavior)
-            tabElement.on('mousedown', (e) => {
-                if (e.which === 2) { // Middle button
-                    e.preventDefault();
-                    closeTab(tab.id);
-                }
-            });
-
-            // Right-click context menu
-            tabElement.on('contextmenu', (e) => {
-                e.preventDefault();
-                showTabContextMenu(e.clientX, e.clientY, tab.id);
-            });
-
-            tabBar.append(tabElement);
+            tabBar.append(buildTabElement(tab, tab.id === activeTabId));
         });
 
         // Add "+" button for new tab
@@ -3865,17 +3858,24 @@
             window.addEventListener('resize', relayout);
 
             // --- Validation wiring ---
-            let validateTimer = null;
-            const triggerValidate = () => {
-                clearTimeout(validateTimer);
-                validateTimer = setTimeout(() => validateMumps(editor.getModel()), 400);
-
-                // Mark current tab as dirty when content changes
-                if (activeTabId) {
-                    markTabDirty(activeTabId, true);
+            // Run lint on idle to keep typing responsive; same rules, less contention
+            let lintHandle = null;
+            const scheduleValidate = (model) => {
+                if (lintHandle) {
+                    if (window.cancelIdleCallback) cancelIdleCallback(lintHandle);
+                    else clearTimeout(lintHandle);
                 }
+                const run = () => { lintHandle = null; validateMumps(model); };
+                lintHandle = window.requestIdleCallback
+                    ? requestIdleCallback(run, { timeout: 800 })
+                    : setTimeout(run, 800);
             };
-            editor.onDidChangeModelContent(triggerValidate);
+            editor.onDidChangeModelContent(() => {
+                scheduleValidate(editor.getModel());
+                if (activeTabId) {
+                    markTabDirty(activeTabId, true, { deferRender: true });
+                }
+            });
             validateMumps(editor.getModel());
             // Removed duplicate validation - already called on line 3902
 
@@ -6249,7 +6249,7 @@
         }
 
         console.log('debugStart response OK', res);
-        console.log('[DEBUG] Full response object:', JSON.stringify(res, null, 2));
+        dbgLog('[DEBUG] Full response object:', JSON.stringify(res, null, 2));
 
         currentDebugSession = {
             id: res.sessionId,
@@ -6285,11 +6285,11 @@
 
         // Show debug bar if hidden
         const bar = debugBarEl || document.getElementById('debugBar');
-        console.log('[DEBUG UI] debugBar element:', bar);
+        dbgLog('[DEBUG UI] debugBar element:', bar);
         if (bar) {
             bar.classList.remove('hidden');
             bar.style.display = 'flex'; // Force show
-            console.log('[DEBUG UI] debugBar shown');
+            dbgLog('[DEBUG UI] debugBar shown');
         }
 
         // Auto-open Debug panel without hiding the terminal permanently
@@ -6311,14 +6311,14 @@
 
         // If the backend already paused us somewhere, reflect that immediately
         if (currentDebugSession.currentLine) {
-            console.log('[DEBUG] Debugger in PAUSED state - enabling all buttons');
+            dbgLog('[DEBUG] Debugger in PAUSED state - enabling all buttons');
             setDebugButtons(true);
             gotoEditorLine(currentDebugSession.currentLine);
             showToast('success', 'Debug', 'Debugger paused at line ' + currentDebugSession.currentLine);
             return;
         }
 
-        console.log('[DEBUG] Debugger initialized without a pause location (unexpected).');
+        dbgLog('[DEBUG] Debugger initialized without a pause location (unexpected).');
     }
 
     async function debugStepInto() {
@@ -6349,7 +6349,7 @@
     }
 
     async function debugContinue() {
-        console.log('[DEBUG] debugContinue called, session:', currentDebugSession);
+        dbgLog('[DEBUG] debugContinue called, session:', currentDebugSession);
         if (!currentDebugSession || !currentDebugSession.id) {
             showToast('warn', 'Debug', 'No active debug session');
             return;
@@ -6398,7 +6398,7 @@
             } else {
                 // Non-fatal error - show error but keep debug session active if it still exists
                 showToast('error', 'Debug', displayMsg);
-                console.error('[DEBUG] Debug error:', msg, friendly);
+                dbgLog('[DEBUG] Debug error:', msg, friendly);
 
                 // Only reset UI if error indicates session is dead
                 if (msg.includes('Session not found') || msg.includes('process error') ||
@@ -6447,20 +6447,20 @@
             if (newRoutine === 'TMPDBG') {
                 // Returning to TMPDBG means returning to the original user routine
                 fileToLoad = currentDebugSession?.originalRoutine;
-                console.log(`[DEBUG] Returning to TMPDBG from external routine, will load original routine: ${fileToLoad}`);
+                dbgLog(`[DEBUG] Returning to TMPDBG from external routine, will load original routine: ${fileToLoad}`);
             } else if (newRoutine !== 'TMPDBG' && newRoutine !== currentlyLoadedRoutine) {
-                console.log(`[DEBUG] Stepping into external routine ${newRoutine}`);
+                dbgLog(`[DEBUG] Stepping into external routine ${newRoutine}`);
             }
 
             if (newRoutine && fileToLoad && fileToLoad !== currentlyLoadedRoutine) {
-                console.log(`[DEBUG] Routine changed from ${currentlyLoadedRoutine} to ${newRoutine} (file: ${fileToLoad}) - loading source`);
+                dbgLog(`[DEBUG] Routine changed from ${currentlyLoadedRoutine} to ${newRoutine} (file: ${fileToLoad}) - loading source`);
                 routineJustChanged = true;
                 try {
                     // Load the routine's source file
                     await loadRoutineByName(fileToLoad, routineStateRef, activeEditor, routinesCache, globalTerminalState);
-                    console.log(`[DEBUG] Successfully loaded routine ${fileToLoad}`);
+                    dbgLog(`[DEBUG] Successfully loaded routine ${fileToLoad}`);
                 } catch (err) {
-                    console.error(`[DEBUG] Failed to load routine ${fileToLoad}:`, err);
+                    dbgLog(`[DEBUG] Failed to load routine ${fileToLoad}:`, err);
                     showToast('warn', 'Debug', `Could not load routine ${fileToLoad}: ${err.message}`);
                     // Continue anyway - we'll highlight in the old routine (might be wrong but better than crashing)
                 }
@@ -6479,11 +6479,11 @@
             // The tag+offset fix in bridge.js ensures this is always correct
             const displayLine = result.currentLine;
 
-            console.log(`[DEBUG] Line display: currentLine=${result.currentLine}, isBreakpoint=${isUserBreakpoint}, routineChanged=${routineJustChanged}, displayLine=${displayLine}`);
+            dbgLog(`[DEBUG] Line display: currentLine=${result.currentLine}, isBreakpoint=${isUserBreakpoint}, routineChanged=${routineJustChanged}, displayLine=${displayLine}`);
             gotoEditorLine(displayLine);
 
             // Update Variables and Stack panels IMMEDIATELY
-            console.log('[DEBUG] Updating variables panel with', Object.keys(currentDebugSession.locals).length, 'variables');
+            dbgLog('[DEBUG] Updating variables panel with', Object.keys(currentDebugSession.locals).length, 'variables');
             renderLocals(currentDebugSession.locals);
             renderStack(currentDebugSession.stack);
             updateDebugButtonState();
@@ -6492,11 +6492,11 @@
             setDebugButtons(true);
 
             if (wasReady) {
-                console.log('[DEBUG] Execution started (transitioned from ready to running)');
+                dbgLog('[DEBUG] Execution started (transitioned from ready to running)');
             }
 
             console.log('Debug State Updated:', currentDebugSession);
-            console.log('[DEBUG] Current variables:', currentDebugSession.locals);
+            dbgLog('[DEBUG] Current variables:', currentDebugSession.locals);
         }
     }
 
@@ -6558,7 +6558,7 @@
             'dbgStepIntoBtn', 'dbgStepOverBtn', 'dbgStepOutBtn',
             'dbgContinueBtn', 'dbgStopBtn', 'dbgRestartBtn', 'dbgPauseBtn'
         ];
-        console.log('[DEBUG] setDebugButtons called with enabled =', enabled);
+        dbgLog('[DEBUG] setDebugButtons called with enabled =', enabled);
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (el) {
@@ -6569,9 +6569,9 @@
                     el.setAttribute('disabled', 'true');
                     el.disabled = true;
                 }
-                console.log(`[DEBUG] Button ${id}: disabled = ${el.disabled}, hasAttribute = ${el.hasAttribute('disabled')}`);
+                dbgLog(`[DEBUG] Button ${id}: disabled = ${el.disabled}, hasAttribute = ${el.hasAttribute('disabled')}`);
             } else {
-                console.log(`[DEBUG] Button ${id} not found in DOM`);
+                dbgLog(`[DEBUG] Button ${id} not found in DOM`);
             }
         });
     }
@@ -7730,5 +7730,18 @@
             }
         });
     }
+
+    // Dispose all tab models on unload to release memory and markers
+    window.addEventListener('beforeunload', () => {
+        tabModels.forEach((model) => {
+            try {
+                monaco.editor.setModelMarkers(model, 'mumps-check', []);
+                model.dispose();
+            } catch (_) {
+                // ignore cleanup errors
+            }
+        });
+        tabModels.clear();
+    });
 
 })();
