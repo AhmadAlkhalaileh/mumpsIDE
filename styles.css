@@ -2007,16 +2007,9 @@ body.hide-terminal #terminalPanel {
     background: #313335 !important;
 }
 
-/* Legacy toolwindows-rail - now using tool-window-bar */
-.toolwindows-rail {
-    display: none;
-}
-
-.toolwindows-content {
-    display: none;
-}
-
-/* Legacy toolwindow-btn - now using tool-window-stripe-btn */
+/* SUSPECTED UNUSED STYLE – verify in DOM/templates before deleting. Legacy toolwindow rail/content/buttons replaced by tool-window-bar. */
+.toolwindows-rail,
+.toolwindows-content,
 .toolwindow-btn {
     display: none;
 }

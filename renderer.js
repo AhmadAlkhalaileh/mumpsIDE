@@ -13,7 +13,6 @@
     const dbgLog = (typeof window !== 'undefined' && window.MIDEDebugLog) ? window.MIDEDebugLog : (...args) => {
         // Fallback if debug-log.js not loaded
         if (typeof process !== 'undefined' && process.env?.MIDE_DEBUG_TRACE === '1') {
-            console.debug('[DBG]', ...args);
         }
     };
 
@@ -374,6 +373,12 @@
     let activeDebugTab = 'tab-breakpoints';
     const maxLintTextLength = 20000;  // Skip linting for files > 20KB
     const maxProblemItems = 100;  // Limit problems panel for performance
+    const RE_DQUOTE = /\"/g;
+    const RE_PAREN_OPEN = /\(/g;
+    const RE_PAREN_CLOSE = /\)/g;
+    const RE_LINE_START = /^[^A-Za-z%;\s]/;
+    const RE_SUSPICIOUS = /[{}\[\]\\]/;
+    let lastValidatedVersionId = null;
     let lintSkipNotified = false;
     const extensionsState = {
         installed: [],
@@ -669,6 +674,42 @@
     let globalTerminalState = null;
     let globalRoutineState = null;
 
+    const createTerminalManager = window.AhmadIDEModules?.terminal?.createTerminalManager;
+    if (!createTerminalManager) {
+        logger.error('TERMINAL_MODULE_MISSING', { path: './src/editor/terminal/renderer-terminal.js' });
+        throw new Error('Terminal module missing: ./src/editor/terminal/renderer-terminal.js');
+    }
+
+    const terminalManager = createTerminalManager({
+        deps: {
+            logger,
+            terminalConfig,
+            getCurrentProject: () => currentProject,
+            getEnvInfoCache: () => envInfoCache,
+            getGlobalTerminalState: () => globalTerminalState,
+            getActiveEditor: () => activeEditor,
+            showToast
+        }
+    });
+
+    const {
+        getTerminalCwd,
+        focusTerminal,
+        isTerminalFocused,
+        createTerminalState,
+        getActiveTerminalTab,
+        updateTerminalStatusPill,
+        ensureTerminalListeners,
+        renderTerminalTabs,
+        activateTerminalTab,
+        refreshTerminalLayout,
+        addTerminalTab,
+        closeTerminalTab,
+        appendOutput,
+        clearOutput,
+        sendCtrlC
+    } = terminalManager;
+
     const mumpsFileIconSvg = `<svg width="16" height="16" viewBox="0 0 16 16"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f0a35c"/><stop offset="100%" stop-color="#d67f3c"/></linearGradient></defs><rect width="16" height="16" rx="3" fill="url(#mg)"/><text x="4" y="12" font-size="10" font-weight="bold" fill="#19100c" font-family="monospace">M</text></svg>`;
 
     // ============================================
@@ -686,361 +727,52 @@
     // Tab icon (same as project tree)
     const tabMumpsIcon = mumpsFileIconSvg;
 
-    function normalizeRoutineTarget(name, folderHint = null) {
-        const trimmed = (name || '').trim();
-        let folder = folderHint || null;
-        if (!trimmed) return { base: '', folder, path: '' };
-        let base = trimmed;
-        if (trimmed.includes('/')) {
-            const parts = trimmed.split('/');
-            folder = parts[0] || folder;
-            base = parts.slice(1).join('/') || parts[1] || '';
-        }
-        const baseNoExt = base.replace(/\.m$/i, '');
-        const normalizedBase = baseNoExt.toUpperCase();
-        const path = folder ? `${folder}/${normalizedBase}` : normalizedBase;
-        return { base: normalizedBase, folder, path };
-    }
-
-    function findOpenTab(target, { exact = false } = {}) {
-        const normTarget = normalizeRoutineTarget(target);
-        const exactMatch = openTabs.find(t => {
-            const normTab = normalizeRoutineTarget(t.path || t.name);
-            return normTab.path === normTarget.path;
-        });
-        if (exact || exactMatch) return exactMatch || null;
-
-        const looseMatches = openTabs.filter(t => {
-            const normTab = normalizeRoutineTarget(t.path || t.name);
-            return normTab.base && normTab.base === normTarget.base;
-        });
-        return looseMatches.length === 1 ? looseMatches[0] : null;
-    }
-
-    function createTab(name, content = '', state = null, options = {}) {
-        const normalized = normalizeRoutineTarget(name, options.folder || state?.current?.split('/')?.[0]);
-        const tabPath = normalized.path || normalized.base || `UNTITLED_${tabIdCounter + 1}`;
-
-        // Check if tab already exists
-        const existingTab = findOpenTab(tabPath, { exact: true });
-        if (existingTab) {
-            switchTab(existingTab.id);
-            return existingTab;
-        }
-
-        const id = `tab_${++tabIdCounter}`;
-        const tabState = state || { current: tabPath };
-        if (tabState && tabPath) {
-            tabState.current = tabPath;
-        }
-
-        const tab = {
-            id,
-            name: normalized.base || tabPath,
-            path: tabPath,
-            folder: normalized.folder,
-            content,
-            isDirty: false,
-            state: tabState,
-            icon: tabMumpsIcon,
-            disposables: []  // Store disposables for cleanup
-        };
-        openTabs.push(tab);
-
-        // Create Monaco model for this tab (for instant switching)
-        if (typeof monaco !== 'undefined') {
-            const model = monaco.editor.createModel(content, 'mumps');
-            tabModels.set(id, model);
-
-            // Track changes for dirty state - STORE the disposable!
-            const changeDisposable = model.onDidChangeContent(() => {
-                const t = openTabs.find(x => x.id === id);
-                if (t && !t.isDirty) {
-                    t.isDirty = true;
-                    debouncedRenderTabs();  // Debounced!
-                }
-            });
-            tab.disposables.push(changeDisposable);
-        }
-
-        renderTabs();
-        switchTab(id);
-        logger.info('TAB_OPEN', { id, path: tabPath, name: normalized.base, folder: normalized.folder });
-        return tab;
-    }
-
-    function switchTab(tabId) {
-        const tab = openTabs.find(t => t.id === tabId);
-        if (!tab) return;
-        if (tabId === activeTabId) return; // Already active
-
-        // Save current tab content
-        if (activeTabId && activeEditor) {
-            const currentTab = openTabs.find(t => t.id === activeTabId);
-            if (currentTab) {
-                currentTab.content = activeEditor.getValue();
-            }
-        }
-
-        activeTabId = tabId;
-        const normalizedTarget = normalizeRoutineTarget(tab.path || tab.name);
-        if (tab.state) {
-            tab.state.current = normalizedTarget.path || tab.state.current;
-        }
-        if (routineStateRef) {
-            routineStateRef.current = normalizedTarget.path || normalizedTarget.base;
-        }
-
-        // Switch Monaco model (instant, no setValue)
-        if (activeEditor) {
-            const model = tabModels.get(tabId);
-            if (model) {
-                activeEditor.setModel(model);
-            } else {
-                // Fallback: create model if missing
-                const newModel = monaco.editor.createModel(tab.content, 'mumps');
-                tabModels.set(tabId, newModel);
-                activeEditor.setModel(newModel);
-            }
-        }
-
-        setCurrentRoutine(normalizedTarget.path || normalizedTarget.base);
-        logger.info('TAB_SWITCH', { tabId, path: normalizedTarget.path || normalizedTarget.base });
-        if (dbgStateRef) {
-            decorateBreakpoints(activeEditor, dbgStateRef);
-            renderBreakpoints(dbgStateRef);
-        }
-        renderTabs();
-
-        // Scroll active tab into view
-        scrollActiveTabIntoView();
-    }
-
-    function closeTab(tabId, force = false) {
-        const tab = openTabs.find(t => t.id === tabId);
-        if (!tab) return;
-        logger.info('TAB_CLOSE_REQUEST', { tabId, path: tab?.path });
-
-        if (!force && tab.isDirty) {
-            showConfirmDialog(
-                'Unsaved Changes',
-                `"${tab.name}" has unsaved changes. Do you want to discard them?`,
-                () => performCloseTab(tabId)
-            );
-        } else {
-            performCloseTab(tabId);
-        }
-    }
-
-    function performCloseTab(tabId) {
-        const index = openTabs.findIndex(t => t.id === tabId);
-        if (index === -1) return;
-        const closing = openTabs[index];
-
-        // Dispose all event listeners for this tab
-        if (closing.disposables) {
-            closing.disposables.forEach(d => d.dispose());
-            closing.disposables = [];
-        }
-
-        // Dispose Monaco model
-        const model = tabModels.get(tabId);
-        if (model) {
-            model.dispose();
-            tabModels.delete(tabId);
-        }
-
-        openTabs.splice(index, 1);
-
-        // Switch to adjacent tab (PhpStorm: activate tab to the left, or right if none)
-        if (openTabs.length > 0) {
-            const newIndex = Math.min(index, openTabs.length - 1);
-            switchTab(openTabs[newIndex].id);
-        } else {
-            activeTabId = null;
-            if (activeEditor) {
-                const emptyModel = monaco.editor.createModel('', 'mumps');
-                activeEditor.setModel(emptyModel);
-            }
-            setCurrentRoutine('');
-            renderTabs();
-        }
-        logger.info('TAB_CLOSED', { tabId, path: closing?.path });
-    }
-
-function markTabDirty(tabId, isDirty = true, opts = {}) {
-    const tab = openTabs.find(t => t.id === tabId);
-    if (tab && tab.isDirty !== isDirty) {
-        tab.isDirty = isDirty;
-        if (!opts.deferRender) {
-            debouncedRenderTabs(); // avoid reflow on every keystroke
-        }
-    }
-}
-
-    function markCurrentTabClean() {
-        if (activeTabId) {
-            markTabDirty(activeTabId, false);
-        }
-    }
-
-    // Cycle through tabs (Ctrl+Tab / Ctrl+Shift+Tab)
-    function cycleTab(direction = 1) {
-        if (openTabs.length <= 1) return;
-        const currentIndex = openTabs.findIndex(t => t.id === activeTabId);
-        if (currentIndex === -1) return;
-
-        let newIndex = (currentIndex + direction + openTabs.length) % openTabs.length;
-        switchTab(openTabs[newIndex].id);
-    }
-
-    function bindTabKeyboardShortcuts() {
-        if (tabShortcutsBound) return;
-        const handler = (e) => {
-            const key = (e.key || '').toLowerCase();
-            if (key !== 'tab') return;
-            if (!(e.ctrlKey || e.metaKey)) return;
-            e.preventDefault();
-            e.stopPropagation();
-            cycleTab(e.shiftKey ? -1 : 1);
-        };
-        window.addEventListener('keydown', handler, true);
-        tabShortcutsBound = true;
-    }
-
-    function scrollActiveTabIntoView() {
-        const tabBar = document.getElementById('tabBar');
-        const activeTab = tabBar?.querySelector('.tab.active');
-        if (activeTab) {
-            activeTab.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'nearest' });
-        }
-    }
-
-    // Debounced version of renderTabs to prevent excessive re-renders
-    let renderTabsTimer = null;
-    const debouncedRenderTabs = () => {
-        if (renderTabsTimer) clearTimeout(renderTabsTimer);
-        renderTabsTimer = setTimeout(() => renderTabs(), 16); // ~60fps
+    const tabsState = {
+        openTabs,
+        tabModels,
+        get activeTabId() { return activeTabId; },
+        set activeTabId(v) { activeTabId = v; },
+        get tabIdCounter() { return tabIdCounter; },
+        set tabIdCounter(v) { tabIdCounter = v; },
+        get tabShortcutsBound() { return tabShortcutsBound; },
+        set tabShortcutsBound(v) { tabShortcutsBound = v; }
     };
 
-    function buildTabElement(tab, isActive) {
-        const el = $('<div class="tab"></div>');
-        if (isActive) el.addClass('active');
-        if (tab.isDirty) el.addClass('modified');
-        el.attr('title', tab.path || tab.name || 'Untitled');
-
-        const iconSpan = $('<span class="tab-icon"></span>').html(tab.icon || tabMumpsIcon);
-        const nameSpan = $('<span class="tab-name"></span>').text(tab.name || 'Untitled');
-        const closeBtn = $('<span class="tab-close">×</span>');
-
-        closeBtn.on('click', (e) => {
-            e.stopPropagation();
-            closeTab(tab.id);
-        });
-
-        el.on('click', (e) => {
-            if (!$(e.target).hasClass('tab-close')) {
-                switchTab(tab.id);
-            }
-        });
-
-        el.on('mousedown', (e) => {
-            if (e.which === 2) { // Middle button closes
-                e.preventDefault();
-                closeTab(tab.id);
-            }
-        });
-
-        el.on('contextmenu', (e) => {
-            e.preventDefault();
-            showTabContextMenu(e.clientX, e.clientY, tab.id);
-        });
-
-        el.append(iconSpan, nameSpan, closeBtn);
-        return el;
+    const createTabManager = window.AhmadIDEModules?.tabs?.createTabManager;
+    if (!createTabManager) {
+        logger.error('TABS_MODULE_MISSING', { path: './src/editor/tabs/renderer-tabs.js' });
+        throw new Error('Tabs module missing: ./src/editor/tabs/renderer-tabs.js');
     }
 
-    function renderTabs() {
-        const tabBar = $('#tabBar');
-        if (!tabBar.length) return;
+    const tabManager = createTabManager({
+        state: tabsState,
+        deps: {
+            $,
+            logger,
+            tabMumpsIcon,
+            getMonaco: () => (typeof monaco !== 'undefined' ? monaco : null),
+            getActiveEditor: () => activeEditor,
+            setLastValidatedVersionIdNull: () => { lastValidatedVersionId = null; },
+            getRoutineStateRef: () => routineStateRef,
+            getDbgStateRef: () => dbgStateRef,
+            decorateBreakpoints,
+            renderBreakpoints,
+            setCurrentRoutine,
+            showConfirmDialog,
+            showCustomPrompt,
+            appendOutput,
+            getGlobalTerminalState: () => globalTerminalState
+        }
+    });
 
-        tabBar.empty();
-
-        openTabs.forEach(tab => {
-            tabBar.append(buildTabElement(tab, tab.id === activeTabId));
-        });
-
-        // Add "+" button for new tab
-        const newBtn = $('<div class="tab ghost">+</div>');
-        newBtn.attr('title', 'New Routine');
-        newBtn.on('click', () => {
-            showCustomPrompt('New Routine', 'Routine name (e.g., NEWRTN)', (name) => {
-                if (name) {
-                    createTab(name.toUpperCase(), `${name.toUpperCase()}\t; New routine\n\tQUIT\n`);
-                    if (globalTerminalState) {
-                        appendOutput(`✓ Created new routine: ${name.toUpperCase()}`, globalTerminalState);
-                    }
-                }
-            });
-        });
-        tabBar.append(newBtn);
-    }
-
-    function showTabContextMenu(x, y, tabId) {
-        const tab = openTabs.find(t => t.id === tabId);
-        if (!tab) return;
-
-        $('.tab-context-menu').remove();
-        const menu = $('<div class="routines-context-menu tab-context-menu"></div>');
-        menu.css({ position: 'fixed', top: y, left: x, zIndex: 5000 });
-
-        const menuItems = [
-            { label: 'Close', action: () => closeTab(tabId) },
-            { label: 'Close Others', action: () => closeOtherTabs(tabId) },
-            { label: 'Close All', action: () => closeAllTabs() },
-            { separator: true },
-            { label: 'Close Tabs to the Left', action: () => closeTabsToSide(tabId, 'left') },
-            { label: 'Close Tabs to the Right', action: () => closeTabsToSide(tabId, 'right') }
-        ];
-
-        menuItems.forEach(item => {
-            if (item.separator) {
-                menu.append('<div class="ctx-separator"></div>');
-            } else {
-                const menuItem = $('<div class="ctx-item"></div>');
-                menuItem.html(`<span class="ctx-label">${item.label}</span>`);
-                menuItem.on('click', () => {
-                    menu.remove();
-                    item.action();
-                });
-                menu.append(menuItem);
-            }
-        });
-
-        $('body').append(menu);
-        setTimeout(() => $(document).one('click', () => menu.remove()), 100);
-    }
-
-    function closeOtherTabs(keepTabId) {
-        const tabsToClose = openTabs.filter(t => t.id !== keepTabId);
-        tabsToClose.forEach(t => performCloseTab(t.id));
-    }
-
-    function closeAllTabs() {
-        const allTabs = [...openTabs];
-        allTabs.forEach(t => performCloseTab(t.id));
-    }
-
-    function closeTabsToSide(tabId, side) {
-        const index = openTabs.findIndex(t => t.id === tabId);
-        if (index === -1) return;
-
-        const tabsToClose = side === 'left'
-            ? openTabs.slice(0, index)
-            : openTabs.slice(index + 1);
-
-        tabsToClose.forEach(t => performCloseTab(t.id));
-    }
+    const normalizeRoutineTarget = tabManager.normalizeRoutineTarget;
+    const findOpenTab = tabManager.findOpenTab;
+    const createTab = tabManager.createTab;
+    const switchTab = tabManager.switchTab;
+    const markTabDirty = tabManager.markTabDirty;
+    const cycleTab = tabManager.cycleTab;
+    const bindTabKeyboardShortcuts = tabManager.bindTabKeyboardShortcuts;
+    const renderTabs = tabManager.renderTabs;
 
     function showConfirmDialog(title, message, onConfirm) {
         const overlay = $('<div class="prompt-overlay"></div>');
@@ -1107,6 +839,47 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
     // PhpStorm-style Project Tree Context Menu
     // ============================================
 
+    function normalizeContextMenuSeparators(items) {
+        const cleaned = [];
+        let lastWasSeparator = false;
+        items.forEach(item => {
+            if (item.separator) {
+                if (!cleaned.length || lastWasSeparator) return;
+                cleaned.push(item);
+                lastWasSeparator = true;
+            } else {
+                cleaned.push(item);
+                lastWasSeparator = false;
+            }
+        });
+        if (cleaned.length && cleaned[cleaned.length - 1].separator) {
+            cleaned.pop();
+        }
+        return cleaned;
+    }
+
+    function createContextMenuItemElement(item, menu) {
+        if (item.separator) return $('<div class="ctx-separator"></div>');
+        const el = $('<div class="ctx-item"></div>');
+        if (item.disabled) el.addClass('disabled');
+        el.append($('<span class="ctx-label"></span>').text(item.label));
+        if (item.shortcut) el.append($('<span class="ctx-shortcut"></span>').text(item.shortcut));
+        if (item.submenu) {
+            el.addClass('has-submenu');
+            el.append($('<span class="ctx-arrow">▸</span>'));
+            const sub = $('<div class="ctx-submenu"></div>');
+            item.submenu.forEach(subItem => sub.append(createContextMenuItemElement(subItem, menu)));
+            el.append(sub);
+        } else if (item.action && !item.disabled) {
+            el.on('click', (e) => {
+                e.stopPropagation();
+                menu.remove();
+                item.action();
+            });
+        }
+        return el;
+    }
+
     function showProjectContextMenu(x, y, options = {}) {
         const { type, path, name, routineStateRef, editorRef, folderName } = options;
         $('.routines-context-menu').remove();
@@ -1169,25 +942,6 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
         };
 
         const menuItems = [];
-
-        const normalizeSeparators = (items) => {
-            const cleaned = [];
-            let lastWasSeparator = false;
-            items.forEach(item => {
-                if (item.separator) {
-                    if (!cleaned.length || lastWasSeparator) return;
-                    cleaned.push(item);
-                    lastWasSeparator = true;
-                } else {
-                    cleaned.push(item);
-                    lastWasSeparator = false;
-                }
-            });
-            if (cleaned.length && cleaned[cleaned.length - 1].separator) {
-                cleaned.pop();
-            }
-            return cleaned;
-        };
 
         if (type === 'folder' || type === 'root') {
             menuItems.push({
@@ -1302,29 +1056,7 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
         });
 
         // Build DOM
-        const createMenuItem = (item) => {
-            if (item.separator) return $('<div class="ctx-separator"></div>');
-            const el = $('<div class="ctx-item"></div>');
-            if (item.disabled) el.addClass('disabled');
-            el.append($('<span class="ctx-label"></span>').text(item.label));
-            if (item.shortcut) el.append($('<span class="ctx-shortcut"></span>').text(item.shortcut));
-            if (item.submenu) {
-                el.addClass('has-submenu');
-                el.append($('<span class="ctx-arrow">▸</span>'));
-                const sub = $('<div class="ctx-submenu"></div>');
-                item.submenu.forEach(subItem => sub.append(createMenuItem(subItem)));
-                el.append(sub);
-            } else if (item.action && !item.disabled) {
-                el.on('click', (e) => {
-                    e.stopPropagation();
-                    menu.remove();
-                    item.action();
-                });
-            }
-            return el;
-        };
-
-        normalizeSeparators(menuItems).forEach(i => menu.append(createMenuItem(i)));
+        normalizeContextMenuSeparators(menuItems).forEach(i => menu.append(createContextMenuItemElement(i, menu)));
         $('body').append(menu);
 
         const rect = menu[0].getBoundingClientRect();
@@ -2046,455 +1778,57 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
         editor.addCommand(binding, handler);
     }
 
-    const escapeRegex = (str = '') => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const escapeHtml = (str = '') => str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-    // Promise helper to avoid hanging UI operations forever
-    const withTimeout = (promise, ms, label = 'Operation') => {
-        return new Promise((resolve, reject) => {
-            let settled = false;
-            const timer = setTimeout(() => {
-                if (settled) return;
-                settled = true;
-                reject(new Error(`${label} timed out after ${ms}ms`));
-            }, ms);
-            promise.then((res) => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timer);
-                resolve(res);
-            }).catch((err) => {
-                if (settled) return;
-                settled = true;
-                clearTimeout(timer);
-                reject(err);
-            });
-        });
-    };
-
-    const getSelectedText = () => {
-        if (!activeEditor) return '';
-        const sel = activeEditor.getSelection();
-        const model = activeEditor.getModel();
-        if (sel && model) {
-            const text = model.getValueInRange(sel).trim();
-            return text;
-        }
-        return '';
-    };
-
-    const searchDebounce = (() => {
-        let t = null;
-        return (fn, ms = 220) => {
-            clearTimeout(t);
-            t = setTimeout(fn, ms);
-        };
-    })();
-
-    const getScopeInfo = () => {
-        const active = getActiveRoutine();
-        const normalized = normalizeRoutineTarget(active);
-        const folder = normalized.folder || (normalized.path?.includes('/') ? normalized.path.split('/')[0] : null) || 'localr';
-        const root = (currentProject?.routinesPath || '').replace(/\\/g, '/');
-        const scopePath = root && folder ? `${root}/${folder}` : (folder || 'UNKNOWN – NEED DESIGN DECISION: localR / routines paths');
-        return { folder, scopePath };
-    };
-
-    async function listScopedRoutines(folder) {
-        try {
-            const query = folder ? `${folder}/` : '';
-            const res = await withTimeout(window.ahmadIDE.listRoutines(query), 8000, 'List routines');
-            if (res?.ok && Array.isArray(res.routines)) {
-                routinesCache = res.routines || routinesCache;
-            }
-        } catch (e) {
-            // fall through to cache
-        }
-        const prefix = folder ? `${folder.toLowerCase()}/` : '';
-        return (routinesCache || []).filter(r => !prefix || r.toLowerCase().startsWith(prefix));
+    // Search (Find/Replace in Path + Search Everywhere) moved to src/editor/search/renderer-search.js
+    const createSearchManager = window.AhmadIDEModules?.search?.createSearchManager;
+    if (!createSearchManager) {
+        logger.error('SEARCH_MODULE_MISSING', { path: './src/editor/search/renderer-search.js' });
+        throw new Error('Search module missing: ./src/editor/search/renderer-search.js');
     }
 
-    const buildSearchRegex = (term, opts = {}) => {
-        if (opts.regex) {
-            try {
-                return new RegExp(term, opts.matchCase ? 'g' : 'gi');
-            } catch (err) {
-                return null;
-            }
-        }
-        const safe = escapeRegex(term);
-        const pattern = opts.wholeWords ? `\\b${safe}\\b` : safe;
-        return new RegExp(pattern, opts.matchCase ? 'g' : 'gi');
+    const routinesCacheRef = {
+        get value() { return routinesCache; },
+        set value(v) { routinesCache = v; }
     };
 
-    const renderFindResults = (hits = [], term = '', mode = 'find') => {
-        const host = document.getElementById('findResults');
-        if (!host) return;
-        if (!hits.length) {
-            host.textContent = 'No matches found.';
-            return;
+    const searchManager = createSearchManager({
+        state: {
+            findReplaceState,
+            searchEverywhereState,
+            routinesCacheRef
+        },
+        deps: {
+            logger,
+            showToast,
+            getCurrentProject: () => currentProject,
+            getActiveEditor: () => activeEditor,
+            getRoutineState: () => routineState,
+            getGlobalTerminalState: () => globalTerminalState,
+            normalizeRoutineTarget,
+            getActiveRoutine: () => getActiveRoutine(),
+            loadRoutineByName,
+            revealLine,
+            findOpenTab,
+            tabModels,
+            getActiveTabId: () => activeTabId,
+            renderTabs
         }
-        host.innerHTML = '';
-        const limit = hits.slice(0, 400);
-        const markRegex = term ? buildSearchRegex(term, findReplaceState.options) : null;
-        limit.forEach(hit => {
-            const row = document.createElement('div');
-            row.className = 'search-hit';
-            const header = document.createElement('div');
-            header.className = 'search-hit-header';
-            const title = document.createElement('span');
-            title.textContent = `${hit.file}:${hit.line}`;
-            title.className = 'search-hit-file';
-            const chip = document.createElement('span');
-            chip.className = 'pill subtle';
-            chip.textContent = hit.kind || (mode === 'replace' ? 'Replace' : 'Match');
-            header.appendChild(chip);
-            header.appendChild(title);
+    });
 
-            const snippet = document.createElement('div');
-            snippet.className = 'search-hit-snippet';
-            if (hit.snippet && markRegex) {
-                snippet.innerHTML = escapeHtml(hit.snippet).replace(markRegex, (m) => `<span class="search-hit-mark">${m}</span>`);
-            } else {
-                snippet.textContent = hit.snippet || '';
-            }
+    const {
+        getSelectedText,
+        searchDebounce,
+        openFindReplaceDialog,
+        closeFindReplaceDialog,
+        executeFindReplacePreview,
+        updateFindScopeLabels,
+        toggleFindMode,
+        confirmAndReplaceAll,
+        openSearchEverywhereResult,
+        openSearchEverywhere,
+        closeSearchEverywhere,
+        renderSearchEverywhereResults
+    } = searchManager;
 
-            row.appendChild(header);
-            row.appendChild(snippet);
-            row.onclick = async () => {
-                await loadRoutineByName(hit.file, routineState, activeEditor, routinesCache, globalTerminalState);
-                revealLine(hit.line);
-                closeFindReplaceDialog();
-            };
-            host.appendChild(row);
-        });
-
-        if (hits.length > limit.length) {
-            const more = document.createElement('div');
-            more.className = 'search-hit-file';
-            more.textContent = `Showing first ${limit.length} of ${hits.length} matches. Refine your query to narrow results.`;
-            host.appendChild(more);
-        }
-    };
-
-    const updateFindScopeLabels = () => {
-        const { scopePath, folder } = getScopeInfo();
-        const scopeLabel = document.getElementById('findScopeLabel');
-        const scopePathEl = document.getElementById('findScopePath');
-        findReplaceState.scopeFolder = folder;
-        if (scopeLabel) scopeLabel.textContent = `Scope: ${scopePath}`;
-        if (scopePathEl) scopePathEl.textContent = `Scope: ${scopePath}`;
-    };
-
-    const toggleFindMode = (mode) => {
-        findReplaceState.mode = mode;
-        const dialog = document.getElementById('findDialog');
-        const replaceRow = document.getElementById('replaceRow');
-        const replaceAllBtn = document.getElementById('replaceAllBtn');
-        const toggleBtn = document.getElementById('findReplaceToggleBtn');
-        const pill = document.getElementById('findModePill');
-        const title = document.getElementById('findDialogTitle');
-        if (dialog) dialog.dataset.mode = mode;
-        if (replaceRow) replaceRow.style.display = mode === 'replace' ? 'flex' : 'none';
-        if (replaceAllBtn) replaceAllBtn.style.display = mode === 'replace' ? 'inline-flex' : 'none';
-        if (toggleBtn) toggleBtn.textContent = mode === 'replace' ? 'Switch to Find' : 'Switch to Replace';
-        if (pill) pill.textContent = mode === 'replace' ? 'Replace' : 'Find';
-        if (title) title.textContent = mode === 'replace' ? 'Replace in Files' : 'Find in Files';
-    };
-
-    function openFindReplaceDialog(mode = 'find', prefill = '') {
-        toggleFindMode(mode);
-        updateFindScopeLabels();
-        document.getElementById('findOverlay')?.classList.remove('hidden');
-        document.getElementById('findDialog')?.classList.remove('hidden');
-        logger.info('SEARCH_DIALOG_OPEN', { mode, prefill });
-        const findInput = document.getElementById('findQueryInput');
-        if (findInput) {
-            findInput.value = prefill || findInput.value;
-            findInput.focus();
-            if (prefill) findInput.select();
-        }
-        const replaceInput = document.getElementById('replaceQueryInput');
-        if (mode === 'replace' && replaceInput && !replaceInput.value) {
-            replaceInput.value = '';
-        }
-        executeFindReplacePreview();
-    }
-
-    function closeFindReplaceDialog() {
-        document.getElementById('findOverlay')?.classList.add('hidden');
-        document.getElementById('findDialog')?.classList.add('hidden');
-        findReplaceState.token += 1; // cancel inflight searches
-    }
-
-    const executeFindReplacePreview = async (applyReplace = false) => {
-        const term = (document.getElementById('findQueryInput')?.value || '').trim();
-        const replaceTerm = (document.getElementById('replaceQueryInput')?.value || '').trim();
-        const host = document.getElementById('findResults');
-        if (!host) return;
-
-        const fail = (msg) => {
-            host.textContent = msg;
-            showToast('error', 'Find', msg);
-        };
-
-        try {
-            if (!term) {
-                host.textContent = 'Enter text to search.';
-                return;
-            }
-
-            const options = {
-                matchCase: !!document.getElementById('findCaseOption')?.checked,
-                wholeWords: !!document.getElementById('findWholeOption')?.checked,
-                regex: !!document.getElementById('findRegexOption')?.checked
-            };
-            findReplaceState.options = options;
-            const regex = buildSearchRegex(term, options);
-            if (!regex) {
-                host.textContent = 'Invalid regular expression.';
-                return;
-            }
-
-            const token = ++findReplaceState.token;
-            const { folder } = getScopeInfo();
-            host.textContent = applyReplace ? 'Replacing across files…' : 'Searching…';
-            logger.info('SEARCH_FIND_IN_PATH_QUERY', { term, replaceTerm: applyReplace ? replaceTerm : undefined, scopeFolder: folder, options, mode: findReplaceState.mode });
-
-            // Fast path: ask backend to grep all routines in scope
-            if (!applyReplace && window.ahmadIDE.searchRoutines) {
-                try {
-                    const fast = await withTimeout(
-                        window.ahmadIDE.searchRoutines(term, { folder, ...options }),
-                        10000,
-                        'Search routines (fast)'
-                    );
-                    if (fast?.ok) {
-                        const hits = fast.hits || [];
-                        renderFindResults(hits, term, findReplaceState.mode);
-                        logger.info('SEARCH_FIND_IN_PATH_RESULTS', { term, count: hits.length, mode: findReplaceState.mode });
-                        return;
-                    }
-                    console.warn('Fast search failed, falling back to slow scan:', fast?.error);
-                } catch (err) {
-                    console.warn('Fast search errored, falling back:', err);
-                }
-            }
-
-            const routines = await listScopedRoutines(folder);
-            if (!routines.length) {
-                host.textContent = `No routines found in scope "${folder || 'UNKNOWN – NEED DESIGN DECISION: localR / routines paths'}".`;
-                return;
-            }
-
-            const total = routines.length;
-            let processed = 0;
-            host.textContent = applyReplace
-                ? `Replacing across files… (0/${total})`
-                : `Searching… (0/${total})`;
-            let hits = [];
-            let replaceCount = 0;
-            let failed = false;
-
-            const searchOne = async (routine) => {
-                if (token !== findReplaceState.token || failed) return;
-                let read = null;
-                try {
-                    read = await withTimeout(window.ahmadIDE.readRoutine(routine), 8000, `Read ${routine}`);
-                } catch (err) {
-                    console.error('Find/Replace read failed:', err);
-                    failed = true;
-                    fail(`Search failed on ${routine}: ${err?.message || err}`);
-                    return;
-                }
-                if (!read?.ok) return;
-
-                const code = read.code || '';
-                const lines = code.split(/\r?\n/);
-                let mutated = code;
-                lines.forEach((line, idx) => {
-                    regex.lastIndex = 0;
-                    if (regex.test(line)) {
-                        hits.push({ file: routine, line: idx + 1, snippet: line });
-                    }
-                });
-
-                if (applyReplace && findReplaceState.mode === 'replace' && replaceTerm) {
-                    mutated = code.replace(regex, replaceTerm);
-                    if (mutated !== code) {
-                        replaceCount += 1;
-                        try {
-                            await window.ahmadIDE.saveRoutine(routine, mutated);
-                        } catch (err) {
-                            console.error('Replace failed to save', err);
-                        }
-                        const openTab = findOpenTab(routine, { exact: true });
-                        if (openTab) {
-                            openTab.content = mutated;
-                            const model = tabModels.get(openTab.id);
-                            if (model) {
-                                model.setValue(mutated);
-                                openTab.isDirty = false;
-                                renderTabs();
-                            } else if (activeTabId === openTab.id && activeEditor) {
-                                activeEditor.setValue(mutated);
-                            }
-                        }
-                    }
-                }
-            };
-
-            // Concurrency-limited search to speed up large projects
-            const limit = Math.min(12, Math.max(2, navigator.hardwareConcurrency || 4));
-            let cursor = 0;
-            const worker = async () => {
-                while (cursor < total && token === findReplaceState.token && !failed) {
-                    const idx = cursor++;
-                    const routine = routines[idx];
-                    await searchOne(routine);
-                    processed += 1;
-                    if (!failed && token === findReplaceState.token) {
-                        if (!applyReplace && processed % 20 === 0) {
-                            host.textContent = `Searching… (${processed}/${total})`;
-                        } else if (applyReplace && processed % 20 === 0) {
-                            host.textContent = `Replacing across files… (${processed}/${total})`;
-                        }
-                        if (!applyReplace && hits.length && hits.length % 50 === 0) {
-                            renderFindResults(hits, term, findReplaceState.mode);
-                        }
-                    }
-                }
-            };
-            const workers = Array.from({ length: limit }, () => worker());
-            await Promise.all(workers);
-
-            if (token !== findReplaceState.token || failed) return;
-            renderFindResults(hits, term, findReplaceState.mode);
-            logger.info('SEARCH_FIND_IN_PATH_RESULTS', { term, count: hits.length, mode: findReplaceState.mode });
-            if (applyReplace && host) {
-                const summary = document.createElement('div');
-                summary.className = 'search-hit-file';
-                summary.textContent = replaceCount
-                    ? `Applied replacements in ${replaceCount} file(s).`
-                    : 'No replacements applied.';
-                host.appendChild(summary);
-            }
-        } catch (err) {
-            console.error('Find/Replace failed:', err);
-            fail(`Search failed: ${err?.message || err}`);
-        }
-    };
-
-    const confirmAndReplaceAll = () => {
-        const term = (document.getElementById('findQueryInput')?.value || '').trim();
-        if (!term) return;
-        const replaceTerm = (document.getElementById('replaceQueryInput')?.value || '').trim();
-        if (!replaceTerm) {
-            showToast('error', 'Replace', 'Enter replacement text before replacing.');
-            return;
-        }
-        const ok = window.confirm(`Replace all occurrences of "${term}" in the current folder?`);
-        if (!ok) return;
-        executeFindReplacePreview(true);
-    };
-
-    const openSearchEverywhereResult = async (path) => {
-        if (!path) return;
-        try {
-            logger.info('SEARCH_EVERYWHERE_OPEN_RESULT', { path });
-            const ok = await loadRoutineByName(path, routineState, activeEditor, routinesCache, globalTerminalState);
-            if (ok !== false) closeSearchEverywhere();
-        } catch (err) {
-            showToast('error', 'Search Everywhere', err?.message || 'Could not open selection.');
-            logger.error('SEARCH_EVERYWHERE_OPEN_ERROR', { path, message: err?.message, stack: err?.stack });
-        }
-    };
-
-    const openSearchEverywhere = async (prefill = '') => {
-        document.getElementById('searchEverywhereOverlay')?.classList.remove('hidden');
-        document.getElementById('searchEverywhereDialog')?.classList.remove('hidden');
-        const input = document.getElementById('searchEverywhereInput');
-        const resultsHost = document.getElementById('searchEverywhereResults');
-        searchEverywhereState.open = true;
-        searchEverywhereState.selectedIndex = 0;
-        logger.info('SEARCH_EVERYWHERE_OPEN', { prefill });
-        if (input) {
-            input.value = prefill || '';
-            input.focus();
-            if (prefill) input.select();
-        }
-        if (resultsHost) resultsHost.textContent = 'Indexing project files…';
-        if (!searchEverywhereState.index.length) {
-            const res = await window.ahmadIDE.listRoutines('');
-            if (res?.ok) {
-                routinesCache = res.routines || routinesCache;
-                // UNKNOWN – NEED DESIGN DECISION: non-project items in Search Everywhere (only routines are indexed here)
-                searchEverywhereState.index = (res.routines || []).map(r => ({
-                    path: r,
-                    name: r.split('/').pop(),
-                    folder: r.split('/')[0] || ''
-                }));
-            } else if (resultsHost) {
-                resultsHost.textContent = res?.error || 'Unable to index project files.';
-                return;
-            }
-        }
-        renderSearchEverywhereResults(input?.value || '');
-    };
-
-    const closeSearchEverywhere = () => {
-        document.getElementById('searchEverywhereOverlay')?.classList.add('hidden');
-        document.getElementById('searchEverywhereDialog')?.classList.add('hidden');
-        searchEverywhereState.open = false;
-    };
-
-    const renderSearchEverywhereResults = (query = '') => {
-        const host = document.getElementById('searchEverywhereResults');
-        if (!host) return;
-        const q = (query || '').toLowerCase();
-        logger.debug('SEARCH_EVERYWHERE_QUERY', { query });
-        const scored = searchEverywhereState.index
-            .map(item => {
-                const name = (item.name || '').toLowerCase();
-                const path = (item.path || '').toLowerCase();
-                const idx = name.indexOf(q);
-                const pathIdx = path.indexOf(q);
-                const hit = q ? Math.min(idx === -1 ? 9999 : idx, pathIdx === -1 ? 9999 : pathIdx) : 0;
-                return { item, score: hit };
-            })
-            .filter(entry => q ? entry.score < 9999 : true)
-            .sort((a, b) => a.score - b.score || a.item.name.localeCompare(b.item.name));
-
-        const results = scored.slice(0, 60).map(s => s.item);
-        host.innerHTML = '';
-        if (!results.length) {
-            searchEverywhereState.selectedIndex = 0;
-            host.textContent = q ? 'No matches.' : 'No files indexed yet.';
-            logger.info('SEARCH_EVERYWHERE_RESULTS', { query, count: 0 });
-            return;
-        }
-        logger.info('SEARCH_EVERYWHERE_RESULTS', { query, count: results.length });
-        searchEverywhereState.selectedIndex = Math.max(0, Math.min(searchEverywhereState.selectedIndex, results.length - 1));
-
-        results.forEach((res, idx) => {
-            const row = document.createElement('div');
-            row.className = 'search-everywhere-item' + (idx === searchEverywhereState.selectedIndex ? ' active' : '');
-            row.dataset.path = res.path;
-            const title = document.createElement('span');
-            title.textContent = res.name;
-            const path = document.createElement('span');
-            path.className = 'search-everywhere-path';
-            path.textContent = res.path;
-            row.appendChild(title);
-            row.appendChild(path);
-            row.onclick = () => openSearchEverywhereResult(res.path);
-            host.appendChild(row);
-        });
-    };
     function describeBinding(binding) {
         if (!binding && binding !== 0) return 'Unbound';
         const parts = [];
@@ -4051,7 +3385,7 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
                         // Check if debugger is already initialized and waiting
                         if (currentDebugSession && currentDebugSession.ready && !currentDebugSession.currentLine) {
                             // Debugger is ready, send Continue to start execution
-                            console.log('[RUN] Debugger already ready, sending Continue command');
+                            logger.debug('[RUN] Debugger already ready, sending Continue command');
                             await debugContinue();
                         } else {
                             // Start new debug session
@@ -4133,7 +3467,7 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
                         // Check if debugger is already initialized and waiting
                         if (currentDebugSession && currentDebugSession.ready && !currentDebugSession.currentLine) {
                             // Debugger is ready, send Continue to start execution
-                            console.log('[RUN] Debugger already ready, sending Continue command');
+                            logger.debug('[RUN] Debugger already ready, sending Continue command');
                             await debugContinue();
                         } else {
                             // Start new debug session
@@ -5155,584 +4489,7 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
     }
 
     // ---------- Terminal & Output ----------
-
-    // Lazy terminal loader; prefers local node_modules/xterm, falls back to CDN if offline assets are missing. TODO: bundle xterm locally once network install is available.
-    const terminalEngineSources = [
-        './node_modules/xterm/lib/xterm.js',
-        'https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js'
-    ];
-    let terminalEnginePromise = null;
-    let terminalFallbackMode = false;
-    let terminalResizeObserver = null;
-
-    const getTerminalCwd = () => terminalConfig.startDir || currentProject?.projectPath || envInfoCache?.cwd || (typeof process !== 'undefined' && process.cwd ? process.cwd() : '');
-    const focusTerminal = () => {
-        const tab = getActiveTerminalTab(globalTerminalState);
-        if (tab?.term) {
-            tab.term.focus();
-        }
-    };
-    const isTerminalFocused = () => {
-        const active = document.activeElement;
-        if (!active) return false;
-        return !!active.closest?.('#terminalViewport') || !!active.closest?.('.xterm');
-    };
-
-    function createTerminalState() {
-        return { tabs: [], active: null, counter: 0, sessionMap: {}, _wiredTerminalEvents: false };
-    }
-
-    function getActiveTerminalTab(state) {
-        if (!state) return null;
-        return state.tabs.find(t => t.id === state.active) || null;
-    }
-
-    function loadScript(src) {
-        return new Promise((resolve, reject) => {
-            const existing = document.querySelector(`script[data-src="${src}"]`);
-            if (existing) {
-                if (existing.dataset.loaded === 'true') {
-                    resolve();
-                    return;
-                }
-                existing.addEventListener('load', () => resolve());
-                existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)));
-                return;
-            }
-            const s = document.createElement('script');
-            s.src = src;
-            s.async = true;
-            s.dataset.src = src;
-            s.onload = () => {
-                s.dataset.loaded = 'true';
-                resolve();
-            };
-            s.onerror = () => reject(new Error(`Failed to load ${src}`));
-            document.head.appendChild(s);
-        });
-    }
-
-    async function ensureTerminalEngine() {
-        if (window.Terminal) {
-            terminalFallbackMode = false;
-            return window.Terminal;
-        }
-        if (terminalEnginePromise) return terminalEnginePromise;
-        terminalEnginePromise = (async () => {
-            let lastErr = null;
-            for (const src of terminalEngineSources) {
-                try {
-                    await loadScript(src);
-                    if (window.Terminal) {
-                        terminalFallbackMode = false;
-                        return window.Terminal;
-                    }
-                } catch (err) {
-                    lastErr = err;
-                }
-            }
-            throw new Error(`Terminal engine unavailable. Install xterm locally or allow CDN. ${lastErr ? lastErr.message : ''}`);
-        })();
-        try {
-            const term = await terminalEnginePromise;
-            terminalFallbackMode = false;
-            return term;
-        } catch (err) {
-            terminalEnginePromise = null;
-            terminalFallbackMode = true;
-            throw err;
-        }
-    }
-
-    function setTerminalError(message) {
-        const errorBox = document.getElementById('terminalError');
-        if (!errorBox) return;
-        if (!message) {
-            errorBox.classList.add('hidden');
-            errorBox.textContent = '';
-            return;
-        }
-        errorBox.classList.remove('hidden');
-        errorBox.textContent = message;
-    }
-
-    function updateTerminalStatusPill() {
-        const pill = document.getElementById('terminalStatusPill');
-        if (!pill) return;
-        const shellLabel = terminalConfig.shellPath ? `Shell: ${terminalConfig.shellPath}` : 'Shell: Default';
-        const cwdLabel = getTerminalCwd() || '';
-        pill.textContent = shellLabel;
-        pill.title = `${shellLabel}\nStart in: ${cwdLabel || 'Project root'}`;
-    }
-
-    function ensureTerminalListeners(state) {
-        if (!window.ahmadIDE.onTerminalData || state._wiredTerminalEvents) return;
-        window.ahmadIDE.onTerminalData((payload) => {
-            if (!payload) return;
-            const tabId = state.sessionMap[payload.id];
-            const tab = state.tabs.find(t => t.id === tabId);
-            if (!tab) return;
-            if (tab.term) {
-                writeAndFollow(tab, payload.data || '');
-            } else {
-                tab.buffer = tab.buffer || [];
-                tab.buffer.push(payload.data || '');
-            }
-        });
-        window.ahmadIDE.onTerminalExit((payload) => {
-            const tabId = state.sessionMap[payload.id];
-            const tab = state.tabs.find(t => t.id === tabId);
-            if (!tab) return;
-            tab.exited = payload.code;
-            tab.sessionId = null;
-            delete state.sessionMap[payload.id];
-            const message = `\r\n[Process exited with code ${payload.code ?? ''}]`;
-            if (tab.term) writeAndFollow(tab, message);
-            if (tab.container) tab.container.classList.add('exited');
-            renderTerminalTabs(state);
-        });
-        state._wiredTerminalEvents = true;
-    }
-
-    function renderTerminalTabs(state) {
-        const host = document.getElementById('terminalTabs');
-        if (!host) return;
-        host.innerHTML = '';
-        state.tabs.forEach(t => {
-            const tab = document.createElement('div');
-            tab.className = 'terminal-tab' + (t.id === state.active ? ' active' : '') + (t.exited !== undefined ? ' exited' : '');
-            tab.textContent = t.name;
-            tab.onclick = () => activateTerminalTab(state, t.id);
-            const close = document.createElement('span');
-            close.className = 'tab-close';
-            close.textContent = '✕';
-            close.title = 'Close tab';
-            close.onclick = (e) => {
-                e.stopPropagation();
-                closeTerminalTab(state, t.id);
-            };
-            tab.appendChild(close);
-            host.appendChild(tab);
-        });
-    }
-
-    function activateTerminalTab(state, tabId) {
-        if (!state) return;
-        state.active = tabId;
-        renderTerminalTabs(state);
-        const tab = state.tabs.find(t => t.id === tabId);
-        const viewport = document.getElementById('terminalViewport');
-        if (viewport) {
-            viewport.querySelectorAll('.terminal-instance').forEach(el => {
-                el.classList.toggle('active', el.dataset.tabId === tabId);
-            });
-        }
-        refreshTerminalLayout(state);
-        autoScrollTerminal(tab);
-        setTimeout(() => {
-            focusTerminal();
-            autoScrollTerminal(tab);
-        }, 30);
-    }
-
-    function createTerminalContainer(tabId) {
-        const viewport = document.getElementById('terminalViewport');
-        if (!viewport) return null;
-        const container = document.createElement('div');
-        container.className = 'terminal-instance';
-        container.dataset.tabId = tabId;
-        viewport.appendChild(container);
-        return container;
-    }
-
-    function buildTerminalOptions() {
-        const styles = getComputedStyle(document.documentElement);
-        const font = (styles.getPropertyValue('--font-code') || '').trim() || 'monospace';
-        const fontSize = parseInt((styles.getPropertyValue('--font-size-code') || '').trim(), 10) || 13;
-        const background = (styles.getPropertyValue('--terminal-input-bg') || styles.getPropertyValue('--editor-bg') || '#1e1e1e').trim();
-        const foreground = (styles.getPropertyValue('--text') || '#ffffff').trim();
-        const selection = (styles.getPropertyValue('--selection-bg') || 'rgba(53,116,240,0.25)').trim();
-        return {
-            allowProposedApi: true,
-            convertEol: true,
-            fontFamily: font,
-            fontSize,
-            lineHeight: 1.2,
-            disableStdin: false,
-            cursorBlink: true,
-            theme: {
-                background,
-                foreground,
-                cursor: foreground,
-                selection
-            }
-        };
-    }
-
-    function measureTerminal(tab) {
-        if (!tab?.term || !tab?.container) return null;
-        const rect = tab.container.getBoundingClientRect();
-        if (rect.width < 10 || rect.height < 10) return null;
-        if (terminalFallbackMode) return null;
-        let cellWidth = null;
-        let cellHeight = null;
-        const coreDims = tab.term._core?._renderService?.dimensions;
-        if (coreDims) {
-            cellWidth = coreDims.actualCellWidth || coreDims.css?.cellWidth || null;
-            cellHeight = coreDims.actualCellHeight || coreDims.css?.cellHeight || null;
-        }
-        if (!cellWidth || !cellHeight) {
-            const rowEl = tab.container.querySelector('.xterm-rows > div');
-            if (rowEl) {
-                const rowRect = rowEl.getBoundingClientRect();
-                if (rowRect.width && rowRect.height) {
-                    cellHeight = rowRect.height;
-                    cellWidth = rowRect.width / (tab.term.cols || 80);
-                }
-            }
-        }
-        if (!cellWidth || !cellHeight) return null;
-        const cols = Math.max(20, Math.floor(rect.width / cellWidth));
-        const rows = Math.max(5, Math.floor(rect.height / cellHeight));
-        return { cols, rows };
-    }
-
-    function refreshTerminalLayout(state, { resizeSession = true } = {}) {
-        if (!state) return;
-        const tab = getActiveTerminalTab(state);
-        if (!tab?.term) return;
-        const dims = measureTerminal(tab);
-        if (!dims) return;
-        if (tab.lastSize && tab.lastSize.cols === dims.cols && tab.lastSize.rows === dims.rows) return;
-        try {
-            tab.term.resize(dims.cols, dims.rows);
-        } catch (e) {
-            console.warn('Terminal resize failed', e);
-        }
-        tab.lastSize = dims;
-        if (resizeSession && tab.sessionId && window.ahmadIDE.terminalResize) {
-            window.ahmadIDE.terminalResize(tab.sessionId, dims.cols, dims.rows);
-        }
-    }
-
-    function ensureTerminalResizeObserver(state) {
-        if (terminalResizeObserver) return;
-        const viewport = document.getElementById('terminalViewport');
-        if (!viewport) return;
-        terminalResizeObserver = new ResizeObserver(() => refreshTerminalLayout(state));
-        terminalResizeObserver.observe(viewport);
-    }
-
-    function autoScrollTerminal(tab) {
-        if (!tab) return;
-        if (tab._scrollTimer) clearTimeout(tab._scrollTimer);
-        tab._scrollTimer = setTimeout(() => {
-            // xterm terminals - wait a tick so the write buffer flushes before scrolling
-            if (tab.term && typeof tab.term.scrollToBottom === 'function') {
-                tab.term.scrollToBottom();
-                const viewportEl = tab.container?.querySelector?.('.xterm-viewport');
-                if (viewportEl) viewportEl.scrollTop = viewportEl.scrollHeight;
-            } else if (tab._plain && tab.container) {
-                // plain renderer
-                const out = tab.container.querySelector('.plain-terminal-output');
-                if (out) out.scrollTop = out.scrollHeight;
-            }
-            if (tab.container) {
-                tab.container.scrollTop = tab.container.scrollHeight;
-            }
-            tab._scrollTimer = null;
-        }, 0);
-    }
-
-    function writeAndFollow(tab, text, { newline = false } = {}) {
-        if (!tab?.term) return;
-        const writer = newline ? tab.term.writeln : tab.term.write;
-        const doScroll = () => {
-            if (typeof requestAnimationFrame === 'function') {
-                requestAnimationFrame(() => autoScrollTerminal(tab));
-            } else {
-                autoScrollTerminal(tab);
-            }
-        };
-        if (typeof writer === 'function') {
-            try {
-                writer.call(tab.term, text ?? '', doScroll);
-            } catch (e) {
-                writer.call(tab.term, text ?? '');
-                doScroll();
-            }
-        } else {
-            doScroll();
-        }
-    }
-
-    function flushBufferedOutput(tab) {
-        if (!tab?.term || !tab?.buffer || !tab.buffer.length) return;
-        const chunks = Array.isArray(tab.buffer) ? tab.buffer : [tab.buffer];
-        chunks.forEach(chunk => writeAndFollow(tab, chunk));
-        tab.buffer = Array.isArray(tab.buffer) ? [] : '';
-    }
-
-    async function startTerminalSession(tab, state) {
-        updateTerminalStatusPill();
-        const dims = measureTerminal(tab);
-        const sessionOptions = {
-            shell: terminalConfig.shellPath || undefined,
-            cwd: getTerminalCwd(),
-            cols: dims?.cols,
-            rows: dims?.rows
-        };
-        if (!window.ahmadIDE.terminalCreate) {
-            writeAndFollow(tab, 'Terminal backend unavailable.', { newline: true });
-            return;
-        }
-        const res = await window.ahmadIDE.terminalCreate(sessionOptions);
-        if (res && res.ok) {
-            tab.sessionId = res.id;
-            state.sessionMap[res.id] = tab.id;
-            if (dims && !tab._plain) {
-                await window.ahmadIDE.terminalResize(tab.sessionId, dims.cols, dims.rows);
-            }
-            flushBufferedOutput(tab);
-            setTerminalError(null);
-            if (tab._plain) {
-                writeAndFollow(tab, 'Running with basic renderer. Install xterm for full TUI/ANSI support.', { newline: true });
-            }
-        } else {
-            const msg = res?.error || 'Unknown error starting terminal';
-            writeAndFollow(tab, `\x1b[31m✗ Failed to start terminal: ${msg}\x1b[0m`, { newline: true });
-            setTerminalError(msg);
-        }
-    }
-
-    function createPlainTerminalTab(id, name, container, state) {
-        container.classList.add('plain-terminal');
-        const output = document.createElement('pre');
-        output.className = 'plain-terminal-output';
-        output.textContent = 'Starting...';
-        const hiddenInput = document.createElement('textarea');
-        hiddenInput.className = 'plain-terminal-input-hidden';
-        hiddenInput.setAttribute('aria-label', 'Terminal input');
-        container.appendChild(output);
-        container.appendChild(hiddenInput);
-
-        const tab = {
-            id,
-            name,
-            buffer: '',
-            sessionId: null,
-            term: null,
-            container,
-            lastSize: null,
-            _plain: true
-        };
-
-        const render = () => {
-            output.textContent = tab.buffer || '';
-            output.scrollTop = output.scrollHeight;
-        };
-
-        const send = async (data) => {
-            if (tab.sessionId && window.ahmadIDE.terminalWrite) {
-                await window.ahmadIDE.terminalWrite(tab.sessionId, data);
-            }
-        };
-
-        tab.term = {
-            write: (data) => {
-                tab.buffer += data || '';
-                render();
-            },
-            writeln: (data) => {
-                tab.buffer += `${data ?? ''}\n`;
-                render();
-            },
-            reset: () => {
-                tab.buffer = '';
-                render();
-            },
-            resize: () => { },
-            dispose: () => { },
-            focus: () => hiddenInput.focus()
-        };
-
-        const handleKey = async (e) => {
-            if (e.key === 'Escape' && terminalConfig.escapeToEditor && !terminalConfig.overrideIdeShortcuts) {
-                e.preventDefault();
-                activeEditor?.focus();
-                return;
-            }
-            if (e.ctrlKey && e.key.toLowerCase() === 'c') {
-                e.preventDefault();
-                await sendCtrlC(state);
-                return;
-            }
-            if (!tab.sessionId) return;
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                await send('\r');
-                return;
-            }
-            if (e.key === 'Backspace') {
-                e.preventDefault();
-                await send('\x7f');
-                return;
-            }
-            if (e.key === 'Tab') {
-                e.preventDefault();
-                await send('\t');
-                return;
-            }
-            if (e.key.length === 1 && !e.metaKey) {
-                e.preventDefault();
-                await send(e.key);
-            }
-        };
-
-        hiddenInput.addEventListener('keydown', handleKey);
-        container.addEventListener('mousedown', () => hiddenInput.focus());
-        hiddenInput.tabIndex = 0;
-
-        render();
-        return tab;
-    }
-
-    async function addTerminalTab(state, isDefault = false) {
-        try {
-            logger.info('TERMINAL_NEW_TAB', { isDefault, existingTabs: state?.tabs?.length });
-            let terminalCtor = null;
-            try {
-                terminalCtor = await ensureTerminalEngine();
-            } catch (err) {
-                console.warn('Falling back to basic terminal renderer', err);
-                setTerminalError(err?.message || 'Terminal engine unavailable; using fallback renderer');
-            }
-            ensureTerminalListeners(state);
-            ensureTerminalResizeObserver(state);
-            state.counter += 1;
-            const id = `term${state.counter}`;
-            const tabName = isDefault ? 'Local' : `Local ${state.counter}`;
-            const container = createTerminalContainer(id);
-            if (!container) {
-                showToast('error', 'Terminal', 'Missing terminal container');
-                return;
-            }
-            const tab = terminalCtor && !terminalFallbackMode
-                ? {
-                    id,
-                    name: tabName,
-                    buffer: [],
-                    sessionId: null,
-                    term: new terminalCtor(buildTerminalOptions()),
-                    container,
-                    lastSize: null
-                }
-                : createPlainTerminalTab(id, tabName, container, state);
-            state.tabs.push(tab);
-            state.active = id;
-
-            if (tab.term && !tab._plain) {
-                tab.term.onData(async (data) => {
-                    if (tab.sessionId && window.ahmadIDE.terminalWrite) {
-                        await window.ahmadIDE.terminalWrite(tab.sessionId, data);
-                    }
-                });
-                tab.term.onResize(({ cols, rows }) => {
-                    tab.lastSize = { cols, rows };
-                    if (tab.sessionId && window.ahmadIDE.terminalResize) {
-                        window.ahmadIDE.terminalResize(tab.sessionId, cols, rows);
-                    }
-                });
-                tab.term.attachCustomKeyEventHandler((ev) => {
-                    if (
-                        terminalConfig.escapeToEditor &&
-                        !terminalConfig.overrideIdeShortcuts &&
-                        ev.key === 'Escape' &&
-                        !ev.altKey && !ev.ctrlKey && !ev.metaKey && !ev.shiftKey
-                    ) {
-                        activeEditor?.focus();
-                        return false;
-                    }
-                    return true;
-                });
-                tab.term.open(container);
-            }
-            renderTerminalTabs(state);
-            activateTerminalTab(state, id);
-            refreshTerminalLayout(state, { resizeSession: false });
-            setTimeout(() => refreshTerminalLayout(state), 50);
-            flushBufferedOutput(tab);
-            await startTerminalSession(tab, state);
-            logger.info('TERMINAL_TAB_READY', { id, sessionId: tab.sessionId });
-        } catch (err) {
-            console.error('Failed to create terminal tab', err);
-            setTerminalError(err?.message || 'Terminal engine unavailable');
-            showToast('error', 'Terminal', err?.message || 'Unable to start terminal');
-            logger.error('TERMINAL_START_ERROR', { message: err?.message, stack: err?.stack });
-        }
-    }
-
-    async function closeTerminalTab(state, id) {
-        if (!state) return;
-        const idx = state.tabs.findIndex(t => t.id === id);
-        if (idx === -1) return;
-        const tab = state.tabs[idx];
-        logger.info('TERMINAL_CLOSE_TAB', { id, sessionId: tab?.sessionId });
-        if (tab.sessionId && window.ahmadIDE.terminalClose) {
-            await window.ahmadIDE.terminalClose(tab.sessionId);
-            delete state.sessionMap[tab.sessionId];
-        }
-        if (tab.term) {
-            tab.term.dispose();
-        }
-        tab.container?.remove();
-        state.tabs.splice(idx, 1);
-        if (state.active === id) {
-            state.active = state.tabs.length ? state.tabs[state.tabs.length - 1].id : null;
-        }
-        renderTerminalTabs(state);
-        refreshTerminalLayout(state);
-    }
-
-    function appendOutput(text, state) {
-        if (!state || !state.tabs.length) return;
-        const tab = getActiveTerminalTab(state);
-        if (!tab) return;
-        const lines = Array.isArray(text) ? text : [text];
-        if (tab.term) {
-            lines.forEach(line => writeAndFollow(tab, line || '', { newline: true }));
-        } else {
-            tab.buffer = tab.buffer || [];
-            lines.forEach(line => tab.buffer.push((line || '') + '\n'));
-        }
-        flushBufferedOutput(tab);
-    }
-
-    function clearOutput(state) {
-        if (!state) return;
-        const tab = getActiveTerminalTab(state);
-        if (!tab?.term) return;
-        tab.term.reset();
-        tab.buffer = [];
-        tab.lastSize = null;
-        refreshTerminalLayout(state);
-    }
-
-    async function sendCtrlC(state) {
-        const tab = getActiveTerminalTab(state);
-        if (!tab || !tab.sessionId || !window.ahmadIDE.terminalWrite) return;
-        await window.ahmadIDE.terminalWrite(tab.sessionId, '\u0003');
-        writeAndFollow(tab, '^C\r\n');
-    }
-
-    async function execTerminalCommand(cmd, state) {
-        const tab = getActiveTerminalTab(state);
-        if (!tab) return;
-        const payload = `${cmd}\n`;
-        if (tab.sessionId && window.ahmadIDE.terminalWrite) {
-            await window.ahmadIDE.terminalWrite(tab.sessionId, payload);
-        }
-    }
+    // Moved to src/editor/terminal/renderer-terminal.js
 
     // ---------- Breakpoints & Debug UI ----------
 
@@ -6206,7 +4963,7 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
         // Reset UI before starting to ensure clean state, but keep debug mode toggle untouched
         resetDebugUI(false);
 
-        console.log('Starting debug session...', { breakpoints });
+        logger.debug('Starting debug session...', { breakpoints });
 
         showToast('info', 'Debug', 'Initializing debug session...');
 
@@ -6248,7 +5005,7 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
             return;
         }
 
-        console.log('debugStart response OK', res);
+        logger.debug('debugStart response OK', res);
         dbgLog('[DEBUG] Full response object:', JSON.stringify(res, null, 2));
 
         currentDebugSession = {
@@ -6270,7 +5027,7 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
             dbgStateParam.currentRoutine = currentDebugSession.currentRoutine;
         }
 
-        console.log('Debug Session Started:', currentDebugSession);
+        logger.debug('Debug Session Started:', currentDebugSession);
 
         // Show initial variables and stack
         renderLocals(currentDebugSession.locals);
@@ -6495,7 +5252,7 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
                 dbgLog('[DEBUG] Execution started (transitioned from ready to running)');
             }
 
-            console.log('Debug State Updated:', currentDebugSession);
+            logger.debug('Debug State Updated:', currentDebugSession);
             dbgLog('[DEBUG] Current variables:', currentDebugSession.locals);
         }
     }
@@ -7181,6 +5938,10 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
 
     function validateMumps(model) {
         if (!model) return;
+        const versionId = (typeof model.getVersionId === 'function') ? model.getVersionId() : null;
+        if (versionId !== null && versionId === lastValidatedVersionId) {
+            return;
+        }
         const text = model.getValue();
         const isHuge = text.length > maxLintTextLength;
         if (isHuge) {
@@ -7195,12 +5956,14 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
                 showToast('info', 'Linting paused', 'Large file detected; skipping lint to keep typing responsive.');
                 lintSkipNotified = true;
             }
+            lastValidatedVersionId = versionId;
             return [];
         }
         // Reset the skip notification only after we are back under the threshold
         if (lintSkipNotified && !isHuge) {
             lintSkipNotified = false;
         }
+        lastValidatedVersionId = versionId;
         const linter = window._mumpsLinter || mumpsLinter;
         const combinedMarkers = [];
         const problems = [];
@@ -7231,7 +5994,8 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
             let parenBalance = 0;
             lines.forEach((line, idx) => {
                 const lineNo = idx + 1;
-                const quoteCount = (line.match(/\"/g) || []).length;
+                RE_DQUOTE.lastIndex = 0;
+                const quoteCount = (line.match(RE_DQUOTE) || []).length;
                 openQuotes = (openQuotes + quoteCount) % 2;
                 if (openQuotes === 1) {
                     problems.push({
@@ -7249,10 +6013,12 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
                         endColumn: line.length + 1
                     });
                 }
-                const opens = (line.match(/\(/g) || []).length;
-                const closes = (line.match(/\)/g) || []).length;
+                RE_PAREN_OPEN.lastIndex = 0;
+                RE_PAREN_CLOSE.lastIndex = 0;
+                const opens = (line.match(RE_PAREN_OPEN) || []).length;
+                const closes = (line.match(RE_PAREN_CLOSE) || []).length;
                 parenBalance += opens - closes;
-                if (/^[^A-Za-z%;\s]/.test(line)) {
+                if (RE_LINE_START.test(line)) {
                     problems.push({
                         severity: 'warning',
                         message: 'Line should start with a label, command, or comment',
@@ -7268,7 +6034,7 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
                         endColumn: line.length + 1
                     });
                 }
-                if (/[{}\[\]\\]/.test(line)) {
+                if (RE_SUSPICIOUS.test(line)) {
                     problems.push({
                         severity: 'info',
                         message: 'Suspicious character for MUMPS',
@@ -7641,7 +6407,7 @@ function markTabDirty(tabId, isDirty = true, opts = {}) {
             provideHover: function (model, position) {
                 // Only show hover during active debug session
                 if (!currentDebugSession || !currentDebugSession.locals) {
-                    console.log('[HOVER] No debug session or locals');
+                    logger.debug('[HOVER] No debug session or locals');
                     return null;
                 }
                 // Don't show hover in "ready" state (before execution starts)

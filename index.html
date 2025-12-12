@@ -775,9 +775,12 @@
     <script src="./assets/mumps/mumps-validator.js"></script>
     <script src="./assets/mumps/mumps-linter.js"></script>
     <script src="./assets/mumps/mumps-lexer.js"></script>
-    <script src="./assets/mumps/mumps-ast.js"></script>
+    <!-- AST/parser intentionally not loaded at startup; parser path is disabled in validateMumps -->
     <script src="./utils/debug-log.js"></script>
     <script src="./utils/logger.js"></script>
+    <script src="./src/editor/tabs/renderer-tabs.js"></script>
+    <script src="./src/editor/terminal/renderer-terminal.js"></script>
+    <script src="./src/editor/search/renderer-search.js"></script>
     <script src="./renderer.js"></script>
 </body>
 

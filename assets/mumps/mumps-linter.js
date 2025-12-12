@@ -11,6 +11,9 @@
  *     - Trailing comma (end-of-line) is error.
  *     - Empty argument between commas is error.
  */
+const RE_LABEL_AT_COL1 = /^([A-Z%][A-Z0-9]*)\s*(\(|;|$)/i;
+const RE_LABEL_TRIM = RE_LABEL_AT_COL1;
+const RE_DO_GOTO = /\b(?:DO|D|GOTO|G)\s+([A-Z%][A-Z0-9]*)/gi;
 
 class MUMPSLinter {
     constructor() {
@@ -101,9 +104,6 @@ class MUMPSLinter {
         const variables = new Set();
         let firstLabelName = null;
 
-        const labelAtCol1Regex = /^([A-Z%][A-Z0-9]*)\s*(\(|;|$)/i;
-        const labelTrimRegex = /^([A-Z%][A-Z0-9]*)\s*(\(|;|$)/i;
-
         // First pass: labels & calls
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
@@ -111,7 +111,7 @@ class MUMPSLinter {
 
             if (!trimmed || trimmed.startsWith(';')) continue;
 
-            const labelMatchLine = line.match(labelAtCol1Regex);
+            const labelMatchLine = line.match(RE_LABEL_AT_COL1);
             if (labelMatchLine) {
                 const name = labelMatchLine[1].toUpperCase();
                 definedLabels.add(name);
@@ -120,9 +120,9 @@ class MUMPSLinter {
                 }
             }
 
-            const doGotoRegex = /\b(?:DO|D|GOTO|G)\s+([A-Z%][A-Z0-9]*)/gi;
+            RE_DO_GOTO.lastIndex = 0;
             let refMatch;
-            while ((refMatch = doGotoRegex.exec(trimmed)) !== null) {
+            while ((refMatch = RE_DO_GOTO.exec(trimmed)) !== null) {
                 const label = refMatch[1];
                 if (label) calledLabels.add(label.toUpperCase());
             }
@@ -143,7 +143,7 @@ class MUMPSLinter {
             const firstToken = firstTokenMatch ? firstTokenMatch[1] : null;
             const isCommandKeyword = firstToken ? this.isCommandToken(firstToken) : false;
 
-            const isLabelAtColumn1 = labelAtCol1Regex.test(line);
+            const isLabelAtColumn1 = RE_LABEL_AT_COL1.test(line);
 
             if (isLabelAtColumn1) {
                 // Proper label line
@@ -183,7 +183,7 @@ class MUMPSLinter {
                     cfg.enforceLabelIndentation &&
                     leadingSpaces > 0 &&
                     !isCommandKeyword &&
-                    labelTrimRegex.test(trimmed)
+                    RE_LABEL_TRIM.test(trimmed)
                 ) {
                     const meta = this.getRuleMeta(
                         'M021-LABEL-AT-COLUMN1',

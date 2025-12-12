@@ -181,10 +181,8 @@ async function startMdebugServer(targetHost, targetPort) {
   try {
     if (fs.existsSync(ahmdbgPath)) {
       mdebugSource = fs.readFileSync(ahmdbgPath, 'utf8');
-      console.log('[MDEBUG] Using AHMDBG.m from project');
     }
   } catch (e) {
-    console.error('[MDEBUG] Error reading AHMDBG.m:', e.message);
   }
 
   if (!mdebugSource) {
@@ -217,7 +215,6 @@ async function startMdebugServer(targetHost, targetPort) {
   }
 
   // Kill any existing AHMDBG processes (CRITICAL: AHMDBG only handles ONE connection)
-  console.log('[MDEBUG] Killing any existing AHMDBG processes...');
   if (useDocker) {
     await new Promise((resolve) => {
       exec(wrapDockerCmd(`docker exec ${cfg.containerId} pkill -9 -f 'AHMDBG' || true`), { timeout: 3000 }, () => resolve(null));
@@ -229,26 +226,20 @@ async function startMdebugServer(targetHost, targetPort) {
   }
 
   // Wait for killed processes and zombie connections to clean up
-  console.log('[MDEBUG] Waiting for cleanup...');
   await new Promise(r => setTimeout(r, 1000));
 
   // Start AHMDBG server in background using -d flag for docker exec
   // CRITICAL: Use MAIN^AHMDBG not ^AHMDBG (AHMDBG.m has QUIT on line 6)
   // CRITICAL: Do NOT redirect stdout/stderr - it breaks TCP socket handling in YottaDB
-  console.log('[MDEBUG] Starting AHMDBG server on port', targetPort);
   const startCmd = useDocker
     ? wrapDockerCmd(`docker exec -d ${cfg.containerId} bash -c "cd ${destDir} && ${envExports} && ${cfg.ydbPath}/mumps -run MAIN^AHMDBG"`)
     : `${cfg.password ? `sshpass -p '${cfg.password}' ` : ''}ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "${envExports} && cd ${destDir} && nohup ${cfg.ydbPath}/mumps -run MAIN^AHMDBG >/dev/null 2>&1 &"`;
 
-  console.log('[MDEBUG] Start command:', startCmd);
   const startRes = await new Promise((resolve) => {
     exec(startCmd, { timeout: 5000 }, (err, stdout, stderr) => {
       if (err) {
-        console.error('[MDEBUG] Start command failed:', err.message);
-        console.error('[MDEBUG] stderr:', stderr);
         resolve({ ok: false, error: err.message, stderr });
       } else {
-        console.log('[MDEBUG] Start command output:', stdout);
         resolve({ ok: true, stdout, stderr });
       }
     });
@@ -259,16 +250,13 @@ async function startMdebugServer(targetHost, targetPort) {
   }
 
   // Wait for server to bind to port (with retries)
-  console.log('[MDEBUG] Waiting for AHMDBG to bind to port', targetPort);
   let portOpen = false;
   for (let i = 0; i < 10; i++) {
     await new Promise(r => setTimeout(r, 300));
     portOpen = await isPortOpen(targetHost, targetPort, 500);
     if (portOpen) {
-      console.log(`[MDEBUG] Port ${targetPort} is open after ${(i + 1) * 300}ms`);
       break;
     }
-    console.log(`[MDEBUG] Attempt ${i + 1}/10: Port ${targetPort} not ready yet...`);
   }
 
   if (!portOpen) {
@@ -290,9 +278,6 @@ async function startMdebugServer(targetHost, targetPort) {
       // ignore
     }
 
-    console.error('[MDEBUG] AHMDBG server failed to bind on', targetHost + ':' + targetPort);
-    console.error('[MDEBUG] Process status:', processInfo || '(not running)');
-    console.error('[MDEBUG] Network status:', netInfo || '(no connections on port 9200)');
 
     return {
       ok: false,
@@ -302,25 +287,20 @@ async function startMdebugServer(targetHost, targetPort) {
     };
   }
 
-  console.log('[MDEBUG] ✓ AHMDBG server started successfully on port', targetPort);
   return { ok: true };
 }
 
 async function ensureMdebugServer(host, port, { forceRestart = false } = {}) {
-  console.log(`[MDEBUG] Ensuring AHMDBG server at ${host}:${port}`);
   if (!forceRestart) {
     const open = await isPortOpen(host, port, 500);
     if (open) {
-      console.log('[MDEBUG] Server already listening — reuse (no restart).');
       return { ok: true, host, port };
     }
   }
-  console.log('[MDEBUG] Restarting AHMDBG server...');
   return startMdebugServer(host, port);
 }
 
 async function forceRestartMdebug(host, port) {
-  console.log('[MDEBUG] Force-restarting AHMDBG server…');
   return ensureMdebugServer(host, port, { forceRestart: true });
 }
 
@@ -402,13 +382,11 @@ class MDebugClient extends EventEmitter {
 
   async connect(retries = 3) {
     if (this.socket) {
-      console.log('[MDEBUG] Already connected');
       return;
     }
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        console.log(`[MDEBUG] Connection attempt ${attempt}/${retries} to ${this.host}:${this.port}...`);
 
         await new Promise((resolve, reject) => {
           const connectTimeout = setTimeout(() => {
@@ -423,21 +401,18 @@ class MDebugClient extends EventEmitter {
             sock.setNoDelay(true);
             sock.setKeepAlive(true, 1000);
             try { sock.setNoDelay(true); } catch { }
-            console.log(`[MDEBUG] ✓ Connected successfully to ${this.host}:${this.port}`);
             resolve();
           });
 
 
           sock.on('error', (err) => {
             clearTimeout(connectTimeout);
-            console.error(`[MDEBUG] Connection error (attempt ${attempt}/${retries}): ${err.message}`);
             reject(err);
           });
 
           sock.on('data', (chunk) => this._onData(chunk.toString()));
 
           sock.on('end', () => {
-            console.log('[MDEBUG] Connection ended');
             this.state = mdebugStates.disconnected;
           });
 
@@ -455,7 +430,6 @@ class MDebugClient extends EventEmitter {
         }
 
         if (attempt < retries) {
-          console.log(`[MDEBUG] Retrying in 1 second...`);
           await new Promise(r => setTimeout(r, 1000)); // Wait 1s before retry
         } else {
           // Final attempt failed
@@ -466,7 +440,6 @@ class MDebugClient extends EventEmitter {
   }
 
   _onData(data) {
-    console.log('[MDEBUG] Received data:', data.length, 'bytes');
     this.buffer += data;
     this.buffer = this.buffer.replace(/\r\n/g, '\n');
     let pos;
@@ -474,7 +447,6 @@ class MDebugClient extends EventEmitter {
       const line = this.buffer.slice(0, pos).trimEnd();
       this.buffer = this.buffer.slice(pos + 1);
       if (!line) continue;
-      console.log('[MDEBUG<=]', line);
       this._processLine(line);
     }
 
@@ -488,13 +460,11 @@ class MDebugClient extends EventEmitter {
     return { reason: m[1].toUpperCase(), routine: m[2].toUpperCase(), line: parseInt(m[3], 10) || 1 };
   }
   _processLine(line) {
-    console.log('[MDEBUG] Current state:', this.state);
 
     // NEW: if server emits a plain STOP/AT/PAUSE/HALT line, resolve immediately.
     if (this._isStopLike(line)) {
       const info = this._parseStopLike(line);
       if (info) {
-        console.log('[MDEBUG] Stop-like event:', info);
         this._resolveStop({ ok: true, reason: info.reason, file: defaultRoutinePath(info.routine), line: info.line });
         return;
       }
@@ -504,16 +474,13 @@ class MDebugClient extends EventEmitter {
 
       case mdebugStates.waitingForStart: {
         if (line === '***STARTVAR') {
-          console.log('[MDEBUG] State change: waitingForStart -> waitingForVars');
           this.state = mdebugStates.waitingForVars;
           this.vars = { system: {}, local: {} };
           this.stack = [];
         } else if (line === '***STARTBP') {
-          console.log('[MDEBUG] State change: waitingForStart -> waitingForBreakpoints');
           this.state = mdebugStates.waitingForBreakpoints;
           this.activeBreakpoints = [];
         } else if (line === '***ENDPROGRAM') {
-          console.log('[MDEBUG] Program ended');
           this._resolveStop({ reason: 'end' });
         }
         if (line === '***READY' || line === '***START') {
@@ -524,9 +491,7 @@ class MDebugClient extends EventEmitter {
       }
       case mdebugStates.waitingForVars: {
         if (line === '***ENDVAR') {
-          console.log('[MDEBUG] State change: waitingForVars -> waitingForStart');
           this.state = mdebugStates.waitingForStart;
-          console.log('[MDEBUG] Calling _checkEvents...');
           this._checkEvents();
         } else {
           const vartype = line.substring(0, 1);
@@ -561,7 +526,6 @@ class MDebugClient extends EventEmitter {
 
   _write(msg) {
     if (!this.socket) throw new Error('Socket not connected');
-    console.log('[MDEBUG] Sending command:', msg);
     // AHMDBG is picky about CRLF; always send \r\n
     const out = msg.endsWith('\r\n')
       ? msg
@@ -578,40 +542,31 @@ class MDebugClient extends EventEmitter {
       // Extract routine name from file path: /var/.../AAAA.m -> AAAA
       const baseName = routine.split('/').pop().replace(/\.m$/i, '');
       routine = baseName.toUpperCase();
-      console.log(`[MDEBUG] Converted file path ${routineOrFile} to routine name: ${routine}`);
     }
 
-    console.log(`[MDEBUG] start() called with routine=${routine}, breakpoints=${breakpoints.length}, stopOnEntry=${stopOnEntry}`);
     await this.connect();
 
-    console.log('[MDEBUG] Clearing breakpoints...');
     this.clearBreakpoints(routine);
 
-    console.log('[MDEBUG] Setting breakpoints...');
     this.setBreakpoints(routine, breakpoints);
 
     // MISMATCH #3 fix: Handle stopOnEntry for both labels and regular routines
     if (stopOnEntry) {
       if (routine.indexOf("^") !== -1) {
         // File contains a label reference (TAG^ROUTINE) - stop at label line (line 0)
-        console.log(`[MDEBUG] stopOnEntry with label: ${routine}, setting BP at line 0`);
         this._write(`SETBP;${routine};0;`);
       } else {
         // Regular routine - stop at line 1 (first executable line)
-        console.log(`[MDEBUG] stopOnEntry without label: ${routine}, setting BP at line 1`);
         this._write(`SETBP;${routine};1`);
       }
     }
 
-    console.log('[MDEBUG] Requesting breakpoints...');
     this.requestBreakpoints();
 
-    console.log('[MDEBUG] Sending START command...');
     this._write(`START;${routine};`);
     this._write('VARS');
 
 
-    console.log('[MDEBUG] Waiting for stop event...');
 
     // Add timeout to prevent infinite hang
     // Wait for first stop with a real timeout
@@ -626,7 +581,6 @@ class MDebugClient extends EventEmitter {
     } catch (e) {
       // If we didn't ask to stop on entry, try forcing a break-in once
       if (!stopOnEntry) {
-        console.log('[MDEBUG] START timed out — sending PAUSE and waiting briefly...');
         this._write(`PAUSE;${routine}`);
         stopInfo = await Promise.race([
           this._waitForStop(),
@@ -706,9 +660,6 @@ class MDebugClient extends EventEmitter {
 
   // Verify breakpoints after receiving server response (MISMATCH #2 fix)
   _verifyBreakpoints() {
-    console.log('[MDEBUG] Verifying breakpoints...');
-    console.log('[MDEBUG] Requested:', this.requestedBreakpoints.length);
-    console.log('[MDEBUG] Active from server:', this.activeBreakpoints.length);
 
     // Reset verification status
     this.requestedBreakpoints.forEach(bp => bp.verified = false);
@@ -723,7 +674,6 @@ class MDebugClient extends EventEmitter {
         // So activeBp.line (0-based) + 1 should equal requestedBp.line (1-based)
         if (activeBpFile === requestedBp.file && activeBp.line + 1 === requestedBp.line) {
           requestedBp.verified = true;
-          console.log(`[MDEBUG] ✓ Breakpoint verified: ${requestedBp.file}:${requestedBp.line}`);
           break;
         }
       }
@@ -812,16 +762,12 @@ class MDebugClient extends EventEmitter {
   }
 
   _checkEvents() {
-    console.log('[MDEBUG] _checkEvents() called');
     const internals = this.vars.system || {};
     const zpos = internals['$ZPOSITION'] || '';
     const zstatus = internals['$ZSTATUS'] || '';
-    console.log('[MDEBUG] $ZPOSITION:', zpos);
-    console.log('[MDEBUG] $ZSTATUS:', zstatus);
     const posInfo = convertMdebugPosition(zpos);
     const filePath = defaultRoutinePath(posInfo.routine);
     const currentLine1 = (posInfo.line ?? posInfo.offset ?? 0) + 1;
-    console.log('[MDEBUG] Parsed position: routine=' + posInfo.routine + ', line=' + currentLine1);
 
     // MISMATCH #7 fix: Handle errors with loop detection
     if (zstatus && zstatus !== '') {
@@ -831,7 +777,6 @@ class MDebugClient extends EventEmitter {
 
       if (zstatus === this.lastError && etrap === zstep) {
         // Repeated error with same trap = end session
-        console.log('[MDEBUG] Repeated error detected, ending session');
         this._resolveStop({ ok: true, reason: 'end', file: filePath, line: currentLine1 });
         return;
       }
@@ -844,7 +789,6 @@ class MDebugClient extends EventEmitter {
         if (statusParts.length > 1) {
           const errorPosInfo = convertMdebugPosition(statusParts[1]);
           if (errorPosInfo.routine) {
-            console.log(`[MDEBUG] Exception at ${statusParts[1]}: ${zstatus}`);
             this._resolveStop({
               ok: true,
               reason: 'exception',
@@ -856,7 +800,6 @@ class MDebugClient extends EventEmitter {
           }
         }
         // Fallback to current position
-        console.log(`[MDEBUG] Exception: ${zstatus}`);
         this._resolveStop({ ok: true, reason: 'exception', file: filePath, line: currentLine1, error: zstatus });
         return;
       }
@@ -871,10 +814,8 @@ class MDebugClient extends EventEmitter {
     );
 
     if (matchingBp) {
-      console.log(`[MDEBUG] Stopped at breakpoint: ${filePath}:${currentLine1}`);
       this._resolveStop({ ok: true, reason: 'breakpoint', file: filePath, line: currentLine1 });
     } else {
-      console.log(`[MDEBUG] Stopped after step: ${filePath}:${currentLine1}`);
       this._resolveStop({ ok: true, reason: 'step', file: filePath, line: currentLine1 });
     }
   }
@@ -1911,7 +1852,6 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
     dbgLog('[DEBUG] ZSTEP process exited with code:', code, 'signal:', signal);
     if (session.output && session.output.length > 0) {
       dbgLog('[DEBUG] Full ZSTEP error output:');
-      console.log(session.output.join(''));
     }
     session.procExited = true;
     resolvePending(session, { event: 'exit' });
