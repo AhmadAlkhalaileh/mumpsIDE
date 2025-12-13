@@ -2683,6 +2683,8 @@ function cleanOutput(raw = '') {
       !line.includes('mupip:') &&
       !line.includes('.bashrc') &&
       !line.toLowerCase().includes('permission denied') &&
+      !line.includes('%YDB-E-NOTEXTRINSIC') &&
+      !line.includes('At M source location') &&
       line.trim().length > 0
     )
     .map(line => line.trimEnd())
@@ -2857,42 +2859,20 @@ async function executeYDB(command) {
   }
 
   // ============================================================================
-  // CRITICAL FIX: Replace all "QUIT <value>" with plain "QUIT"
+  // SAFETY: Do not strip QUIT values. If user writes QUIT 1, let it run.
+  // Although DO calls normally error on return value (%YDB-E-NOTEXTRINSIC), 
+  // we will suppress that specific error in the output if it occurs at the end.
   // ============================================================================
-  // When running via DO (not $$), QUIT with return values causes:
-  //   %YDB-E-NOTEXTRINSIC, QUIT/ZHALT does not return to an extrinsic function
-  // We must strip return values from ALL QUIT statements, not just the last one.
-  // Pattern: Q(UIT)? followed by whitespace and a non-comment value
-  // Preserve: Q(UIT)? at end of line, Q(UIT)? followed by semicolon (comment)
-  routineSource = routineSource.split('\n').map(line => {
-    // Don't modify comment lines
-    const trimmed = line.trim();
-    if (trimmed.startsWith(';')) return line;
 
-    // Match QUIT or Q followed by space and a value (but not followed by comment)
-    // Replace with just QUIT (or Q)
-    return line.replace(
-      /\b(Q(?:UIT)?)\s+(?!;)(\S)/gi,
-      (match, quitCmd, firstChar) => {
-        // If it's a postconditional like Q:condition, don't modify
-        if (firstChar === ':') return match;
-        // Otherwise strip the value, keep just QUIT
-        return quitCmd;
-      }
-    );
-  }).join('\n');
-
-  // Add a safe QUIT to guarantee clean exit
+  // Add a safe QUIT to guarantee clean exit if not present
   const contentLines = routineSource.split('\n').filter(line => line.trim() && !/^\s*;/.test(line.trim()));
   const lastContent = (contentLines[contentLines.length - 1] || '').trim();
 
-  // Check if last line is a QUIT with arguments (e.g., QUIT 1)
-  // Such QUITs are for extrinsic functions, but we're calling with DO, not $$
-  const quitWithArgs = /^Q(UIT)?\s+\S/i.test(lastContent);
+  // If the last line is not a QUIT, append one to be safe
+  // (We don't strictly need to check for arguments anymore if we are tolerant)
   const hasQuit = /^Q(UIT)?(\s|;|$)/i.test(lastContent);
 
-  if (!hasQuit || quitWithArgs) {
-    // Either no QUIT, or QUIT has arguments - add a plain QUIT
+  if (!hasQuit) {
     if (!routineSource.endsWith('\n')) routineSource += '\n';
     routineSource += '\tQUIT\n';
   }
@@ -2902,7 +2882,9 @@ async function executeYDB(command) {
 
   const codeB64 = Buffer.from(routineSource, 'utf8').toString('base64');
   const cmdFile = '/tmp/ahmad_cmd.txt';
-  const runCmdB64 = Buffer.from(`${entryCall}\n`, 'utf8').toString('base64');
+
+  // Use NOECHO to prevent command echoing in output
+  const runCmdB64 = Buffer.from(`USE $P:(NOECHO) ${entryCall}\n`, 'utf8').toString('base64');
 
   const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
   if (useDocker) {

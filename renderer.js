@@ -2241,10 +2241,17 @@
         }, 5000);
     }
 
-    const loaderScript = document.createElement('script');
-    loaderScript.src = './node_modules/monaco-editor/min/vs/loader.js';
-    loaderScript.onload = bootstrapMonaco;
-    document.head.appendChild(loaderScript);
+    // Monaco loader is now loaded in HTML head via monaco-loader-init.js
+    // Wait for it to be ready, then bootstrap
+    function waitForMonacoLoader(callback) {
+        if (typeof require !== 'undefined' && require.config) {
+            callback();
+        } else {
+            setTimeout(() => waitForMonacoLoader(callback), 50);
+        }
+    }
+
+    waitForMonacoLoader(bootstrapMonaco);
 
     function bootstrapMonaco() {
         window.MonacoEnvironment = {

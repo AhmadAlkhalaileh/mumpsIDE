@@ -26,9 +26,9 @@
         function sampleMumps() {
             return [
                 'HELLO ; sample routine',
-                '    WRITE "Hello, Ahmad IDE!", !',
+                '    WRITE "Hello, Ahmad IDE!",!',
                 '    SET X=1',
-                '    IF X=1 WRITE "X is one", !',
+                '    IF X=1 WRITE "X is one",!',
                 '    QUIT'
             ].join('\n');
         }
@@ -264,7 +264,22 @@
             monacoRef.languages.registerCompletionItemProvider('mumps', {
                 triggerCharacters: [' ', '$', '^', '.'],
                 provideCompletionItems: (model, position, context, token) => {
-                    return { suggestions: buildDataset() };
+                    // Get the word range to ensure proper replacement
+                    const word = model.getWordUntilPosition(position);
+                    const range = {
+                        startLineNumber: position.lineNumber,
+                        endLineNumber: position.lineNumber,
+                        startColumn: word.startColumn,
+                        endColumn: word.endColumn
+                    };
+
+                    // Add range to each suggestion to replace the typed word
+                    const suggestions = buildDataset().map(sug => ({
+                        ...sug,
+                        range: range
+                    }));
+
+                    return { suggestions };
                 }
             });
         }

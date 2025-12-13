@@ -125,7 +125,7 @@
       "abbr": "Q",
       "detail": "QUIT value",
       "documentation": "Return from subroutine or function",
-      "insertText": "QUIT value",
+      "insertText": "QUIT ",
       "kind": "Command"
     },
     {
@@ -370,28 +370,28 @@
       "label": "for-loop",
       "detail": "FOR loop with variable",
       "documentation": "Standard FOR loop pattern",
-      "insertText": "FOR i=1:1:10 DO\n. command\n",
+      "insertText": "FOR ${1:i}=1:1:${2:10} DO\n. ${3:command}\n",
       "kind": "Snippet"
     },
     {
       "label": "if-else",
       "detail": "IF-ELSE conditional",
       "documentation": "IF-ELSE pattern",
-      "insertText": "IF condition DO\n. true-block\nELSE  DO\n. false-block\n",
+      "insertText": "IF ${1:condition} DO\n. ${2:true-block}\nELSE  DO\n. ${3:false-block}\n",
       "kind": "Snippet"
     },
     {
       "label": "new-label",
       "detail": "Label with parameters",
       "documentation": "Create new label entry point",
-      "insertText": "LABEL(params) ;\n command\n QUIT value\n",
+      "insertText": "LABEL(${1:params}) ;\n ${2:command}\n QUIT ${3:value}\n",
       "kind": "Snippet"
     },
     {
       "label": "error-handler",
       "detail": "Error handling pattern",
       "documentation": "Standard error trap pattern",
-      "insertText": "NEW $ETRAP\nSET $ETRAP=\"DO ERROR^ROUTINE\"\ncode\nQUIT\nERROR ;\n WRITE !,\"Error: \",$ZSTATUS,!\n QUIT\n",
+      "insertText": "NEW $ETRAP\nSET $ETRAP=\"DO ERROR^${1:ROUTINE}\"\n${2:code}\nQUIT\nERROR ;\n WRITE !,\"Error: \",$ZSTATUS,!\n QUIT\n",
       "kind": "Snippet"
     }
   ]
