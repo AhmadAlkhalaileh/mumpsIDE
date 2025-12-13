@@ -50,17 +50,11 @@ apps:
 
 parts:
   mumps-ide:
-    plugin: nil
+    plugin: dump
     source: .
     build-packages:
       - nodejs
       - npm
-      - libgconf-2-4
-      - libnotify4
-      - libxtst6
-      - libnss3
-      - libxss1
-      - libasound2
     stage-packages:
       - libnss3
       - libnspr4
@@ -72,30 +66,30 @@ parts:
       - libappindicator3-1
       - libsecret-1-0
     override-build: |
-      # Install Node.js dependencies
-      npm install --production
+      # Copy all application files to install directory
+      mkdir -p $SNAPCRAFT_PART_INSTALL/app
 
-      # Create app directory
-      mkdir -p $SNAPCRAFT_PART_INSTALL/mumps-ide
+      # Copy all files
+      cp -r $SNAPCRAFT_PART_SRC/* $SNAPCRAFT_PART_INSTALL/app/ || true
 
-      # Copy application files
-      cp -r . $SNAPCRAFT_PART_INSTALL/mumps-ide/
+      # Remove unwanted directories
+      rm -rf $SNAPCRAFT_PART_INSTALL/app/node_modules
+      rm -rf $SNAPCRAFT_PART_INSTALL/app/.git
+      rm -rf $SNAPCRAFT_PART_INSTALL/app/snap
+      rm -f $SNAPCRAFT_PART_INSTALL/app/*.log
+
+      # Install production dependencies
+      cd $SNAPCRAFT_PART_INSTALL/app
+      npm install --production --ignore-scripts
 
       # Create launcher script
-      cat > $SNAPCRAFT_PART_INSTALL/mumps-ide-launcher << 'EOF'
+      mkdir -p $SNAPCRAFT_PART_INSTALL/bin
+      cat > $SNAPCRAFT_PART_INSTALL/bin/mumps-ide << 'EOF'
       #!/bin/bash
-      exec "$SNAP/mumps-ide/node_modules/.bin/electron" "$SNAP/mumps-ide" "$@" --no-sandbox
+      exec "$SNAP/app/node_modules/.bin/electron" "$SNAP/app" "$@" --no-sandbox --disable-gpu
       EOF
 
-      chmod +x $SNAPCRAFT_PART_INSTALL/mumps-ide-launcher
-
-      # Create symlink for the command
-      mkdir -p $SNAPCRAFT_PART_INSTALL/bin
-      ln -s ../mumps-ide-launcher $SNAPCRAFT_PART_INSTALL/bin/mumps-ide
-
-    organize:
-      mumps-ide: mumps-ide
-      mumps-ide-launcher: mumps-ide-launcher
+      chmod +x $SNAPCRAFT_PART_INSTALL/bin/mumps-ide
 
   desktop-file:
     plugin: nil

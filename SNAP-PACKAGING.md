@@ -68,12 +68,14 @@ Ensure your `package.json` has proper metadata:
 # Clean previous builds
 snapcraft clean
 
-# Build the snap (this will take several minutes)
-snapcraft
+# Build the snap (recommended - builds in clean container)
+snapcraft pack --use-lxd
 
-# OR build in a container (recommended for cleaner builds)
-snapcraft --use-lxd
+# OR build locally (faster but less clean)
+snapcraft pack
 ```
+
+**Note:** Building takes 5-15 minutes depending on your system.
 
 This creates `mumps-ide_1.0_amd64.snap`
 
