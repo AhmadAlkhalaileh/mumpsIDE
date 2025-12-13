@@ -59,10 +59,10 @@ docker exec <container-id> bash -c "ls -la /var/worldvista/prod/"
 
 **Common Configuration #1: WorldVista Standard**
 ```
-Environment key: hakeem
+Environment key: h
 YottaDB path: /opt/fis-gtm/YDB136
-Global directory path: /var/worldvista/prod/hakeem/globals/mumps.gld
-Routines path: /var/worldvista/prod/hakeem/localr
+Global directory path: /var/worldvista/prod/h/globals/mumps.gld
+Routines path: /var/worldvista/prod/h/localr
 ```
 
 **Common Configuration #2: Custom YottaDB**
@@ -96,10 +96,10 @@ Click **Run** (or press Ctrl+Enter). You should see output in the terminal.
 
 | Field | Description | Required | Example |
 |-------|-------------|----------|---------|
-| **Environment key** | Namespace/environment name | No | `hakeem`, `cc`, `prod` |
+| **Environment key** | Namespace/environment name | No | `h`, `cc`, `prod` |
 | **YottaDB path** | Directory containing `mumps` executable | Yes* | `/opt/fis-gtm/YDB136` |
-| **Global directory path** | Location of `.gld` file | No | `/var/worldvista/prod/hakeem/globals/mumps.gld` |
-| **Routines path** | Where `.m` files are stored | No | `/var/worldvista/prod/hakeem/localr` |
+| **Global directory path** | Location of `.gld` file | No | `/var/worldvista/prod/h/globals/mumps.gld` |
+| **Routines path** | Where `.m` files are stored | No | `/var/worldvista/prod/h/localr` |
 
 \* Required for Run/Debug functionality
 
@@ -124,15 +124,15 @@ The last selected container ID is saved in:
 
 ```javascript
 {
-  "envKey": "hakeem",
+  "envKey": "h",
   "ydbPath": "/opt/fis-gtm/YDB136",
-  "gldPath": "/var/worldvista/prod/hakeem/globals/mumps.gld",
-  "routinesPath": "/var/worldvista/prod/hakeem/localr"
+  "gldPath": "/var/worldvista/prod/h/globals/mumps.gld",
+  "routinesPath": "/var/worldvista/prod/h/localr"
 }
 ```
 
 **File locations:**
-- Routines: `/var/worldvista/prod/hakeem/localr/ROUTINE.m`
+- Routines: `/var/worldvista/prod/h/localr/ROUTINE.m`
 - Globals: Stored in YottaDB database
 
 ### Setup 2: Development/Universal
@@ -225,7 +225,7 @@ Or reconnect to container:
 
 1. Right-click in project tree → **New** → **Folder**
 2. Enter path: `myapp` (relative to routines path)
-3. Full path: `/var/worldvista/prod/hakeem/localr/myapp`
+3. Full path: `/var/worldvista/prod/h/localr/myapp`
 4. Refresh to see it
 
 ### Saving Files to Folders
@@ -289,7 +289,7 @@ When you select a container, config is merged:
 **Container A (Production - WorldVista):**
 ```
 YottaDB path: /opt/fis-gtm/YDB136
-Routines: /var/worldvista/prod/hakeem/localr
+Routines: /var/worldvista/prod/h/localr
 ```
 
 **Container B (Development - Simple):**

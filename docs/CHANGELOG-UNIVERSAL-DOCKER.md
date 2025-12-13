@@ -178,7 +178,7 @@ Routes IPC calls to bridge function.
 <!-- NEW: Configuration inputs -->
 <div class="pane-subtitle">Docker Configuration (optional)</div>
 <div class="ssh-form">
-  <input id="dockerEnvKeyInput" placeholder="Environment key (e.g., hakeem)">
+  <input id="dockerEnvKeyInput" placeholder="Environment key (e.g., h)">
   <input id="dockerYdbPathInput" placeholder="YottaDB path (e.g., /opt/fis-gtm/YDB136)">
   <input id="dockerGldPathInput" placeholder="Global directory path (optional)">
   <input id="dockerRoutinesPathInput" placeholder="Routines path (optional)">
@@ -385,7 +385,7 @@ div.onclick = async () => {
 
 **Before:**
 - Hard-coded container ID: `8c21cf79fb67`
-- Hard-coded paths: `/opt/fis-gtm/YDB136`, `/var/worldvista/prod/hakeem/...`
+- Hard-coded paths: `/opt/fis-gtm/YDB136`, `/var/worldvista/prod/h/...`
 
 **After:**
 - Container ID: Selected by user, saved in `ahmadIDE:lastContainerId`

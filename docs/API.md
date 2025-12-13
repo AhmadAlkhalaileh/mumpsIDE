@@ -130,7 +130,7 @@ Configure Docker or SSH connection.
 {
   containerId: string,              // Docker container ID
   ydbPath?: string,                 // Default: '/opt/fis-gtm/YDB136'
-  envKey?: string,                  // Default: 'hakeem'
+  envKey?: string,                  // Default: 'h'
   routinesPath?: string,            // Auto-generated from envKey
   gldPath?: string                  // Auto-generated from envKey
 }
