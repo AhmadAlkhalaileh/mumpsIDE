@@ -29,7 +29,7 @@ architectures:
 
 apps:
   mumps-ide:
-    command: mumps-ide
+    command: bin/mumps-ide
     extensions: [gnome]
     plugs:
       - home
@@ -49,12 +49,53 @@ apps:
       ELECTRON_TRASH: gio
 
 parts:
+  # Main application: copy your whole repo (one level up from snap/)
+  # IMPORTANT: no npm install here (avoids ETIMEDOUT + Node version issues in LXD)
   mumps-ide:
     plugin: dump
-    source: .
-    build-packages:
-      - nodejs
-      - npm
+    source: ..
+    organize:
+      "*": app/
+    prime:
+      - -app/.git/**
+      - -app/snap/**
+      - -app/**/*.log
+      - -app/*.log
+    override-build: |
+      set -eux
+
+      # Ensure icon ends up in the right place for the desktop file
+      mkdir -p "$SNAPCRAFT_PART_INSTALL/meta/gui"
+      if [ -f "$SNAPCRAFT_PART_SRC/icon.png" ]; then
+        cp -f "$SNAPCRAFT_PART_SRC/icon.png" "$SNAPCRAFT_PART_INSTALL/meta/gui/icon.png"
+      elif [ -f "$SNAPCRAFT_PART_SRC/app/icon.png" ]; then
+        cp -f "$SNAPCRAFT_PART_SRC/app/icon.png" "$SNAPCRAFT_PART_INSTALL/meta/gui/icon.png"
+      fi
+
+      # Desktop file
+      cat > "$SNAPCRAFT_PART_INSTALL/meta/gui/mumps-ide.desktop" << 'EOF'
+      [Desktop Entry]
+      Name=MUMPS IDE
+      Comment=Professional IDE for MUMPS/M Programming
+      Exec=mumps-ide %U
+      Icon=${SNAP}/meta/gui/icon.png
+      Terminal=false
+      Type=Application
+      Categories=Development;IDE;
+      StartupWMClass=MUMPS IDE
+      EOF
+
+      # Launcher script
+      mkdir -p "$SNAPCRAFT_PART_INSTALL/bin"
+      cat > "$SNAPCRAFT_PART_INSTALL/bin/mumps-ide" << 'EOF'
+      #!/bin/sh
+      # Run Electron from your packaged node_modules
+      exec "$SNAP/app/node_modules/.bin/electron" "$SNAP/app" "$@" --no-sandbox --disable-gpu
+      EOF
+      chmod +x "$SNAPCRAFT_PART_INSTALL/bin/mumps-ide"
+
+      snapcraftctl build
+
     stage-packages:
       - libnss3
       - libnspr4
@@ -65,56 +106,6 @@ parts:
       - libxtst6
       - libappindicator3-1
       - libsecret-1-0
-    override-build: |
-      # Copy all application files to install directory
-      mkdir -p $SNAPCRAFT_PART_INSTALL/app
-
-      # Copy all files
-      cp -r $SNAPCRAFT_PART_SRC/* $SNAPCRAFT_PART_INSTALL/app/ || true
-
-      # Remove unwanted directories
-      rm -rf $SNAPCRAFT_PART_INSTALL/app/node_modules
-      rm -rf $SNAPCRAFT_PART_INSTALL/app/.git
-      rm -rf $SNAPCRAFT_PART_INSTALL/app/snap
-      rm -f $SNAPCRAFT_PART_INSTALL/app/*.log
-
-      # Install production dependencies
-      cd $SNAPCRAFT_PART_INSTALL/app
-      npm install --production --ignore-scripts
-
-      # Create launcher script
-      mkdir -p $SNAPCRAFT_PART_INSTALL/bin
-      cat > $SNAPCRAFT_PART_INSTALL/bin/mumps-ide << 'EOF'
-      #!/bin/bash
-      exec "$SNAP/app/node_modules/.bin/electron" "$SNAP/app" "$@" --no-sandbox --disable-gpu
-      EOF
-
-      chmod +x $SNAPCRAFT_PART_INSTALL/bin/mumps-ide
-
-  desktop-file:
-    plugin: nil
-    override-build: |
-      mkdir -p $SNAPCRAFT_PART_INSTALL/meta/gui
-      cat > $SNAPCRAFT_PART_INSTALL/meta/gui/mumps-ide.desktop << EOF
-      [Desktop Entry]
-      Name=MUMPS IDE
-      Comment=Professional IDE for MUMPS/M Programming
-      Exec=mumps-ide %U
-      Icon=\${SNAP}/meta/gui/icon.png
-      Terminal=false
-      Type=Application
-      Categories=Development;IDE;
-      StartupWMClass=MUMPS IDE
-      EOF
-
-  icon:
-    plugin: nil
-    override-build: |
-      # Create a simple icon (you can replace this with a proper icon file)
-      mkdir -p $SNAPCRAFT_PART_INSTALL/meta/gui
-      # For now, we'll create a placeholder
-      # You should add your actual icon.png to the project
-      # cp icon.png $SNAPCRAFT_PART_INSTALL/meta/gui/icon.png
 
 slots:
   dbus-daemon:
