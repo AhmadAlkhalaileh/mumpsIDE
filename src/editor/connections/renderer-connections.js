@@ -23,6 +23,12 @@
             const dockerListEl = document.getElementById('dockerList');
             const refreshDockerBtn = document.getElementById('refreshDockerBtn');
             const useLocalDockerBtn = document.getElementById('useLocalDockerBtn');
+            const dockerEnvKeyInput = document.getElementById('dockerEnvKeyInput');
+            const dockerYdbPathInput = document.getElementById('dockerYdbPathInput');
+            const dockerGldPathInput = document.getElementById('dockerGldPathInput');
+            const dockerRoutinesPathInput = document.getElementById('dockerRoutinesPathInput');
+            const dockerSaveConfigBtn = document.getElementById('dockerSaveConfigBtn');
+            const dockerConfigStatus = document.getElementById('dockerConfigStatus');
             const sshHostInput = document.getElementById('sshHostInput');
             const sshPortInput = document.getElementById('sshPortInput');
             const sshEnvInput = document.getElementById('sshEnvInput');
@@ -35,6 +41,51 @@
             const sshSaveEnvBtn = document.getElementById('sshSaveEnvBtn');
 
             let savedProfiles = [];
+            let dockerConfig = null;
+
+            // Docker config management
+            function loadDockerConfig() {
+                try {
+                    const raw = localStorage.getItem('ahmadIDE:dockerConfig');
+                    return raw ? JSON.parse(raw) : null;
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function saveDockerConfig(config) {
+                try {
+                    localStorage.setItem('ahmadIDE:dockerConfig', JSON.stringify(config));
+                } catch (e) {
+                    // ignore persistence errors
+                }
+            }
+
+            function fillDockerConfigForm(config) {
+                if (!config) return;
+                if (dockerEnvKeyInput && config.envKey) dockerEnvKeyInput.value = config.envKey;
+                if (dockerYdbPathInput && config.ydbPath) dockerYdbPathInput.value = config.ydbPath;
+                if (dockerGldPathInput && config.gldPath) dockerGldPathInput.value = config.gldPath;
+                if (dockerRoutinesPathInput && config.routinesPath) dockerRoutinesPathInput.value = config.routinesPath;
+            }
+
+            function updateDockerConfigStatus(message, severity = 'info') {
+                if (!dockerConfigStatus) return;
+                dockerConfigStatus.textContent = message;
+                dockerConfigStatus.style.background = severity === 'error'
+                    ? 'rgba(248,113,113,0.18)'
+                    : 'rgba(91,213,255,0.12)';
+                dockerConfigStatus.style.color = severity === 'error'
+                    ? '#fecdd3'
+                    : '#38bdf8';
+            }
+
+            // Load and display saved Docker config
+            dockerConfig = loadDockerConfig();
+            if (dockerConfig) {
+                fillDockerConfigForm(dockerConfig);
+                updateDockerConfigStatus('Config loaded');
+            }
 
             function readSavedSshProfiles() {
                 try {
@@ -269,11 +320,50 @@
 
             refreshDockerBtn?.addEventListener('click', refreshDockerList);
             useLocalDockerBtn?.addEventListener('click', async () => {
-                await window.ahmadIDE.setConnection('docker');
-                setConnStatus('Docker (local)', 'info');
-                appendOutput('✓ Using default Docker connection', terminalState);
+                // Get last selected container ID from localStorage
+                let lastContainerId = null;
+                try {
+                    lastContainerId = localStorage.getItem('ahmadIDE:lastContainerId');
+                } catch (e) {
+                    // ignore
+                }
+
+                if (!lastContainerId) {
+                    markSshStatus('Please select a container from the list first', 'error');
+                    appendOutput('✗ No container selected. Click on a container above first.', terminalState);
+                    return;
+                }
+
+                const config = dockerConfig || {};
+                config.containerId = lastContainerId;
+                await window.ahmadIDE.setConnection('docker', { docker: config });
+                const modeLabel = config.ydbPath ? 'Docker (configured)' : 'Docker (universal)';
+                setConnStatus(modeLabel, 'info');
+                appendOutput(`✓ Using ${modeLabel.toLowerCase()} connection`, terminalState);
                 closeConnectionsPanel();
                 await loadRoutineList(routineState, editor);
+            });
+
+            dockerSaveConfigBtn?.addEventListener('click', () => {
+                const envKey = dockerEnvKeyInput?.value?.trim() || '';
+                const ydbPath = dockerYdbPathInput?.value?.trim() || '';
+                const gldPath = dockerGldPathInput?.value?.trim() || '';
+                const routinesPath = dockerRoutinesPathInput?.value?.trim() || '';
+
+                const config = {};
+                if (envKey) config.envKey = envKey;
+                if (ydbPath) config.ydbPath = ydbPath;
+                if (gldPath) config.gldPath = gldPath;
+                if (routinesPath) config.routinesPath = routinesPath;
+
+                saveDockerConfig(config);
+                dockerConfig = config;
+
+                const hasConfig = Object.keys(config).length > 0;
+                updateDockerConfigStatus(
+                    hasConfig ? 'Docker config saved' : 'Config cleared (universal mode)',
+                    hasConfig ? 'info' : 'info'
+                );
             });
 
             connectionsOverlay?.addEventListener('click', closeConnectionsPanel);

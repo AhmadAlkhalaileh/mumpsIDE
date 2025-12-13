@@ -3156,8 +3156,23 @@
             div.textContent = `${c.name} (${c.id}) :: ${c.status}`;
             div.onclick = async () => {
                 appendOutput(`🐳 Using container ${c.name} (${c.id})`);
-                await window.ahmadIDE.setConnection('docker', { docker: { containerId: c.id } });
-                setConnStatus(`Docker: ${c.name}`, 'success');
+                // Save this container ID for later use
+                try {
+                    localStorage.setItem('ahmadIDE:lastContainerId', c.id);
+                } catch (e) {
+                    // ignore
+                }
+                // Load saved Docker config if available
+                let dockerConfig = {};
+                try {
+                    const raw = localStorage.getItem('ahmadIDE:dockerConfig');
+                    dockerConfig = raw ? JSON.parse(raw) : {};
+                } catch (e) {
+                    dockerConfig = {};
+                }
+                await window.ahmadIDE.setConnection('docker', { docker: { containerId: c.id, ...dockerConfig } });
+                const modeLabel = dockerConfig.ydbPath ? 'configured' : 'universal';
+                setConnStatus(`Docker: ${c.name} (${modeLabel})`, 'success');
                 await loadRoutineList(
                     routineState,
                     editor,

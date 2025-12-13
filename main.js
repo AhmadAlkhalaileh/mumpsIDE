@@ -253,6 +253,11 @@ ipcHandle('ssh:disconnect', async (_event, payload) => {
     return bridge.sshDisconnect(payload?.sessionId || '');
 });
 
+// Environment operations
+ipcHandle('env:createDirectory', async (_event, payload) => {
+    return bridge.createDirectoryInCurrentEnv(payload?.dirPath || '');
+});
+
 // Routines
 ipcHandle('routines:list', async (_event, payload) => {
     return bridge.listRoutines(payload?.search || '');

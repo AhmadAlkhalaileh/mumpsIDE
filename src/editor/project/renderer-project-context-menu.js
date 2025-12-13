@@ -141,7 +141,35 @@
                                 });
                             }
                         },
-                        { label: 'Folder', action: () => showToast('info', 'NOT IMPLEMENTED YET', 'Folder creation requires file system access') }
+                        {
+                            label: 'Folder',
+                            action: () => {
+                                showCustomPrompt('New Folder', 'Folder path (e.g., /workspace/myFolder)', async (val) => {
+                                    if (!val) return;
+                                    const folderPath = val.trim();
+                                    if (!folderPath) {
+                                        showToast('error', 'Invalid path', 'Folder path cannot be empty');
+                                        return;
+                                    }
+
+                                    // If relative path, prepend /workspace (universal mode default)
+                                    const fullPath = folderPath.startsWith('/') ? folderPath : `/workspace/${folderPath}`;
+
+                                    // Create directory in current environment (Docker or SSH)
+                                    const result = await window.ahmadIDE.createDirectoryInCurrentEnv(fullPath);
+
+                                    if (result.ok) {
+                                        showToast('success', 'Created', `Folder created: ${fullPath}`);
+                                        // Refresh project tree
+                                        if (routineStateRef && editorRef) {
+                                            await loadRoutineList(routineStateRef, editorRef);
+                                        }
+                                    } else {
+                                        showToast('error', 'Failed', result.error || 'Could not create folder');
+                                    }
+                                });
+                            }
+                        }
                     ]
                 });
                 menuItems.push({ separator: true });

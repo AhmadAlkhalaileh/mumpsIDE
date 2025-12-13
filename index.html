@@ -462,8 +462,19 @@
                 <div id="dockerList" class="list docker-list"></div>
                 <div class="flex">
                     <button class="btn ghost" id="refreshDockerBtn">Refresh Docker</button>
-                    <button class="btn ghost" id="useLocalDockerBtn">Use Default</button>
+                    <button class="btn ghost" id="useLocalDockerBtn">Use Universal</button>
                 </div>
+                <div class="pane-subtitle" style="margin-top: 12px;">Docker Configuration (optional)</div>
+                <div class="ssh-form">
+                    <input class="ssh-input" id="dockerEnvKeyInput" placeholder="Environment key (e.g., hakeem)">
+                    <input class="ssh-input" id="dockerYdbPathInput" placeholder="YottaDB path (e.g., /opt/fis-gtm/YDB136)">
+                    <input class="ssh-input" id="dockerGldPathInput" placeholder="Global directory path (optional)">
+                    <input class="ssh-input" id="dockerRoutinesPathInput" placeholder="Routines path (optional)">
+                </div>
+                <div class="flex">
+                    <button class="btn ghost" id="dockerSaveConfigBtn">Save Docker Config</button>
+                </div>
+                <div class="pill subtle" id="dockerConfigStatus">No config saved (universal mode)</div>
             </div>
             <div class="connection-card">
                 <div class="panel-title">SSH</div>

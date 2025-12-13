@@ -53,17 +53,35 @@ function buildEnvPaths(envKey = DEFAULT_ENV_KEY) {
 }
 
 // Default connection config (from web backend)
-function buildSshPaths(envKey = DEFAULT_ENV_KEY) {
+function buildSshPaths(envKey = DEFAULT_ENV_KEY, ydbPath = '/opt/fis-gtm/YDB136') {
   return {
-    ydbPath: '/opt/fis-gtm/YDB136',
+    ydbPath,
     ...buildEnvPaths(envKey)
   };
+}
+
+function buildDockerPaths(envKey = DOCKER_DEFAULT_ENV_KEY, ydbPath = null) {
+  // In universal mode (no ydbPath), don't set any YottaDB-specific paths
+  if (!ydbPath) {
+    return {
+      ydbPath: null,
+      gldPath: null,
+      routinesPath: null,
+      rpcRoutinesPath: null,
+      basePath: null,
+      envKey: envKey || DOCKER_DEFAULT_ENV_KEY
+    };
+  }
+  // In configured mode, build all the paths
+  const basePaths = buildEnvPaths(envKey);
+  return { ydbPath, ...basePaths };
 }
 
 function mergeSshConfig(cfg = {}) {
   const fallbackEnvKey = cfg.envKey || cfg.baseKey || cfg.namespace || connectionConfig.ssh?.envKey || DEFAULT_ENV_KEY;
   const envKey = deriveEnvKeyFromUsername(cfg.username, fallbackEnvKey);
-  const paths = buildSshPaths(envKey);
+  const ydbPath = cfg.ydbPath || connectionConfig.ssh?.ydbPath || '/opt/fis-gtm/YDB136';
+  const paths = buildSshPaths(envKey, ydbPath);
   return {
     ...connectionConfig.ssh,
     ...paths,
@@ -73,9 +91,11 @@ function mergeSshConfig(cfg = {}) {
 }
 
 function mergeDockerConfig(cfg = {}) {
-  // Docker always uses 'hakeem' as envKey (not configurable)
-  const envKey = DOCKER_DEFAULT_ENV_KEY;
-  const paths = buildEnvPaths(envKey);
+  // Use envKey from config if provided, otherwise use default
+  const envKey = cfg.envKey || connectionConfig.docker?.envKey || DOCKER_DEFAULT_ENV_KEY;
+  // ydbPath is optional - if not provided, Docker works in universal mode
+  const ydbPath = cfg.ydbPath !== undefined ? cfg.ydbPath : connectionConfig.docker?.ydbPath;
+  const paths = buildDockerPaths(envKey, ydbPath);
   return {
     ...connectionConfig.docker,
     ...paths,
@@ -87,9 +107,13 @@ function mergeDockerConfig(cfg = {}) {
 const connectionConfig = {
   type: 'docker',
   docker: {
-    containerId: '8c21cf79fb67',
-    ydbPath: '/opt/fis-gtm/YDB136',
-    ...buildEnvPaths(DOCKER_DEFAULT_ENV_KEY)
+    containerId: null, // Will be set when user selects a container
+    envKey: DOCKER_DEFAULT_ENV_KEY,
+    ydbPath: null,  // null = universal mode (no YottaDB paths)
+    gldPath: null,
+    routinesPath: null,
+    rpcRoutinesPath: null,
+    basePath: null
   },
   ssh: {
     host: '',
@@ -2708,6 +2732,12 @@ function getRoutineDirs() {
       if (!dirs.includes(p)) dirs.push(p);
     });
   }
+
+  // Universal mode fallback: use /workspace if no paths are configured
+  if (dirs.length === 0) {
+    dirs.push('/workspace');
+  }
+
   return dirs;
 }
 
@@ -2796,6 +2826,19 @@ async function executeYDB(command) {
   const routineDirs = getRoutineDirs();
   const routinesPath = routineDirs[0];
   if (!routinesPath) return { ok: false, error: 'No routines path configured' };
+
+  // Get YottaDB configuration
+  const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
+  const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
+
+  // Check if YottaDB is configured
+  if (!cfg.ydbPath) {
+    return {
+      ok: false,
+      error: 'YottaDB not configured. Please configure YottaDB path in Connections panel to run MUMPS code.'
+    };
+  }
+
   const routineFile = `${routinesPath}/${routineName}.m`;
 
   const lines = (command || '').split('\n').map(l => l.replace(/\r/g, ''));
@@ -2886,9 +2929,16 @@ async function executeYDB(command) {
   // Use NOECHO to prevent command echoing in output
   const runCmdB64 = Buffer.from(`USE $P:(NOECHO) ${entryCall}\n`, 'utf8').toString('base64');
 
-  const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
-  if (useDocker) {
-    const cfg = connectionConfig.docker;
+  const useDockerExec = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
+  if (useDockerExec) {
+    // Build gtmroutines: include temp file location first
+    const gtmroutines = routinesPath
+      ? `${routinesPath}(${routinesPath}) ${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}`
+      : `${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}`;
+
+    // Use a default globals dir if not configured
+    const gldPath = cfg.gldPath || '/tmp/mumps.gld';
+
     const writeCmd = wrapDockerCmd(
       `docker exec ${cfg.containerId} bash -lc "echo ${codeB64} | base64 -d > ${routineFile}"`
     );
@@ -2896,7 +2946,7 @@ async function executeYDB(command) {
       `docker exec ${cfg.containerId} bash -lc "echo ${runCmdB64} | base64 -d > ${cmdFile}"`
     );
     const runCmd = wrapDockerCmd(
-      `docker exec ${cfg.containerId} bash -lc "export gtm_dist=${cfg.ydbPath} && export gtmgbldir=${cfg.gldPath} && export gtmroutines='${(cfg.rpcRoutinesPath || cfg.routinesPath)}(${(cfg.rpcRoutinesPath || cfg.routinesPath)}) ${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}' && export gtm_etrap='' && export gtm_ztrap='' && ${cfg.ydbPath}/mumps -direct < ${cmdFile} 2>&1; rm -f ${routineFile} ${cmdFile}"`
+      `docker exec ${cfg.containerId} bash -lc "export gtm_dist=${cfg.ydbPath} && export gtmgbldir=${gldPath} && export gtmroutines='${gtmroutines}' && export gtm_etrap='' && export gtm_ztrap='' && ${cfg.ydbPath}/mumps -direct < ${cmdFile} 2>&1; rm -f ${routineFile} ${cmdFile}"`
     );
 
     return new Promise((resolve) => {
@@ -2906,11 +2956,20 @@ async function executeYDB(command) {
       });
     });
   } else {
-    const cfg = connectionConfig.ssh;
+    // SSH mode
     const sshPass = cfg.password ? `sshpass -p '${cfg.password}'` : '';
+
+    // Build gtmroutines: include temp file location first
+    const gtmroutines = routinesPath
+      ? `${routinesPath}(${routinesPath}) ${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}`
+      : `${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}`;
+
+    // Use a default globals dir if not configured
+    const gldPath = cfg.gldPath || '/tmp/mumps.gld';
+
     const writeCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "echo ${codeB64} | base64 -d > ${routineFile}"`;
     const writeRun = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "echo ${runCmdB64} | base64 -d > ${cmdFile}"`;
-    const runCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "export gtm_dist=${cfg.ydbPath} && export gtmgbldir=${cfg.gldPath} && export gtmroutines='${(cfg.rpcRoutinesPath || cfg.routinesPath)}(${(cfg.rpcRoutinesPath || cfg.routinesPath)}) ${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}' && export gtm_etrap='' && export gtm_ztrap='' && ${cfg.ydbPath}/mumps -direct < ${cmdFile} 2>&1; rm -f ${routineFile} ${cmdFile}"`;
+    const runCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "export gtm_dist=${cfg.ydbPath} && export gtmgbldir=${gldPath} && export gtmroutines='${gtmroutines}' && export gtm_etrap='' && export gtm_ztrap='' && ${cfg.ydbPath}/mumps -direct < ${cmdFile} 2>&1; rm -f ${routineFile} ${cmdFile}"`;
 
     return new Promise((resolve) => {
       exec(`${writeCmd} && ${writeRun} && ${runCmd}`, { timeout: 30000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
@@ -3056,18 +3115,39 @@ module.exports = {
     const allRoutines = [];
 
     for (const dir of routineDirs) {
+      // First, ensure the directory exists
+      const mkdirCmd = `mkdir -p ${shellQuote(dir)}`;
+      await runHostCommand(mkdirCmd);
+
       const cmd = `find ${dir} -name '*.m' -type f 2>/dev/null | sort`;
       const res = await runHostCommand(cmd);
       if (!res.ok) continue;
 
       const files = (res.stdout || '').split('\n').filter(Boolean);
 
-      // Determine folder name (localr or routines)
-      const folderName = dir.includes('/localr') ? 'localr' : 'routines';
-
       files.forEach(fullPath => {
+        // Extract relative path from the base dir
+        const relativePath = fullPath.replace(`${dir}/`, '');
         const routineName = path.basename(fullPath, '.m');
-        const routineWithFolder = `${folderName}/${routineName}.m`;
+
+        // Determine folder name based on the directory structure
+        let folderName;
+        if (relativePath.includes('/')) {
+          // File is in a subdirectory, use that as folder name
+          folderName = relativePath.split('/')[0];
+        } else if (dir.includes('/localr')) {
+          folderName = 'localr';
+        } else if (dir.includes('/routines')) {
+          folderName = 'routines';
+        } else {
+          // Universal mode: no subfolder
+          folderName = 'workspace';
+        }
+
+        const routineWithFolder = relativePath.includes('/')
+          ? relativePath
+          : `${folderName}/${routineName}.m`;
+
         if (!search || routineWithFolder.toLowerCase().includes(search.toLowerCase())) {
           allRoutines.push(routineWithFolder);
         }
@@ -3082,12 +3162,14 @@ module.exports = {
   },
 
   async readRoutine(name) {
-    // Handle both "ROUTINE" and "localr/ROUTINE" formats
+    // Handle both "ROUTINE" and "localr/ROUTINE" or "routines/HELLO.m" formats
     let routine, targetFolder;
     if (name.includes('/')) {
       const parts = name.split('/');
-      targetFolder = parts[0]; // "localr" or "routines"
-      routine = sanitizeRoutineName(parts[1]);
+      targetFolder = parts[0]; // "localr", "routines", or subfolder name
+      // Handle both "folder/ROUTINE" and "folder/ROUTINE.m"
+      routine = parts[1].endsWith('.m') ? parts[1].slice(0, -2) : parts[1];
+      routine = sanitizeRoutineName(routine);
     } else {
       routine = sanitizeRoutineName(name);
     }
@@ -3096,38 +3178,54 @@ module.exports = {
       logger.warn('ROUTINE_READ_INVALID', { name });
       return { ok: false, error: 'Invalid routine name' };
     }
-    logger.info('ROUTINE_READ', { routine, targetFolder });
+    logger.info('ROUTINE_READ', { routine, targetFolder, name });
     const routineDirs = getRoutineDirs();
     if (!routineDirs.length) return { ok: false, error: 'No routines path configured' };
     let lastError = '';
 
-    // If folder specified, search only in that folder
-    const dirsToSearch = targetFolder
-      ? routineDirs.filter(d => d.includes(`/${targetFolder}`))
-      : routineDirs;
+    // Try each directory with multiple path strategies
+    for (const dir of routineDirs) {
+      const pathsToTry = [];
 
-    for (const dir of dirsToSearch) {
-      const cmd = `cat ${dir}/${routine}.m 2>/dev/null`;
-      const res = await runHostCommand(cmd);
-      if (res.ok && res.stdout) {
-        const folder = dir.includes('/localr') ? 'localr' : 'routines';
-        return { ok: true, routine, folder, code: res.stdout };
+      if (targetFolder) {
+        // Strategy 1: dir contains targetFolder (e.g., "/var/.../localr" matches "localr")
+        if (dir.includes(`/${targetFolder}`)) {
+          pathsToTry.push(`${dir}/${routine}.m`);
+        }
+        // Strategy 2: targetFolder is a subdirectory (e.g., "/workspace" + "/routines/HELLO.m")
+        pathsToTry.push(`${dir}/${targetFolder}/${routine}.m`);
+      } else {
+        pathsToTry.push(`${dir}/${routine}.m`);
       }
-      lastError = res.error || res.stderr || lastError;
+
+      for (const filePath of pathsToTry) {
+        const cmd = `cat ${shellQuote(filePath)} 2>/dev/null || echo "___FILE_NOT_FOUND___"`;
+        const res = await runHostCommand(cmd);
+        if (res.ok && res.stdout && !res.stdout.includes('___FILE_NOT_FOUND___')) {
+          logger.info('ROUTINE_READ_OK', { routine, folder: targetFolder || 'root', filePath });
+          return { ok: true, code: res.stdout };
+        }
+      }
+      lastError = `File not found in any expected location`;
     }
-    logger.warn('ROUTINE_READ_FAIL', { routine, lastError });
+
+    logger.warn('ROUTINE_READ_FAIL', { routine, targetFolder, lastError });
     return { ok: false, error: lastError || 'Routine not found' };
   },
 
   async saveRoutine(name, code) {
-    // Handle both "ROUTINE" and "localr/ROUTINE" formats
+    // Handle both "ROUTINE", "localr/ROUTINE", and "routines/HELLO.m" formats
     let routine, targetFolder;
     if (name.includes('/')) {
       const parts = name.split('/');
       targetFolder = parts[0].toLowerCase(); // normalize to lowercase
-      routine = sanitizeRoutineName(parts[1]);
+      // Handle both "folder/ROUTINE" and "folder/ROUTINE.m"
+      routine = parts[1].endsWith('.m') ? parts[1].slice(0, -2) : parts[1];
+      routine = sanitizeRoutineName(routine);
     } else {
-      routine = sanitizeRoutineName(name);
+      // Handle "ROUTINE" or "ROUTINE.m"
+      const nameWithoutExt = name.endsWith('.m') ? name.slice(0, -2) : name;
+      routine = sanitizeRoutineName(nameWithoutExt);
     }
 
     if (!routine) {
@@ -3135,30 +3233,34 @@ module.exports = {
       return { ok: false, error: 'Invalid routine name' };
     }
     if (!code) return { ok: false, error: 'Code is empty' };
-    logger.info('ROUTINE_SAVE', { routine, targetFolder });
+    logger.info('ROUTINE_SAVE', { routine, targetFolder, name });
     const routineDirs = getRoutineDirs();
 
-    // If folder specified, save to that folder; otherwise use first dir (localr)
+    // If folder specified, save to that folder; otherwise use first dir
     let routinesPath;
     if (targetFolder) {
       routinesPath = routineDirs.find(d => d.toLowerCase().includes(`/${targetFolder}`));
-      if (!routinesPath) return { ok: false, error: `Folder '${targetFolder}' not found` };
+      // If not found, create it under the first routines dir
+      if (!routinesPath) {
+        routinesPath = `${routineDirs[0]}/${targetFolder}`;
+      }
     } else {
       routinesPath = routineDirs[0];
     }
 
     if (!routinesPath) return { ok: false, error: 'No routines path configured' };
 
-    const b64 = Buffer.from(code, 'utf8').toString('base64');
-    const cmd = `printf '%s' '${b64}' | base64 -d > ${routinesPath}/${routine}.m`;
-    const res = await runHostCommand(cmd);
+    // Use writeRemoteFile which creates directories automatically
+    const filePath = `${routinesPath}/${routine}.m`;
+    logger.info('ROUTINE_SAVE_PATH', { filePath });
+    const res = await writeRemoteFile(filePath, code);
     if (!res.ok) {
       logger.error('ROUTINE_SAVE_FAIL', { routine, error: res.error || res.stderr });
       return { ok: false, error: res.error || res.stderr || 'Failed to save routine' };
     }
 
-    const folder = routinesPath.includes('/localr') ? 'localr' : 'routines';
-    logger.info('ROUTINE_SAVE_OK', { routine, folder });
+    const folder = routinesPath.includes('/localr') ? 'localr' : (targetFolder || 'workspace');
+    logger.info('ROUTINE_SAVE_OK', { routine, folder, filePath });
     return { ok: true, routine, folder };
   },
 
@@ -3664,5 +3766,55 @@ module.exports = {
       delete sshSessions[sessionId];
     }
     return { ok: true };
+  },
+
+  /**
+   * Create a directory in the current environment (Docker or SSH).
+   * Works in both universal mode (no YottaDB) and configured mode.
+   * @param {string} dirPath - The directory path to create (relative or absolute)
+   * @returns {Promise<{ok: boolean, error?: string}>}
+   */
+  async createDirectoryInCurrentEnv(dirPath) {
+    if (!dirPath || typeof dirPath !== 'string') {
+      return { ok: false, error: 'Directory path is required' };
+    }
+
+    const cfg = connectionConfig.type === 'ssh' ? connectionConfig.ssh : connectionConfig.docker;
+    const isDocker = connectionConfig.type === 'docker';
+    const mkdirCmd = `mkdir -p ${shellQuote(dirPath)}`;
+
+    return new Promise((resolve) => {
+      try {
+        if (isDocker) {
+          if (!cfg.containerId) {
+            return resolve({ ok: false, error: 'No Docker container selected' });
+          }
+          const dockerCmd = wrapDockerCmd(`docker exec ${cfg.containerId} bash -c ${shellQuote(mkdirCmd)}`);
+          exec(dockerCmd, { timeout: 8000 }, (err, stdout, stderr) => {
+            if (err) {
+              resolve({ ok: false, error: err.message || stderr || 'Failed to create directory' });
+            } else {
+              resolve({ ok: true });
+            }
+          });
+        } else {
+          // SSH mode
+          if (!cfg.host || !cfg.username) {
+            return resolve({ ok: false, error: 'SSH not connected' });
+          }
+          const sshPass = cfg.password ? `sshpass -p '${cfg.password}' ` : '';
+          const sshCmd = `${sshPass}ssh -o StrictHostKeyChecking=no -p ${cfg.port || 22} ${cfg.username}@${cfg.host} ${shellQuote(mkdirCmd)}`;
+          exec(sshCmd, { timeout: 8000 }, (err, stdout, stderr) => {
+            if (err) {
+              resolve({ ok: false, error: err.message || stderr || 'Failed to create directory' });
+            } else {
+              resolve({ ok: true });
+            }
+          });
+        }
+      } catch (err) {
+        resolve({ ok: false, error: err.message || 'Failed to create directory' });
+      }
+    });
   }
 };

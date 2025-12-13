@@ -34,6 +34,9 @@ contextBridge.exposeInMainWorld('ahmadIDE', {
     sshExec: (sessionId, command) => ipcRenderer.invoke('ssh:exec', { sessionId, command }),
     sshDisconnect: (sessionId) => ipcRenderer.invoke('ssh:disconnect', { sessionId }),
 
+    // Environment operations (works with current Docker or SSH connection)
+    createDirectoryInCurrentEnv: (dirPath) => ipcRenderer.invoke('env:createDirectory', { dirPath }),
+
     // Routines
     listRoutines: (search) => ipcRenderer.invoke('routines:list', { search }),
     searchRoutines: (term, options) => ipcRenderer.invoke('routines:search', { term, options }),
