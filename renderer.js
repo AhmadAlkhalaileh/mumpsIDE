@@ -176,6 +176,8 @@
     let dbgStateRef = null; // shared debug state reference for helpers outside init scope
     let currentDebugSession = null; // current debug session (shared with debug module)
     let debugManager = null; // debug module instance (src/editor/debug/renderer-debug.js)
+    let problemsManager = null; // problems UI module instance (src/editor/problems/renderer-problems.js)
+    let diagnosticsManager = null; // lint/diagnostics module instance (src/editor/diagnostics/renderer-diagnostics.js)
 
     // ========== MUMPS Reference Parser (shared utility) ==========
     // Parse routine/tag reference at cursor position (supports TAG^RTN, ^RTN, DO TAG)
@@ -816,6 +818,64 @@
             ensureTerminalListeners,
             getTerminalCwd,
             terminalConfig
+        }
+    });
+
+    // Problems UI moved to src/editor/problems/renderer-problems.js
+    const createProblemsManager = window.AhmadIDEModules?.problems?.createProblemsManager;
+    if (!createProblemsManager) {
+        logger.error('PROBLEMS_MODULE_MISSING', { path: './src/editor/problems/renderer-problems.js' });
+        throw new Error('Problems module missing: ./src/editor/problems/renderer-problems.js');
+    }
+
+    // Diagnostics (lint/markers) moved to src/editor/diagnostics/renderer-diagnostics.js
+    const createDiagnosticsManager = window.AhmadIDEModules?.diagnostics?.createDiagnosticsManager;
+    if (!createDiagnosticsManager) {
+        logger.error('DIAGNOSTICS_MODULE_MISSING', { path: './src/editor/diagnostics/renderer-diagnostics.js' });
+        throw new Error('Diagnostics module missing: ./src/editor/diagnostics/renderer-diagnostics.js');
+    }
+
+    const lastValidatedVersionIdRef = {
+        get value() { return lastValidatedVersionId; },
+        set value(v) { lastValidatedVersionId = v; }
+    };
+
+    const lintSkipNotifiedRef = {
+        get value() { return lintSkipNotified; },
+        set value(v) { lintSkipNotified = v; }
+    };
+
+    diagnosticsManager = createDiagnosticsManager({
+        state: {
+            maxLintTextLength,
+            maxProblemItems,
+            lastValidatedVersionIdRef,
+            lintSkipNotifiedRef,
+            regex: {
+                RE_DQUOTE,
+                RE_PAREN_OPEN,
+                RE_PAREN_CLOSE,
+                RE_LINE_START,
+                RE_SUSPICIOUS
+            }
+        },
+        deps: {
+            showToast,
+            renderProblems: (...args) => renderProblems(...args),
+            getMonaco: () => (typeof monaco !== 'undefined' ? monaco : null),
+            mumpsLinter,
+            MUMPSLexerClass,
+            MUMPSParserClass
+        }
+    });
+
+    problemsManager = createProblemsManager({
+        state: { maxProblemItems },
+        deps: {
+            revealLine,
+            normalizeSeverity: (...args) => diagnosticsManager.normalizeSeverity(...args),
+            setActiveDebugTab,
+            getActiveDebugTab: () => activeDebugTab
         }
     });
 
@@ -4565,71 +4625,7 @@
     // ---------- Problems / Docker / Misc ----------
 
     function renderProblems(items) {
-        const list = document.getElementById('problemsList');
-        if (!list) return;
-
-        const problems = Array.isArray(items) ? items : [];
-        const limited = problems.slice(0, maxProblemItems);
-        const trimmed = problems.length > limited.length;
-
-        // Use DocumentFragment to batch DOM operations (reduces reflows)
-        const fragment = document.createDocumentFragment();
-
-        if (!limited.length) {
-            const li = document.createElement('li');
-            li.textContent = 'No problems.';
-            fragment.appendChild(li);
-            list.innerHTML = '';
-            list.appendChild(fragment);
-            return;
-        }
-
-        const iconFor = (sev) => {
-            const s = (sev || 'info').toLowerCase();
-            if (s.startsWith('err')) return '⛔';
-            if (s.startsWith('warn')) return '⚠';
-            return 'ℹ';
-        };
-
-        limited.forEach(item => {
-            const li = document.createElement('li');
-            const sev = item.severity || 'info';
-            li.className = `problem-item ${sev.toLowerCase()}`;
-            li.dataset.line = item.line || '';
-
-            const icon = document.createElement('span');
-            icon.className = 'problem-icon';
-            icon.textContent = iconFor(sev);
-
-            const text = document.createElement('span');
-            text.className = 'problem-text';
-            const lineInfo = item.line ? ` (line ${item.line})` : '';
-            const codeInfo = item.code ? ` [${item.code}]` : '';
-            const msg = item.message || '';
-            text.textContent = `${sev}${codeInfo}: ${msg}${lineInfo}`;
-            li.title = `${sev.toUpperCase()}${codeInfo} ${msg}${lineInfo}`;
-
-            li.appendChild(icon);
-            li.appendChild(text);
-            li.onclick = () => {
-                const ln = parseInt(li.dataset.line || '0', 10);
-                if (ln) revealLine(ln);
-            };
-            fragment.appendChild(li);
-        });
-        if (trimmed) {
-            const li = document.createElement('li');
-            li.className = 'problem-item info';
-            li.textContent = `Showing first ${maxProblemItems} issues...`;
-            fragment.appendChild(li);
-        }
-
-        // Single DOM operation: clear and append all at once
-        list.innerHTML = '';
-        list.appendChild(fragment);
-
-        updateProblemSummary(limited);
-        setActiveDebugTab(activeDebugTab);
+        return problemsManager.renderProblems(items);
     }
 
     function renderDocker(containers, routineState, editor, opts) {
@@ -5076,254 +5072,27 @@
     }
 
     function markerSeverity(sev) {
-        if (sev === 'error') return monaco.MarkerSeverity.Error;
-        if (sev === 'warning') return monaco.MarkerSeverity.Warning;
-        return monaco.MarkerSeverity.Info;
+        return diagnosticsManager.markerSeverity(sev);
     }
 
     function normalizeSeverity(sev) {
-        if (!sev) return 'info';
-        const lower = (sev + '').toLowerCase();
-        if (lower.startsWith('err')) return 'error';
-        if (lower.startsWith('warn')) return 'warning';
-        return 'info';
+        return diagnosticsManager.normalizeSeverity(sev);
     }
 
     function updateProblemSummary(items) {
-        const pill = document.getElementById('problemsSummary');
-        if (!pill) return;
-        const problems = Array.isArray(items) ? items : [];
-        const total = problems.length;
-        const highest = problems.reduce((acc, cur) => {
-            const sev = normalizeSeverity(cur.severity);
-            if (sev === 'error') return 'error';
-            if (sev === 'warning' && acc !== 'error') return 'warning';
-            return acc;
-        }, 'info');
-
-        pill.textContent = `Problems: ${total}`;
-        if (highest === 'error') {
-            pill.style.background = 'rgba(248,113,113,0.18)';
-            pill.style.color = '#fecdd3';
-            pill.style.borderColor = 'rgba(248,113,113,0.35)';
-        } else if (highest === 'warning') {
-            pill.style.background = 'rgba(252,211,77,0.18)';
-            pill.style.color = '#fcd34d';
-            pill.style.borderColor = 'rgba(252,211,77,0.35)';
-        } else {
-            pill.style.background = '';
-            pill.style.color = '';
-            pill.style.borderColor = '';
-        }
+        return problemsManager.updateProblemSummary(items);
     }
 
     function hasLintRules(linter) {
-        return !!(linter && linter.rules && Object.keys(linter.rules || {}).length);
+        return diagnosticsManager.hasLintRules(linter);
     }
 
     function applyLintMarkers(model, issues) {
-        const markers = (issues || []).map(issue => ({
-            severity: markerSeverity(issue.severity),
-            message: issue.message || issue.description || 'Issue',
-            startLineNumber: issue.line || 1,
-            startColumn: issue.column || 1,
-            endLineNumber: issue.line || 1,
-            endColumn: (issue.column || 1) + 1
-        }));
-        monaco.editor.setModelMarkers(model, 'mumps-check', markers);
+        return diagnosticsManager.applyLintMarkers(model, issues);
     }
 
     function validateMumps(model) {
-        if (!model) return;
-        const versionId = (typeof model.getVersionId === 'function') ? model.getVersionId() : null;
-        if (versionId !== null && versionId === lastValidatedVersionId) {
-            return;
-        }
-        const text = model.getValue();
-        const isHuge = text.length > maxLintTextLength;
-        if (isHuge) {
-            monaco.editor.setModelMarkers(model, 'mumps-check', []);
-            renderProblems([{
-                severity: 'info',
-                message: `Lint disabled for large file (${Math.round(text.length / 1000)} KB)`,
-                line: 1,
-                code: 'LINT_SKIPPED'
-            }]);
-            if (!lintSkipNotified) {
-                showToast('info', 'Linting paused', 'Large file detected; skipping lint to keep typing responsive.');
-                lintSkipNotified = true;
-            }
-            lastValidatedVersionId = versionId;
-            return [];
-        }
-        // Reset the skip notification only after we are back under the threshold
-        if (lintSkipNotified && !isHuge) {
-            lintSkipNotified = false;
-        }
-        lastValidatedVersionId = versionId;
-        const linter = window._mumpsLinter || mumpsLinter;
-        const combinedMarkers = [];
-        const problems = [];
-        const Parser = window._mumpsParserClass || MUMPSParserClass;
-
-        if (hasLintRules(linter)) {
-            const res = linter.lint(text || '', { mode: 'edit' });
-            (res.issues || []).forEach(issue => {
-                const sev = normalizeSeverity(issue.severity);
-                problems.push({
-                    severity: sev,
-                    message: issue.message || issue.description || 'Issue',
-                    line: issue.line || null,
-                    code: issue.ruleId || issue.code || null
-                });
-                combinedMarkers.push({
-                    severity: markerSeverity(sev),
-                    message: issue.ruleId ? `[${issue.ruleId}] ${issue.message || issue.description || 'Issue'}` : (issue.message || issue.description || 'Issue'),
-                    startLineNumber: issue.line || 1,
-                    startColumn: issue.column || 1,
-                    endLineNumber: issue.line || 1,
-                    endColumn: (issue.column || 1) + 1
-                });
-            });
-        } else {
-            const lines = text.split('\n');
-            let openQuotes = 0;
-            let parenBalance = 0;
-            lines.forEach((line, idx) => {
-                const lineNo = idx + 1;
-                RE_DQUOTE.lastIndex = 0;
-                const quoteCount = (line.match(RE_DQUOTE) || []).length;
-                openQuotes = (openQuotes + quoteCount) % 2;
-                if (openQuotes === 1) {
-                    problems.push({
-                        severity: 'warning',
-                        message: 'Unclosed string literal',
-                        line: lineNo,
-                        code: 'LEX_UNCLOSED_STRING'
-                    });
-                    combinedMarkers.push({
-                        severity: monaco.MarkerSeverity.Warning,
-                        message: '[LEX_UNCLOSED_STRING] Unclosed string literal',
-                        startLineNumber: lineNo,
-                        startColumn: 1,
-                        endLineNumber: lineNo,
-                        endColumn: line.length + 1
-                    });
-                }
-                RE_PAREN_OPEN.lastIndex = 0;
-                RE_PAREN_CLOSE.lastIndex = 0;
-                const opens = (line.match(RE_PAREN_OPEN) || []).length;
-                const closes = (line.match(RE_PAREN_CLOSE) || []).length;
-                parenBalance += opens - closes;
-                if (RE_LINE_START.test(line)) {
-                    problems.push({
-                        severity: 'warning',
-                        message: 'Line should start with a label, command, or comment',
-                        line: lineNo,
-                        code: 'LEX_LINE_START'
-                    });
-                    combinedMarkers.push({
-                        severity: monaco.MarkerSeverity.Warning,
-                        message: '[LEX_LINE_START] Line should start with a label, command, or comment',
-                        startLineNumber: lineNo,
-                        startColumn: 1,
-                        endLineNumber: lineNo,
-                        endColumn: line.length + 1
-                    });
-                }
-                if (RE_SUSPICIOUS.test(line)) {
-                    problems.push({
-                        severity: 'info',
-                        message: 'Suspicious character for MUMPS',
-                        line: lineNo,
-                        code: 'LEX_SUSPICIOUS_CHAR'
-                    });
-                    combinedMarkers.push({
-                        severity: monaco.MarkerSeverity.Info,
-                        message: '[LEX_SUSPICIOUS_CHAR] Suspicious character for MUMPS',
-                        startLineNumber: lineNo,
-                        startColumn: 1,
-                        endLineNumber: lineNo,
-                        endColumn: line.length + 1
-                    });
-                }
-            });
-            if (parenBalance !== 0) {
-                problems.push({
-                    severity: 'warning',
-                    message: 'Unbalanced parentheses detected',
-                    line: 1,
-                    code: 'LEX_PAREN_BALANCE'
-                });
-                combinedMarkers.push({
-                    severity: monaco.MarkerSeverity.Warning,
-                    message: '[LEX_PAREN_BALANCE] Unbalanced parentheses detected',
-                    startLineNumber: 1,
-                    startColumn: 1,
-                    endLineNumber: lines.length,
-                    endColumn: 1
-                });
-            }
-        }
-
-        const Lexer = window._mumpsLexerClass || MUMPSLexerClass;
-        if (Lexer) {
-            try {
-                const lexer = new Lexer(text || '');
-                lexer.tokenize();
-                (lexer.errors || []).forEach(err => {
-                    problems.push({
-                        severity: 'error',
-                        message: err.message || 'Syntax error',
-                        line: err.line || null,
-                        code: err.code || 'LEX_ERROR'
-                    });
-                    combinedMarkers.push({
-                        severity: monaco.MarkerSeverity.Error,
-                        message: `[${err.code || 'LEX_ERROR'}] ${err.message || 'Syntax error'}`,
-                        startLineNumber: err.line || 1,
-                        startColumn: err.column || 1,
-                        endLineNumber: err.line || 1,
-                        endColumn: (err.column || 1) + 1
-                    });
-                });
-            } catch (e) {
-                // ignore lexer failures
-            }
-        }
-
-        // TEMPORARILY DISABLED: Parser is causing IDE to freeze
-        // TODO: Fix MUMPSParser infinite loop issue
-        if (false && Parser) {
-            try {
-                const parser = new Parser();
-                parser.parse(text || '');
-                (parser.getErrors ? parser.getErrors() : parser.errors || []).forEach(err => {
-                    const sev = normalizeSeverity(err.severity || 'error');
-                    problems.push({
-                        severity: sev,
-                        message: err.message || 'Parse error',
-                        line: err.line || null,
-                        code: err.code || 'PARSE_ERROR'
-                    });
-                    combinedMarkers.push({
-                        severity: markerSeverity(sev),
-                        message: `[${err.code || 'PARSE_ERROR'}] ${err.message || 'Parse error'}`,
-                        startLineNumber: err.line || 1,
-                        startColumn: err.column || 1,
-                        endLineNumber: err.line || 1,
-                        endColumn: (err.column || 1) + 1
-                    });
-                });
-            } catch (e) {
-                // ignore parser failures to avoid blocking editing
-            }
-        }
-
-        const limitedMarkers = combinedMarkers.slice(0, maxProblemItems);
-        monaco.editor.setModelMarkers(model, 'mumps-check', limitedMarkers);
-        renderProblems(problems);
-        return limitedMarkers;
+        return diagnosticsManager.validateMumps(model);
     }
 
     async function runMumpsCode(editor, terminalState) {
