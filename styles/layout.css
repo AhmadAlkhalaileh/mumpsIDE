@@ -1,0 +1,303 @@
+/* ============================================
+   PhpStorm-style IDE Layout (CSS Grid)
+   ============================================ */
+
+/* Main IDE body - 3-column grid layout */
+.ide-body {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    grid-template-rows: 1fr;
+    overflow: hidden;
+    z-index: 1;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    gap: 0;
+    background: #2b2b2b;
+}
+
+/* Tool Window Bars (icon strips on edges) */
+.tool-window-bar {
+    background: var(--rail-bg);
+    display: flex;
+    z-index: 10;
+}
+
+.tool-window-bar-left {
+    flex-direction: column;
+    width: 36px;
+    border-right: 1px solid var(--border);
+    grid-column: 1;
+}
+
+.tool-window-bar-right {
+    flex-direction: column;
+    width: 36px;
+    border-left: 1px solid var(--border);
+    grid-column: 5;
+}
+
+.tool-window-bar-bottom {
+    flex-direction: row;
+    height: 28px;
+    border-top: 1px solid var(--border);
+    align-items: center;
+    padding: 0 4px;
+}
+
+/* Tool Window Stripe Buttons (PhpStorm-style) */
+.tool-window-stripe-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 6px;
+    background: transparent !important;
+    border: none;
+    color: #808080 !important;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    position: relative;
+}
+
+.tool-window-stripe-btn svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.tool-window-stripe-btn .stripe-text {
+    writing-mode: vertical-lr;
+    text-orientation: mixed;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transform: rotate(180deg);
+}
+
+.tool-window-stripe-btn.horizontal {
+    padding: 4px 8px;
+}
+
+.tool-window-stripe-btn.horizontal .stripe-text {
+    writing-mode: horizontal-tb;
+    transform: none;
+}
+
+.tool-window-stripe-btn:hover {
+    background: #2d2f30 !important;
+    color: #bbbbbb !important;
+}
+
+.tool-window-stripe-btn:hover svg {
+    opacity: 1;
+}
+
+.tool-window-stripe-btn.active {
+    background: #2d2f30 !important;
+    color: #bbbbbb !important;
+}
+
+.tool-window-bar-left .tool-window-stripe-btn.active {
+    border-left: 2px solid #4a9eff;
+    padding-left: 4px;
+}
+
+.tool-window-bar-right .tool-window-stripe-btn.active {
+    border-right: 2px solid #4a9eff;
+    padding-right: 4px;
+}
+
+.tool-window-bar-bottom .tool-window-stripe-btn.active {
+    border-bottom: 2px solid #4a9eff;
+    margin-bottom: -2px;
+}
+
+.stripe-spacer {
+    flex: 1;
+}
+
+/* Tool Window Content Areas */
+.tool-window-content {
+    background: var(--sidebar);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.tool-window-left {
+    width: 280px;
+    min-width: 200px;
+    max-width: 500px;
+    border-right: 1px solid var(--border);
+    grid-column: 2;
+    resize: horizontal;
+}
+
+.tool-window-left.hidden {
+    display: none;
+}
+
+.tool-window-right {
+    width: 300px;
+    min-width: 200px;
+    max-width: 500px;
+    border-left: 1px solid var(--border);
+    grid-column: 4;
+    resize: horizontal;
+}
+
+.tool-window-right.hidden {
+    display: none;
+}
+
+.tool-window-bottom {
+    border-top: 1px solid var(--border);
+    min-height: 150px;
+    max-height: 400px;
+    resize: vertical;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.tool-window-bottom.hidden {
+    display: none;
+}
+
+/* Tool Window Panel (content inside tool window) */
+.tool-window-panel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.tool-window-panel.hidden {
+    display: none;
+}
+
+.tool-window-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: #3c3f41 !important;
+    border-bottom: 1px solid #323232;
+    flex-shrink: 0;
+}
+
+.tool-window-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.tool-window-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.tool-window-action-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tool-window-action-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+
+.tool-window-body {
+    flex: 1;
+    overflow: auto;
+    padding: 8px;
+}
+
+.placeholder-content {
+    color: var(--muted);
+    font-size: 12px;
+    padding: 20px;
+    text-align: center;
+    font-style: italic;
+}
+
+/* IDE Center (Editor + Bottom panels) */
+.ide-center {
+    grid-column: 3;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* Editor Area */
+.editor-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    min-height: 0;
+    overflow: hidden;
+    background: #2b2b2b;
+}
+
+/* Bottom Panels Container */
+.bottom-panels-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.tool-window-content.tool-window-bottom {
+    flex: 1;
+    min-height: 200px;
+    max-height: var(--bottom-toolwindow-height);
+    background: #2b2b2b !important;
+    border-top: none;
+    /* Already has border on wrapper */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.tool-window-content.tool-window-bottom.collapsed {
+    flex: 0 0 44px;
+    max-height: 44px;
+    min-height: 44px;
+}
+
+.tool-window-content.tool-window-bottom.collapsed .panel {
+    display: none !important;
+}
+
+/* Legacy compatibility - hide old classes */
+.body {
+    display: none;
+}
+
+.content-area {
+    display: none;
+}
+
+.sidebar {
+    display: none;
+}
+
+.bottom-panel {
+    display: none;
+}
+

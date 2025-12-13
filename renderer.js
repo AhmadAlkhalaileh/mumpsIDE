@@ -177,8 +177,19 @@
 	    let currentDebugSession = null; // current debug session (shared with debug module)
 	    let debugManager = null; // debug module instance (src/editor/debug/renderer-debug.js)
 	    let problemsManager = null; // problems UI module instance (src/editor/problems/renderer-problems.js)
-	    let diagnosticsManager = null; // lint/diagnostics module instance (src/editor/diagnostics/renderer-diagnostics.js)
-	    let mumpsMonacoManager = null; // monaco+mumps bootstrap module instance (src/editor/mumps/renderer-mumps-monaco.js)
+		    let diagnosticsManager = null; // lint/diagnostics module instance (src/editor/diagnostics/renderer-diagnostics.js)
+		    let mumpsMonacoManager = null; // monaco+mumps bootstrap module instance (src/editor/mumps/renderer-mumps-monaco.js)
+		    let gitToolWindowManager = null; // git tool window module instance (src/editor/git/renderer-git-toolwindow.js)
+		    let gitSettingsManager = null; // git settings panel module instance (src/editor/git/renderer-git-settings.js)
+		    let connectionsManager = null; // connections panel module instance (src/editor/connections/renderer-connections.js)
+		    let extensionsManager = null; // extensions view module instance (src/editor/extensions/renderer-extensions.js)
+		    let projectCreateManager = null; // new project creation module instance (src/editor/project/renderer-project-create.js)
+		    let projectTreeManager = null; // project tree module instance (src/editor/project/renderer-project-tree.js)
+		    let projectContextMenuManager = null; // project tree context menu module instance (src/editor/project/renderer-project-context-menu.js)
+		    let editorContextMenuManager = null; // editor context menu module instance (src/editor/ui/renderer-editor-context-menu.js)
+		    let settingsPanelManager = null; // settings panel UI module instance (src/editor/ui/renderer-settings-panel.js)
+		    let ctrlHoverManager = null; // ctrl+hover and gutter module instance (src/editor/ui/renderer-ctrl-hover.js)
+		    let routinesManager = null; // routines module instance (src/editor/routines/renderer-routines.js)
 
     // ========== MUMPS Reference Parser (shared utility) ==========
     // Parse routine/tag reference at cursor position (supports TAG^RTN, ^RTN, DO TAG)
@@ -385,11 +396,6 @@
     const RE_SUSPICIOUS = /[{}\[\]\\]/;
     let lastValidatedVersionId = null;
     let lintSkipNotified = false;
-    const extensionsState = {
-        installed: [],
-        selectedId: null,
-        enabled: {}
-    };
     if (typeof window !== 'undefined') {
         window._mumpsLinter = mumpsLinter;
         window._mumpsValidator = mumpsValidator;
@@ -481,85 +487,13 @@
     }
 
     function bindGitSettingsPanel() {
-        const saveBtn = $('#gitSettingsSave');
-        const testBtn = $('#gitSettingsTest');
-        const statusEl = $('#gitSettingsStatus');
-        const nameInput = $('#gitUserName');
-        const emailInput = $('#gitUserEmail');
-        const remoteInput = $('#gitRemoteUrl');
-        if (!saveBtn.length || !statusEl.length) return;
-
-        // Prefill from project .git/config or global/home git config
-        (async () => {
-            // Try project .git/config first if a project is open
-            if (currentProject && currentProject.projectPath) {
-                const gitConfig = await window.ahmadIDE.getGitConfig(currentProject.projectPath);
-                if (gitConfig?.ok) {
-                    if (gitConfig.user?.name) nameInput.val(gitConfig.user.name);
-                    if (gitConfig.user?.email) emailInput.val(gitConfig.user.email);
-                    if (gitConfig.remote?.origin) remoteInput.val(gitConfig.remote.origin);
-                    return; // Found project config, don't load global
-                }
-            }
-
-            // Fallback to global git config
-            const resUser = await window.ahmadIDE.git('git config --global user.name');
-            if (resUser?.ok && resUser.stdout) nameInput.val(resUser.stdout.trim());
-            const resEmail = await window.ahmadIDE.git('git config --global user.email');
-            if (resEmail?.ok && resEmail.stdout) emailInput.val(resEmail.stdout.trim());
-        })();
-
-        const runGit = async (cmd) => {
-            try {
-                const res = await window.ahmadIDE.git(cmd);
-                if (!res.ok) {
-                    showToast('error', 'Git', res.error || res.stderr || 'Git command failed');
-                    statusEl.text(`Error: ${res.error || res.stderr || 'Git command failed'}`);
-                    return false;
-                }
-                return res;
-            } catch (e) {
-                showToast('error', 'Git', e.message || 'Git command failed');
-                statusEl.text(`Error: ${e.message || 'Git command failed'}`);
-                return false;
-            }
-        };
-
-        saveBtn.on('click', async () => {
-            const name = (nameInput.val() || '').trim();
-            const email = (emailInput.val() || '').trim();
-            const remote = (remoteInput.val() || '').trim();
-            const cmds = [];
-            if (name) cmds.push(`git config user.name "${name.replace(/"/g, '\\"')}"`);
-            if (email) cmds.push(`git config user.email "${email.replace(/"/g, '\\"')}"`);
-            if (remote) {
-                const escRemote = remote.replace(/"/g, '\\"');
-                cmds.push(`git remote set-url origin "${escRemote}" || git remote add origin "${escRemote}"`);
-            }
-            if (!cmds.length) {
-                statusEl.text('No changes to apply');
-                return;
-            }
-            statusEl.text('Applying...');
-            for (const cmd of cmds) {
-                const ok = await runGit(cmd);
-                if (!ok) return;
-            }
-            statusEl.text('Git settings applied');
-            showToast('info', 'Git', 'Git settings applied');
-        });
-
-        testBtn.on('click', async () => {
-            statusEl.text('Testing...');
-            const res = await runGit('git status --short');
-            if (res && res.ok) {
-                statusEl.text(res.stdout ? res.stdout.trim() : 'Clean status');
-                showToast('info', 'Git', 'Status ok');
-            }
-        });
+        return gitSettingsManager.bindGitSettingsPanel();
     }
 
     function openSettingsPanel() {
+        if (settingsPanelManager && typeof settingsPanelManager.openSettingsPanel === 'function') {
+            return settingsPanelManager.openSettingsPanel();
+        }
         const panel = document.getElementById('settingsPanel');
         const overlay = document.getElementById('settingsOverlay');
         panel?.classList.remove('hidden');
@@ -893,9 +827,207 @@
 	        }
 	    });
 
-    function showConfirmDialog(title, message, onConfirm) {
-        const overlay = $('<div class="prompt-overlay"></div>');
-        const dialog = $('<div class="prompt-dialog"></div>');
+	    // Git tool window moved to src/editor/git/renderer-git-toolwindow.js
+	    const createGitToolWindowManager = window.AhmadIDEModules?.git?.createGitToolWindowManager;
+	    if (!createGitToolWindowManager) {
+	        logger.error('GIT_TOOL_WINDOW_MODULE_MISSING', { path: './src/editor/git/renderer-git-toolwindow.js' });
+	        throw new Error('Git Tool Window module missing: ./src/editor/git/renderer-git-toolwindow.js');
+	    }
+		    gitToolWindowManager = createGitToolWindowManager({
+		        deps: {
+		            showToast,
+		            normalizeGitError: (...args) => normalizeGitError(...args),
+		            toggleToolWindowPanel
+		        }
+		    });
+
+		    // Git settings panel moved to src/editor/git/renderer-git-settings.js
+		    const createGitSettingsManager = window.AhmadIDEModules?.git?.createGitSettingsManager;
+		    if (!createGitSettingsManager) {
+		        logger.error('GIT_SETTINGS_MODULE_MISSING', { path: './src/editor/git/renderer-git-settings.js' });
+		        throw new Error('Git Settings module missing: ./src/editor/git/renderer-git-settings.js');
+		    }
+		    gitSettingsManager = createGitSettingsManager({
+		        deps: {
+		            $,
+		            showToast,
+		            getCurrentProject: () => currentProject
+		        }
+		    });
+
+		    // Connections panel moved to src/editor/connections/renderer-connections.js
+		    const createConnectionsManager = window.AhmadIDEModules?.connections?.createConnectionsManager;
+		    if (!createConnectionsManager) {
+		        logger.error('CONNECTIONS_MODULE_MISSING', { path: './src/editor/connections/renderer-connections.js' });
+		        throw new Error('Connections module missing: ./src/editor/connections/renderer-connections.js');
+		    }
+				    connectionsManager = createConnectionsManager({
+				        deps: {
+				            appendOutput,
+				            loadRoutineList: (...args) => loadRoutineList(...args),
+				            renderDocker: (...args) => renderDocker(...args),
+				            setConnStatus: (...args) => setConnStatus(...args),
+				            getRoutineSearchValue: () => {
+				                try {
+				                    if (typeof routineSearch !== 'undefined' && routineSearch && routineSearch.value != null) {
+				                        return routineSearch.value || '';
+				                    }
+				                } catch (e) {
+				                    // ignore global lookup errors
+				                }
+				                return document.getElementById('routineSearch')?.value || '';
+				            }
+				        }
+				    });
+
+				    // Extensions view moved to src/editor/extensions/renderer-extensions.js
+				    const createExtensionsManager = window.AhmadIDEModules?.extensions?.createExtensionsManager;
+				    if (!createExtensionsManager) {
+				        logger.error('EXTENSIONS_MODULE_MISSING', { path: './src/editor/extensions/renderer-extensions.js' });
+				        throw new Error('Extensions module missing: ./src/editor/extensions/renderer-extensions.js');
+				    }
+				    extensionsManager = createExtensionsManager({
+				        deps: {
+				            updateDebugButtonState: (...args) => updateDebugButtonState(...args)
+				        }
+				    });
+
+				    // New Project panel moved to src/editor/project/renderer-project-create.js
+				    const createProjectCreateManager = window.AhmadIDEModules?.projectCreate?.createProjectCreateManager;
+				    if (!createProjectCreateManager) {
+				        logger.error('PROJECT_CREATE_MODULE_MISSING', { path: './src/editor/project/renderer-project-create.js' });
+			        throw new Error('Project Create module missing: ./src/editor/project/renderer-project-create.js');
+			    }
+			    projectCreateManager = createProjectCreateManager({
+			        deps: {
+			            $,
+			            showToast,
+			            loadProjectIntoTree: (...args) => loadProjectIntoTree(...args)
+			        }
+			    });
+
+			    // Project tree context menu moved to src/editor/project/renderer-project-context-menu.js
+			    const createProjectContextMenuManager = window.AhmadIDEModules?.projectContextMenu?.createProjectContextMenuManager;
+			    if (!createProjectContextMenuManager) {
+			        logger.error('PROJECT_CONTEXT_MENU_MODULE_MISSING', { path: './src/editor/project/renderer-project-context-menu.js' });
+	        throw new Error('Project Context Menu module missing: ./src/editor/project/renderer-project-context-menu.js');
+	    }
+	    projectContextMenuManager = createProjectContextMenuManager({
+	        deps: {
+	            $,
+	            showToast,
+	            showCustomPrompt,
+	            createTab,
+	            setCurrentRoutine: (...args) => setCurrentRoutine(...args),
+	            loadRoutineByName: (...args) => loadRoutineByName(...args),
+	            loadRoutineList: (...args) => loadRoutineList(...args),
+	            getCurrentProject: () => currentProject,
+	            openGitToolWindow: (...args) => openGitToolWindow(...args),
+	            runGitQuickCmd: (...args) => runGitQuickCmd(...args)
+	        }
+	    });
+
+	    // Editor context menu moved to src/editor/ui/renderer-editor-context-menu.js
+	    const createEditorContextMenuManager = window.AhmadIDEModules?.ui?.createEditorContextMenuManager;
+	    if (!createEditorContextMenuManager) {
+	        logger.error('EDITOR_CONTEXT_MENU_MODULE_MISSING', { path: './src/editor/ui/renderer-editor-context-menu.js' });
+	        throw new Error('Editor Context Menu module missing: ./src/editor/ui/renderer-editor-context-menu.js');
+	    }
+			    editorContextMenuManager = createEditorContextMenuManager({
+			        deps: {
+			            $,
+			            showToast,
+			            getActiveEditor: () => activeEditor,
+			            parseRoutineReferenceAtPosition,
+			            getActiveRoutine,
+			            runGitContextAction: (...args) => runGitContextAction(...args),
+			            goToDeclaration: (...args) => goToDeclaration(...args)
+			        }
+			    });
+
+			    // Settings panel UI moved to src/editor/ui/renderer-settings-panel.js
+			    const createSettingsPanelManager = window.AhmadIDEModules?.ui?.createSettingsPanelManager;
+			    if (!createSettingsPanelManager) {
+			        logger.error('SETTINGS_PANEL_MODULE_MISSING', { path: './src/editor/ui/renderer-settings-panel.js' });
+			        throw new Error('Settings Panel module missing: ./src/editor/ui/renderer-settings-panel.js');
+			    }
+			    settingsPanelManager = createSettingsPanelManager();
+
+			    // Ctrl+hover + gutter click moved to src/editor/ui/renderer-ctrl-hover.js
+			    const createCtrlHoverManager = window.AhmadIDEModules?.ui?.createCtrlHoverManager;
+			    if (!createCtrlHoverManager) {
+			        logger.error('CTRL_HOVER_MODULE_MISSING', { path: './src/editor/ui/renderer-ctrl-hover.js' });
+		        throw new Error('Ctrl Hover module missing: ./src/editor/ui/renderer-ctrl-hover.js');
+		    }
+		    ctrlHoverManager = createCtrlHoverManager({
+		        deps: {
+		            getMonaco: () => (typeof monaco !== 'undefined' ? monaco : null),
+		            parseRoutineReferenceAtPosition,
+		            goToDeclaration: (...args) => goToDeclaration(...args),
+		            toggleBreakpoint: (...args) => toggleBreakpoint(...args)
+		        }
+		    });
+
+		    // Project tree moved to src/editor/project/renderer-project-tree.js
+		    const createProjectTreeManager = window.AhmadIDEModules?.projectTree?.createProjectTreeManager;
+		    if (!createProjectTreeManager) {
+		        logger.error('PROJECT_TREE_MODULE_MISSING', { path: './src/editor/project/renderer-project-tree.js' });
+	        throw new Error('Project Tree module missing: ./src/editor/project/renderer-project-tree.js');
+	    }
+	    projectTreeManager = createProjectTreeManager({
+	        state: {
+	            collapsedTreeNodes,
+	            mumpsFileIconSvg
+	        },
+	        deps: {
+	            $,
+	            normalizeRoutineTarget,
+	            loadRoutineByName: (...args) => loadRoutineByName(...args),
+	            showProjectContextMenu: (...args) => showProjectContextMenu(...args),
+	            getCurrentProject: () => currentProject,
+	            getActiveEditor: () => activeEditor,
+	            getRoutineFilterTerm: () => routineFilterTerm,
+	            getRoutineState: () => routineState
+	        }
+	    });
+
+	    // Routines moved to src/editor/routines/renderer-routines.js
+	    const createRoutinesManager = window.AhmadIDEModules?.routines?.createRoutinesManager;
+	    if (!createRoutinesManager) {
+	        logger.error('ROUTINES_MODULE_MISSING', { path: './src/editor/routines/renderer-routines.js' });
+	        throw new Error('Routines module missing: ./src/editor/routines/renderer-routines.js');
+	    }
+	    routinesManager = createRoutinesManager({
+	        deps: {
+	            logger,
+	            showToast,
+	            appendOutput,
+	            showCustomPrompt,
+	            normalizeRoutineTarget,
+	            setActiveRoutineName: (v) => { activeRoutineName = v; },
+	            getRoutinesCache: () => routinesCache,
+	            setRoutinesCache: (v) => { routinesCache = v; },
+	            renderProjectTree: (...args) => renderProjectTree(...args),
+	            getActiveEditor: () => activeEditor,
+	            findOpenTab,
+	            switchTab,
+	            createTab,
+	            getActiveTabId: () => activeTabId,
+	            getOpenTabs: () => openTabs,
+	            markTabDirty,
+	            renderTabs,
+	            validateMumps: (...args) => validateMumps(...args),
+	            hasLintRules: (...args) => hasLintRules(...args),
+	            applyLintMarkers: (...args) => applyLintMarkers(...args),
+	            renderProblems: (...args) => renderProblems(...args),
+	            mumpsValidator,
+	            mumpsLinter
+	        }
+	    });
+
+	    function showConfirmDialog(title, message, onConfirm) {
+	        const overlay = $('<div class="prompt-overlay"></div>');
+	        const dialog = $('<div class="prompt-dialog"></div>');
         dialog.html(`
             <div class="prompt-title">${title}</div>
             <div class="prompt-message">${message}</div>
@@ -954,245 +1086,17 @@
         });
     }
 
-    // ============================================
-    // PhpStorm-style Project Tree Context Menu
-    // ============================================
+	    // ============================================
+	    // PhpStorm-style Project Tree Context Menu
+	    // ============================================
 
-    function normalizeContextMenuSeparators(items) {
-        const cleaned = [];
-        let lastWasSeparator = false;
-        items.forEach(item => {
-            if (item.separator) {
-                if (!cleaned.length || lastWasSeparator) return;
-                cleaned.push(item);
-                lastWasSeparator = true;
-            } else {
-                cleaned.push(item);
-                lastWasSeparator = false;
-            }
-        });
-        if (cleaned.length && cleaned[cleaned.length - 1].separator) {
-            cleaned.pop();
-        }
-        return cleaned;
-    }
+	    function showProjectContextMenu(x, y, options = {}) {
+	        return projectContextMenuManager.showProjectContextMenu(x, y, options);
+	    }
 
-    function createContextMenuItemElement(item, menu) {
-        if (item.separator) return $('<div class="ctx-separator"></div>');
-        const el = $('<div class="ctx-item"></div>');
-        if (item.disabled) el.addClass('disabled');
-        el.append($('<span class="ctx-label"></span>').text(item.label));
-        if (item.shortcut) el.append($('<span class="ctx-shortcut"></span>').text(item.shortcut));
-        if (item.submenu) {
-            el.addClass('has-submenu');
-            el.append($('<span class="ctx-arrow">▸</span>'));
-            const sub = $('<div class="ctx-submenu"></div>');
-            item.submenu.forEach(subItem => sub.append(createContextMenuItemElement(subItem, menu)));
-            el.append(sub);
-        } else if (item.action && !item.disabled) {
-            el.on('click', (e) => {
-                e.stopPropagation();
-                menu.remove();
-                item.action();
-            });
-        }
-        return el;
-    }
-
-    function showProjectContextMenu(x, y, options = {}) {
-        const { type, path, name, routineStateRef, editorRef, folderName } = options;
-        $('.routines-context-menu').remove();
-
-        const menu = $('<div class="routines-context-menu"></div>');
-        menu.css({ position: 'fixed', top: y, left: x, zIndex: 5000 });
-
-        const resolvedPath = path || (folderName ? `${folderName}/${name || ''}` : null);
-        const projectRoot = currentProject?.projectPath || '';
-        const copyPathText = resolvedPath ? `${projectRoot ? projectRoot + '/' : ''}${resolvedPath}` : projectRoot || '';
-
-        const copyToClipboard = async (text, label = 'Path copied') => {
-            try {
-                await navigator.clipboard.writeText(text);
-                showToast('success', 'Copied', label);
-            } catch (err) {
-                showToast('error', 'Copy failed', err.message || 'Could not copy');
-            }
-        };
-
-        const ensureGitPanel = () => {
-            openGitToolWindow();
-        };
-
-        const gitActions = {
-            add: async (target) => {
-                if (!target) return;
-                ensureGitPanel();
-                await runGitQuickCmd(`git add -- "${target}"`, { toastLabel: 'Git Add' });
-                document.getElementById('gitStatusBtn')?.click();
-            },
-            commitFile: async (target) => {
-                ensureGitPanel();
-                const msg = document.getElementById('gitCommitMessage');
-                const diffPath = document.getElementById('gitDiffPath');
-                if (diffPath) diffPath.value = target || '';
-                await runGitQuickCmd(`git add -- "${target}"`, { toastLabel: 'Git Commit' });
-                showToast('info', 'Commit File', 'Staged file. Enter message in Git tool window to commit.');
-                msg?.focus();
-                document.getElementById('gitStatusBtn')?.click();
-            },
-            history: async (target) => {
-                ensureGitPanel();
-                await runGitQuickCmd(`git log --oneline -- "${target}"`, { toastLabel: 'Git History' });
-                const input = document.getElementById('gitDiffPath');
-                if (input) input.value = target || '';
-                document.getElementById('gitLogBtn')?.click();
-            },
-            compareHead: async (target) => {
-                ensureGitPanel();
-                const input = document.getElementById('gitDiffPath');
-                if (input) input.value = target || '';
-                document.getElementById('gitDiffFileBtn')?.click();
-            },
-            rollback: async (target) => {
-                ensureGitPanel();
-                await runGitQuickCmd(`git checkout -- "${target}"`, { toastLabel: 'Git Rollback' });
-                document.getElementById('gitStatusBtn')?.click();
-            }
-        };
-
-        const menuItems = [];
-
-        if (type === 'folder' || type === 'root') {
-            menuItems.push({
-                label: 'New…',
-                submenu: [
-                    {
-                        label: 'MUMPS Routine',
-                        action: () => {
-                            showCustomPrompt('New MUMPS Routine', 'Routine name (e.g., MYRTN)', (val) => {
-                                if (!val) return;
-                                const routineName = val.toUpperCase();
-                                const targetFolder = folderName || 'routines';
-                                const fullPath = `${targetFolder}/${routineName}`;
-                                const newContent = `${routineName}\t; New routine created\n\tQUIT\n`;
-                                createTab(routineName, newContent, { current: fullPath });
-                                editorRef?.setValue(newContent);
-                                if (routineStateRef) routineStateRef.current = fullPath;
-                                setCurrentRoutine(fullPath);
-                                showToast('success', 'Created', `New routine: ${routineName}`);
-                            });
-                        }
-                    },
-                    { label: 'Folder', action: () => showToast('info', 'NOT IMPLEMENTED YET', 'Folder creation requires file system access') }
-                ]
-            });
-            menuItems.push({ separator: true });
-        }
-
-        if (type === 'file') {
-            menuItems.push({
-                label: 'Open',
-                action: async () => {
-                    if (path && routineStateRef && editorRef) {
-                        await loadRoutineByName(path, routineStateRef, editorRef);
-                    }
-                }
-            });
-            menuItems.push({ separator: true });
-        }
-
-        // Core actions
-        menuItems.push({ label: 'Cut', disabled: true, action: () => showToast('info', 'NOT IMPLEMENTED YET', 'Cut requires filesystem access') });
-        menuItems.push({ label: 'Copy', disabled: true, action: () => showToast('info', 'NOT IMPLEMENTED YET', 'Copy requires filesystem access') });
-        menuItems.push({ label: 'Paste', disabled: true, action: () => showToast('info', 'NOT IMPLEMENTED YET', 'Paste requires filesystem access') });
-        menuItems.push({ separator: true });
-
-        if (type === 'file') {
-            menuItems.push({
-                label: 'Rename…',
-                shortcut: 'F2',
-                disabled: true
-            });
-        }
-        menuItems.push({
-            label: 'Delete',
-            shortcut: '⌦',
-            disabled: true
-        });
-        menuItems.push({ separator: true });
-
-        menuItems.push({ label: 'Refactor', action: () => showToast('info', 'NOT IMPLEMENTED YET', 'Refactor operations not available yet') });
-        menuItems.push({ separator: true });
-
-        menuItems.push({
-            label: 'Copy Path',
-            action: () => {
-                if (copyPathText) copyToClipboard(copyPathText, 'Path copied');
-            }
-        });
-        menuItems.push({
-            label: 'Copy Reference',
-            action: () => {
-                const ref = resolvedPath || '';
-                copyToClipboard(ref, 'Reference copied');
-            }
-        });
-        menuItems.push({ separator: true });
-
-        menuItems.push({
-            label: 'Reveal in File Explorer',
-            action: () => {
-                if (window.ahmadIDE?.revealInExplorer) {
-                    window.ahmadIDE.revealInExplorer(copyPathText || currentProject?.projectPath);
-                } else {
-                    showToast('info', 'Not Available', 'File explorer integration not available');
-                }
-            }
-        });
-        menuItems.push({ separator: true });
-
-        // Git submenu
-        menuItems.push({
-            label: 'Git',
-            submenu: [
-                { label: 'Add', action: () => gitActions.add(resolvedPath || '.') },
-                { label: 'Commit…', action: () => gitActions.commitFile(resolvedPath || '.') },
-                { label: 'Show History', action: () => gitActions.history(resolvedPath || '.') },
-                { label: 'Compare with Latest Version', action: () => gitActions.compareHead(resolvedPath || '.') },
-                { label: 'Revert / Rollback', action: () => gitActions.rollback(resolvedPath || '.') }
-            ]
-        });
-        menuItems.push({ separator: true });
-
-        menuItems.push({
-            label: 'Refresh',
-            action: async () => {
-                if (routineStateRef && editorRef) {
-                    await loadRoutineList(routineStateRef, editorRef);
-                    showToast('success', 'Refreshed', 'Project tree updated');
-                }
-            }
-        });
-
-        // Build DOM
-        normalizeContextMenuSeparators(menuItems).forEach(i => menu.append(createContextMenuItemElement(i, menu)));
-        $('body').append(menu);
-
-        const rect = menu[0].getBoundingClientRect();
-        if (rect.right > window.innerWidth) menu.css('left', window.innerWidth - rect.width - 10);
-        if (rect.bottom > window.innerHeight) menu.css('top', window.innerHeight - rect.height - 10);
-        setTimeout(() => $(document).one('click', () => menu.remove()), 100);
-        return false;
-    }
-
-    // Legacy wrapper for compatibility
-    function showRoutinesFolderContextMenu(x, y, routineStateRef, editorRef) {
-        return showProjectContextMenu(x, y, {
-            type: 'folder',
-            routineStateRef,
-            editorRef
-        });
-    }
+	    function showRoutinesFolderContextMenu(x, y, routineStateRef, editorRef) {
+	        return projectContextMenuManager.showRoutinesFolderContextMenu(x, y, routineStateRef, editorRef);
+	    }
 
     function getFileIcon(filename) {
         const ext = filename.split('.').pop().toLowerCase();
@@ -1271,321 +1175,22 @@
         return iconMap[ext] || { icon: '📄', cls: 'default' };
     }
 
-    // ============================================
-    // PhpStorm-style SVG Icons for Project Tree
-    // ============================================
-    const treeIcons = {
-        folder: `<svg width="16" height="16" viewBox="0 0 16 16" fill="#8c7a65"><path d="M2 3h5l1 1h6v9H2V3zm1 1v8h10V5H7.5L6.5 4H3z"/></svg>`,
-        folderOpen: `<svg width="16" height="16" viewBox="0 0 16 16" fill="#c4a97a"><path d="M2 3h5l1 1h6v2h-1l-1 7H3L2 6V3zm1 1v1.5l.8 6.5h8.4l.8-5H4V4z"/></svg>`,
-        project: `<svg width="16" height="16" viewBox="0 0 16 16"><rect x="1" y="1" width="14" height="14" rx="2" fill="#6b8dad"/><path d="M4 5h8v1H4zm0 3h8v1H4zm0 3h5v1H4z" fill="#fff" opacity="0.8"/></svg>`,
-        mumps: mumpsFileIconSvg,
-        arrow: `<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>`
-    };
+	    // Project tree moved to src/editor/project/renderer-project-tree.js
+	    function renderProjectTreeLoading(message = 'Loading routines…') {
+	        return projectTreeManager.renderProjectTreeLoading(message);
+	    }
 
-    let projectTreeRenderPending = null;
-    let projectTreeRenderArgs = null;
-    let projectTreeRenderToken = 0;
-    let lastSelectedTreeItem = null;
-
-    function renderProjectTreeLoading(message = 'Loading routines…') {
-        const host = document.getElementById('projectTree');
-        if (!host) return;
-        host.innerHTML = `<div class="tree-item disabled">${message}</div>`;
-    }
-
-    function renderProjectTree(routines = [], routineStateRef = null, editorRef = null) {
-        const token = ++projectTreeRenderToken;
-        projectTreeRenderArgs = { routines, routineStateRef, editorRef, token };
-        if (projectTreeRenderPending) return;
-        projectTreeRenderPending = window.requestAnimationFrame(() => {
-            projectTreeRenderPending = null;
-            const args = projectTreeRenderArgs || { routines: [], routineStateRef: null, editorRef: null, token: projectTreeRenderToken };
-            projectTreeRenderArgs = null;
-            renderProjectTreeImmediate(args.routines, args.routineStateRef, args.editorRef, args.token);
-        });
-    }
-
-    function renderProjectTreeImmediate(routines = [], routineStateRef = null, editorRef = null, token = projectTreeRenderToken) {
-        if (token !== projectTreeRenderToken) return;
-        const host = $('#projectTree');
-        if (!host.length) return;
-        const hostEl = host[0];
-        hostEl.innerHTML = '';
-        const frag = document.createDocumentFragment();
-        const normalizedCurrent = normalizeRoutineTarget(routineStateRef?.current || '').path;
-        lastSelectedTreeItem = null;
-
-        // PhpStorm-style tree item builder
-        const createTreeItem = (label, options = {}) => {
-            const { icon, isFolder, hasChildren, expanded, depth = 0, togglePath, onClick, onContext, isActive, isDisabled } = options;
-
-            const item = $('<div class="tree-item"></div>');
-            if (isFolder) item.addClass('folder');
-            if (isActive) item.addClass('active');
-            if (isDisabled) item.addClass('disabled');
-
-            // Indentation based on depth
-            item.css('padding-left', `${4 + depth * 16}px`);
-
-            // Expand/collapse arrow (PhpStorm style)
-            if (hasChildren) {
-                const arrow = $('<span class="tree-arrow"></span>');
-                arrow.html(treeIcons.arrow);
-                if (expanded) arrow.addClass('expanded');
-                arrow.on('click', (e) => {
-                    e.stopPropagation();
-                    if (togglePath) {
-                        if (collapsedTreeNodes.has(togglePath)) {
-                            collapsedTreeNodes.delete(togglePath);
-                        } else {
-                            collapsedTreeNodes.add(togglePath);
-                        }
-                        renderProjectTree(routines, routineStateRef, editorRef);
-                    }
-                });
-                item.append(arrow);
-            } else {
-                // Empty placeholder for alignment
-                const arrow = $('<span class="tree-arrow empty"></span>');
-                item.append(arrow);
-            }
-
-            // Icon
-            const iconSpan = $('<span class="tree-icon"></span>');
-            iconSpan.html(icon || treeIcons.mumps);
-            item.append(iconSpan);
-
-            // Label
-            const labelSpan = $('<span class="tree-label"></span>').text(label);
-            item.append(labelSpan);
-
-            // Click handler
-            if (onClick && !isDisabled) {
-                item.on('click', (e) => {
-                    if (!$(e.target).hasClass('tree-arrow') && !$(e.target).closest('.tree-arrow').length) {
-                        onClick(e);
-                    }
-                });
-            }
-
-            // Context menu handler
-            if (onContext) {
-                item.on('contextmenu', (e) => {
-                    e.preventDefault();
-                    onContext(e);
-                });
-            }
-
-            return item;
-        };
-
-        const scheduleIdle = (cb) => {
-            if (window.requestIdleCallback) return window.requestIdleCallback(cb, { timeout: 50 });
-            if (window.requestAnimationFrame) return window.requestAnimationFrame(cb);
-            return setTimeout(cb, 16);
-        };
-
-        const renderRoutineItemsChunked = (list, childrenContainer, opts = {}) => {
-            const { folderName, depth, routinesSource } = opts;
-            const batchSize = 200;
-            const maxMs = 10;
-            let idx = 0;
-
-            const renderBatch = () => {
-                if (token !== projectTreeRenderToken) return;
-                const start = performance.now();
-                let added = 0;
-                while (idx < list.length && added < batchSize && (performance.now() - start) < maxMs) {
-                    const routinePath = list[idx++];
-                    const displayName = routinePath.replace(/^(localr|routines)\//, '');
-                    const isCurrentRoutine = normalizeRoutineTarget(routinePath).path === normalizedCurrent;
-
-                    const fileItem = createTreeItem(displayName, {
-                        icon: treeIcons.mumps,
-                        depth: depth + 1,
-                        isActive: isCurrentRoutine,
-                        onClick: async () => {
-                            if (lastSelectedTreeItem) {
-                                lastSelectedTreeItem.removeClass('selected active');
-                            }
-                            fileItem.addClass('selected active');
-                            lastSelectedTreeItem = fileItem;
-                            await loadRoutineByName(routinePath, routineStateRef, editorRef || activeEditor, routinesSource);
-                        },
-                        onContext: (e) => showProjectContextMenu(e.clientX, e.clientY, {
-                            type: 'file',
-                            path: routinePath,
-                            name: displayName,
-                            folderName: folderName,
-                            routineStateRef,
-                            editorRef
-                        })
-                    });
-                    childrenContainer.append(fileItem);
-                    added += 1;
-                }
-                if (idx < list.length) {
-                    scheduleIdle(renderBatch);
-                }
-            };
-
-            renderBatch();
-        };
-
-        // Project root
-        const rootPath = 'root';
-        const rootExpanded = !collapsedTreeNodes.has(rootPath);
-        const projectName = currentProject?.projectPath?.split('/').pop() || 'Project';
-
-        const rootItem = createTreeItem(projectName, {
-            icon: rootExpanded ? treeIcons.folderOpen : treeIcons.project,
-            isFolder: true,
-            hasChildren: true,
-            expanded: rootExpanded,
-            depth: 0,
-            togglePath: rootPath,
-            onContext: (e) => showProjectContextMenu(e.clientX, e.clientY, {
-                type: 'root',
-                routineStateRef,
-                editorRef
-            })
-        });
-        frag.appendChild(rootItem[0]);
-
-        if (!rootExpanded) {
-            hostEl.appendChild(frag);
-            return; // Don't render children if collapsed
-        }
-
-        // Group routines by folder
-        const routinesByFolder = { localr: [], routines: [] };
-        (routines || []).forEach(r => {
-            if (r.startsWith('localr/')) {
-                routinesByFolder.localr.push(r);
-            } else if (r.startsWith('routines/')) {
-                routinesByFolder.routines.push(r);
-            }
-        });
-
-        // Helper to create folder with routines
-        const createRoutineFolder = (folderName, folderRoutines, depth) => {
-            const folderPath = `root/${folderName}`;
-            const folderExpanded = !collapsedTreeNodes.has(folderPath);
-            const hasRoutines = folderRoutines.length > 0;
-
-            const container = $('<div></div>');
-
-            const folderItem = createTreeItem(folderName, {
-                icon: folderExpanded ? treeIcons.folderOpen : treeIcons.folder,
-                isFolder: true,
-                hasChildren: hasRoutines,
-                expanded: folderExpanded,
-                depth: depth,
-                togglePath: folderPath,
-                onContext: (e) => showProjectContextMenu(e.clientX, e.clientY, {
-                    type: 'folder',
-                    folderName: folderName,
-                    routineStateRef,
-                    editorRef
-                })
-            });
-            container.append(folderItem);
-
-            if (folderExpanded) {
-                const children = $('<div class="tree-children"></div>');
-
-                const filteredRoutines = folderRoutines.filter(r =>
-                    !routineFilterTerm || r.toLowerCase().includes(routineFilterTerm.toLowerCase())
-                );
-
-                if (!filteredRoutines.length) {
-                    const msg = routineFilterTerm ? `No match for "${routineFilterTerm}"` : '(empty)';
-                    const emptyItem = createTreeItem(msg, {
-                        icon: treeIcons.mumps,
-                        depth: depth + 1,
-                        isDisabled: true
-                    });
-                    children.append(emptyItem);
-                } else {
-                    const routinesSource = routines;
-                    if (filteredRoutines.length > 400) {
-                        renderRoutineItemsChunked(filteredRoutines, children, {
-                            folderName,
-                            depth,
-                            routinesSource
-                        });
-                    } else {
-                        filteredRoutines.forEach(routinePath => {
-                            const displayName = routinePath.replace(/^(localr|routines)\//, '');
-                            const isCurrentRoutine = normalizeRoutineTarget(routinePath).path === normalizedCurrent;
-
-                            const fileItem = createTreeItem(displayName, {
-                                icon: treeIcons.mumps,
-                                depth: depth + 1,
-                                isActive: isCurrentRoutine,
-                                onClick: async () => {
-                                    if (lastSelectedTreeItem) {
-                                        lastSelectedTreeItem.removeClass('selected active');
-                                    }
-                                    fileItem.addClass('selected active');
-                                    lastSelectedTreeItem = fileItem;
-                                    await loadRoutineByName(routinePath, routineStateRef, editorRef || activeEditor, routinesSource);
-                                },
-                                onContext: (e) => showProjectContextMenu(e.clientX, e.clientY, {
-                                    type: 'file',
-                                    path: routinePath,
-                                    name: displayName,
-                                    folderName: folderName,
-                                    routineStateRef,
-                                    editorRef
-                                })
-                            });
-                            children.append(fileItem);
-                        });
-                    }
-                }
-                container.append(children);
-            }
-
-            return container;
-        };
-
-        // Create folders
-        const rootChildren = $('<div class="tree-children"></div>');
-
-        if (routinesByFolder.localr.length > 0) {
-            rootChildren.append(createRoutineFolder('localr', routinesByFolder.localr, 1));
-        }
-
-        if (routinesByFolder.routines.length > 0) {
-            rootChildren.append(createRoutineFolder('routines', routinesByFolder.routines, 1));
-        }
-
-        if (routinesByFolder.localr.length === 0 && routinesByFolder.routines.length === 0) {
-            const emptyItem = createTreeItem('No routines found', {
-                icon: treeIcons.mumps,
-                depth: 1,
-                isDisabled: true
-            });
-            rootChildren.append(emptyItem);
-        }
-
-        frag.appendChild(rootChildren[0]);
-        hostEl.appendChild(frag);
-    }
+	    function renderProjectTree(routines = [], routineStateRef = null, editorRef = null) {
+	        return projectTreeManager.renderProjectTree(routines, routineStateRef, editorRef);
+	    }
 
     function defaultShortcut(actionId) {
         return shortcutDefaults[actionId] || null;
     }
 
-    function setCollapseStateAll(collapsed) {
-        collapsedTreeNodes.clear();
-        if (collapsed) {
-            collapsedTreeNodes.add('root');
-            collapsedTreeNodes.add('root/routines');
-        }
-        renderProjectTree(routineState?._cacheFull || routineState?._lastRoutines || [], routineState, activeEditor);
-    }
+	    function setCollapseStateAll(collapsed) {
+	        return projectTreeManager.setCollapseStateAll(collapsed);
+	    }
 
     function registerKeybinding(editor, label, actionId, handler, binding) {
         if (!editor || !handler) return;
@@ -1613,136 +1218,9 @@
     // MUST be defined BEFORE any code that references it (hoisting doesn't work for nested scopes)
 
 
-    function bindEditorContextMenu(editor) {
-        const menu = $('#editorContextMenu');
-        if (!menu.length || !editor) return;
-
-        const getEditor = () => activeEditor || editor;
-        const hideMenu = () => menu.hide();
-        const toggleDisabled = (actionId, disabled) => {
-            const el = menu.find(`[data-action="${actionId}"]`);
-            el.toggleClass('disabled', !!disabled);
-        };
-
-        if (!menu.data('ctx-bound')) {
-            $(document).on('click', hideMenu);
-            $(document).on('keydown', (e) => {
-                if (e.key === 'Escape') hideMenu();
-            });
-            menu.data('ctx-bound', true);
-        }
-
-        const gitContextActions = (targetPath) => {
-            const ensurePath = (fnLabel) => {
-                if (!targetPath) {
-                    showToast('info', 'Git', `NOT IMPLEMENTED YET: Git → ${fnLabel} (no active file)`);
-                    return null;
-                }
-                return targetPath;
-            };
-            return {
-                'ctx-git-add': () => {
-                    const target = ensurePath('Add');
-                    if (target) runGitContextAction('add', target);
-                },
-                'ctx-git-commit-file': () => {
-                    const target = ensurePath('Commit…');
-                    if (target) runGitContextAction('commit', target);
-                },
-                'ctx-git-history': () => {
-                    const target = ensurePath('Show History');
-                    if (target) runGitContextAction('history', target);
-                },
-                'ctx-git-compare': () => {
-                    const target = ensurePath('Compare with Latest Version');
-                    if (target) runGitContextAction('compare', target);
-                },
-                'ctx-git-rollback': () => {
-                    const target = ensurePath('Revert / Rollback');
-                    if (target) runGitContextAction('rollback', target);
-                }
-            };
-        };
-
-        const actionMap = {
-            'ctx-cut': () => document.execCommand('cut'),
-            'ctx-copy': () => document.execCommand('copy'),
-            'ctx-paste': () => document.execCommand('paste'),
-            'ctx-format': async () => {
-                const ed = getEditor();
-                if (!ed) return;
-                const action = ed.getAction && ed.getAction('editor.action.formatDocument');
-                if (action && action.isSupported && action.isSupported()) {
-                    try {
-                        await action.run();
-                        return;
-                    } catch (err) {
-                        // Fall through to toast when formatter rejects
-                    }
-                }
-                showToast('info', 'Format Code', 'NOT IMPLEMENTED YET for this file type');
-            },
-            'ctx-declare': () => goToDeclaration(getEditor(), null, { silentIfMissing: false }),
-            'ctx-usages': () => showToast('info', 'Find Usages', 'NOT IMPLEMENTED YET'),
-            'ctx-comment': () => {
-                const ed = getEditor();
-                if (ed) ed.trigger('keyboard', 'editor.action.commentLine', null);
-            },
-            'ctx-run': () => $('#runBtn').trigger('click'),
-            'ctx-debug': () => $('#debugStartBtn').trigger('click')
-        };
-
-        const bindActions = (map) => {
-            Object.entries(map).forEach(([id, fn]) => {
-                const item = menu.find(`[data-action="${id}"]`);
-                item.off('click').on('click', async (e) => {
-                    e.stopPropagation();
-                    hideMenu();
-                    if (item.hasClass('disabled')) return;
-                    try {
-                        await fn();
-                    } catch (err) {
-                        console.error('Context menu action failed', err);
-                    }
-                });
-            });
-        };
-        bindActions(actionMap);
-
-        const showEditorMenu = (clientX, clientY) => {
-            const ed = getEditor();
-            const model = ed?.getModel();
-            const position = ed?.getPosition();
-            // parseRoutineReferenceAtPosition is now defined above, no typeof check needed
-            const ref = (model && position)
-                ? parseRoutineReferenceAtPosition(model, position)
-                : null;
-            toggleDisabled('ctx-declare', !ref);
-            const activePath = getActiveRoutine();
-            bindActions(gitContextActions(activePath));
-            menu.css({ top: clientY, left: clientX }).show();
-        };
-
-        editor.onContextMenu((e) => {
-            e.event.preventDefault();
-            e.event.stopPropagation();
-            const evt = e.event.browserEvent || e.event;
-            const x = (evt && evt.clientX != null) ? evt.clientX : e.event.posx || 0;
-            const y = (evt && evt.clientY != null) ? evt.clientY : e.event.posy || 0;
-            showEditorMenu(x, y);
-        });
-
-        const domNode = editor.getDomNode();
-        if (domNode && !domNode._ctxMenuHooked) {
-            const handleDomContextMenu = (ev) => {
-                ev.preventDefault();
-                ev.stopPropagation();
-                showEditorMenu(ev.clientX, ev.clientY);
-            };
-            domNode.addEventListener('contextmenu', handleDomContextMenu, true); // capture to bypass Monaco handlers
-            domNode._ctxMenuHooked = true;
-        }
-    }
+	    function bindEditorContextMenu(editor) {
+	        return editorContextMenuManager.bindEditorContextMenu(editor);
+	    }
 
     async function goToDeclaration(editor, position = null, options = {}) {
         const { silentIfMissing = false } = options;
@@ -2013,34 +1491,11 @@
     }
 
     function openNewProjectPanel() {
-        const panel = document.getElementById('newProjectPanel');
-        const overlay = document.getElementById('newProjectOverlay');
-        panel?.classList.remove('hidden');
-        overlay?.classList.remove('hidden');
-
-        // Update structure preview when project name changes
-        const updatePreview = () => {
-            const name = $('#projectName').val() || 'my-project';
-            const fetchRoutines = $('#fetchRoutines').is(':checked');
-
-            let preview = `${name}/\n└── routines/\n`;
-            if (fetchRoutines) {
-                preview += `    ├── localr/\n    │   └── (MUMPS .m files from localr)\n`;
-                preview += `    └── routines/\n        └── (MUMPS .m files from routines)`;
-            } else {
-                preview += `    ├── localr/ (empty)\n    └── routines/ (empty)`;
-            }
-
-            $('#structurePreview').text(preview);
-        };
-
-        $('#projectName, #fetchRoutines').on('change keyup', updatePreview);
-        updatePreview();
+        return projectCreateManager.openNewProjectPanel();
     }
 
     function closeNewProjectPanel() {
-        document.getElementById('newProjectPanel')?.classList.add('hidden');
-        document.getElementById('newProjectOverlay')?.classList.add('hidden');
+        return projectCreateManager.closeNewProjectPanel();
     }
 
     async function createNewFile() {
@@ -3526,89 +2981,6 @@
                     }
                     updateDebugButtonState();
                 });
-            } else {
-                const runBtn = document.getElementById('runBtn');
-                runBtn?.addEventListener('click', async () => {
-                    // Lint code - only errors block execution (warnings/info allowed)
-                    const code = editor.getValue();
-                    const linter = window._mumpsLinter || mumpsLinter;
-                    if (hasLintRules(linter)) {
-                        const lintResult = linter.lint(code || '', { mode: 'create' });
-                        applyLintMarkers(editor.getModel(), lintResult.issues || []);
-                        renderProblems((lintResult.issues || []).map(i => ({
-                            message: i.message || i.description || '',
-                            severity: i.severity || 'info',
-                            line: i.line || null,
-                            code: i.ruleId || i.code || null
-                        })));
-                        const summary = lintResult.summary || { errors: 0, warnings: 0, info: 0 };
-                        if (summary.errors > 0) {
-                            appendOutput(
-                                `✗ Cannot run: ${summary.errors} error(s) found`,
-                                terminalState
-                            );
-                            return;
-                        }
-                    } else {
-                        // Fallback to existing marker check
-                        const markers = monaco.editor.getModelMarkers({ owner: 'mumps-check' }) || [];
-                        if (markers.length) {
-                            const m = markers[0];
-                            appendOutput(
-                                `✗ Cannot run: ${m.message} (line ${m.startLineNumber})`,
-                                terminalState
-                            );
-                            return;
-                        }
-                    }
-
-                    const bpLines = getBpLines();
-                    const debugActive = shouldDebugForRun();
-
-                    // If debug mode enabled, check if session already ready
-                    if (debugActive) {
-                        // Check if debugger is already initialized and waiting
-                        if (currentDebugSession && currentDebugSession.ready && !currentDebugSession.currentLine) {
-                            // Debugger is ready, send Continue to start execution
-                            logger.debug('[RUN] Debugger already ready, sending Continue command');
-                            await debugContinue();
-                        } else {
-                            // Start new debug session
-                            debugStartBtnEl?.classList.add('active');
-                            dbgState.debugModeEnabled = true;
-                            await startDebugSession(editor, dbgState, terminalState, debugBar, bpLines);
-                        }
-                    } else {
-                        // Normal execution (no debugging)
-                        const res = await runMumpsCode(editor, terminalState);
-                        if (!res || !res.ok) {
-                            await stopDebug(editor, dbgState, terminalState, debugBar);
-                        }
-                    }
-                });
-
-                const debugStartBtn = document.getElementById('debugStartBtn');
-                debugStartBtn?.addEventListener('click', () => {
-                    // If a session is active, stop it
-                    if (currentDebugSession && currentDebugSession.id) {
-                        debugStop();
-                        return;
-                    }
-
-                    dbgState.debugModeEnabled = !dbgState.debugModeEnabled;
-
-                    if (dbgState.debugModeEnabled) {
-                        const bpLines = getBpLines();
-                        if (bpLines.length === 0) {
-                            appendOutput('⚠️  Debug armed, but no breakpoints set. Run will execute normally.', terminalState);
-                        } else {
-                            appendOutput('✅ Debug armed. Click Run to start debugging.', terminalState);
-                        }
-                    } else {
-                        appendOutput('🛑 Debug disarmed. Run will execute normally.', terminalState);
-                    }
-                    updateDebugButtonState();
-                });
             }
 
             const clearBtn = document.getElementById('terminalClearBtn');
@@ -3618,365 +2990,48 @@
             newTabBtn?.addEventListener('click', async () => await addTerminalTab(terminalState));
             hideBtn?.addEventListener('click', () => toggleToolWindowPanel('terminalPanel', 'bottom'));
 
-            if ($) {
-                $('#saveRoutineBtn').on('click', async () => {
-                    await saveRoutineFlow(editor, routineState, terminalState);
-                });
-                $('#undoBtn').on('click', () => {
-                    editor.trigger('keyboard', 'undo', {});
-                });
-                $('#redoBtn').on('click', () => {
-                    editor.trigger('keyboard', 'redo', {});
-                });
-                $('#newRoutineBtn').on('click', async () => {
-                    await newRoutineFlow(editor, routineState, terminalState);
-                });
-            } else {
-                document.getElementById('saveRoutineBtn')?.addEventListener('click', async () => {
-                    await saveRoutineFlow(editor, routineState, terminalState);
-                });
-                document.getElementById('newRoutineBtn')?.addEventListener('click', async () => {
-                    await newRoutineFlow(editor, routineState, terminalState);
-                });
-            }
+            $('#saveRoutineBtn').on('click', async () => {
+                await saveRoutineFlow(editor, routineState, terminalState);
+            });
+            $('#undoBtn').on('click', () => {
+                editor.trigger('keyboard', 'undo', {});
+            });
+            $('#redoBtn').on('click', () => {
+                editor.trigger('keyboard', 'redo', {});
+            });
+            $('#newRoutineBtn').on('click', async () => {
+                await newRoutineFlow(editor, routineState, terminalState);
+            });
 
-            if ($) {
-                $('#lintBtn').on('click', async () => {
-                    const code = editor.getValue();
-                    appendOutput('🧹 Linting...', terminalState);
-                    const linter = window._mumpsLinter || mumpsLinter;
-                    if (hasLintRules(linter)) {
-                        const res = linter.lint(code || '', { mode: 'edit' });
-                        applyLintMarkers(editor.getModel(), res.issues || []);
-                        renderProblems((res.issues || []).map(i => ({
-                            message: i.message || i.description || '',
-                            severity: i.severity || 'info',
-                            line: i.line || null,
-                            code: i.ruleId || i.code || null
-                        })));
-                        const summary = res.summary || { errors: 0, warnings: 0, info: 0 };
-                        appendOutput(`✓ Lint: ${summary.errors} errors, ${summary.warnings} warnings, ${summary.info} info`, terminalState);
+            $('#lintBtn').on('click', async () => {
+                const code = editor.getValue();
+                appendOutput('🧹 Linting...', terminalState);
+                const linter = window._mumpsLinter || mumpsLinter;
+                if (hasLintRules(linter)) {
+                    const res = linter.lint(code || '', { mode: 'edit' });
+                    applyLintMarkers(editor.getModel(), res.issues || []);
+                    renderProblems((res.issues || []).map(i => ({
+                        message: i.message || i.description || '',
+                        severity: i.severity || 'info',
+                        line: i.line || null,
+                        code: i.ruleId || i.code || null
+                    })));
+                    const summary = res.summary || { errors: 0, warnings: 0, info: 0 };
+                    appendOutput(`✓ Lint: ${summary.errors} errors, ${summary.warnings} warnings, ${summary.info} info`, terminalState);
+                } else {
+                    const res = await window.ahmadIDE.lint(code);
+                    if (res.ok) {
+                        appendOutput(`✓ ${res.summary}`, terminalState);
+                        renderProblems([{ message: res.summary, severity: 'info' }]);
                     } else {
-                        const res = await window.ahmadIDE.lint(code);
-                        if (res.ok) {
-                            appendOutput(`✓ ${res.summary}`, terminalState);
-                            renderProblems([{ message: res.summary, severity: 'info' }]);
-                        } else {
-                            appendOutput(`✗ Lint error: ${res.error || res.stderr}`, terminalState);
-                            renderProblems([{ message: res.error || 'Lint failed', severity: 'error' }]);
-                        }
+                        appendOutput(`✗ Lint error: ${res.error || res.stderr}`, terminalState);
+                        renderProblems([{ message: res.error || 'Lint failed', severity: 'error' }]);
                     }
-                });
-            } else {
-                document.getElementById('lintBtn')?.addEventListener('click', async () => {
-                    const code = editor.getValue();
-                    appendOutput('🧹 Linting...', terminalState);
-                    const linter = window._mumpsLinter || mumpsLinter;
-                    if (hasLintRules(linter)) {
-                        const res = linter.lint(code || '', { mode: 'edit' });
-                        applyLintMarkers(editor.getModel(), res.issues || []);
-                        renderProblems((res.issues || []).map(i => ({
-                            message: i.message || i.description || '',
-                            severity: i.severity || 'info',
-                            line: i.line || null,
-                            code: i.ruleId || i.code || null
-                        })));
-                        const summary = res.summary || { errors: 0, warnings: 0, info: 0 };
-                        appendOutput(`✓ Lint: ${summary.errors} errors, ${summary.warnings} warnings, ${summary.info} info`, terminalState);
-                    } else {
-                        const res = await window.ahmadIDE.lint(code);
-                        if (res.ok) {
-                            appendOutput(`✓ ${res.summary}`, terminalState);
-                            renderProblems([{ message: res.summary, severity: 'info' }]);
-                        } else {
-                            appendOutput(`✗ Lint error: ${res.error || res.stderr}`, terminalState);
-                            renderProblems([{ message: res.error || 'Lint failed', severity: 'error' }]);
-                        }
-                    }
-                });
-            }
+                }
+            });
 
             // --- SSH / Docker handling ---
-            const connectionsPanel = document.getElementById('connectionsPanel');
-            const connectionsOverlay = document.getElementById('connectionsOverlay');
-            const closeConnectionsBtn = document.getElementById('closeConnectionsBtn');
-            const dockerListEl = document.getElementById('dockerList');
-            const refreshDockerBtn = document.getElementById('refreshDockerBtn');
-            const useLocalDockerBtn = document.getElementById('useLocalDockerBtn');
-            const sshHostInput = document.getElementById('sshHostInput');
-            const sshPortInput = document.getElementById('sshPortInput');
-            const sshEnvInput = document.getElementById('sshEnvInput');
-            const sshUserInput = document.getElementById('sshUserInput');
-            const sshPassInput = document.getElementById('sshPassInput');
-            const sshConnectBtn = document.getElementById('sshConnectBtn');
-            const sshFormStatus = document.getElementById('sshFormStatus');
-            const connectionsBtn = document.getElementById('toggleConnections');
-            const sshSavedList = document.getElementById('sshSavedList');
-            const sshSaveEnvBtn = document.getElementById('sshSaveEnvBtn');
-
-            let savedProfiles = [];
-
-            function readSavedSshProfiles() {
-                try {
-                    const raw = localStorage.getItem('ahmadIDE:sshList');
-                    const parsed = raw ? JSON.parse(raw) : [];
-                    if (Array.isArray(parsed)) return parsed.filter(Boolean);
-                    if (parsed && typeof parsed === 'object') return [parsed];
-                    return [];
-                } catch (e) {
-                    return [];
-                }
-            }
-
-            function persistSavedSshProfiles(list) {
-                try {
-                    localStorage.setItem('ahmadIDE:sshList', JSON.stringify(list || []));
-                } catch (e) {
-                    // ignore persistence errors
-                }
-            }
-
-            function fillSshForm(entry) {
-                if (!entry) return;
-                if (sshHostInput && entry.host) sshHostInput.value = entry.host;
-                if (sshUserInput && entry.username) sshUserInput.value = entry.username;
-                if (sshPortInput && entry.port) sshPortInput.value = entry.port;
-                if (sshEnvInput && entry.envKey) sshEnvInput.value = entry.envKey;
-            }
-
-            function renderSavedSshProfiles(list) {
-                if (!sshSavedList) return;
-                sshSavedList.innerHTML = '';
-                if (!list || !list.length) {
-                    sshSavedList.textContent = 'No saved environments.';
-                    return;
-                }
-                list.forEach((item) => {
-                    const pill = document.createElement('div');
-                    pill.className = 'saved-env-pill';
-                    pill.title = `${item.username || ''}@${item.host || ''}:${item.port || 22}`;
-                    pill.onclick = () => fillSshForm(item);
-
-                    const keyEl = document.createElement('span');
-                    keyEl.className = 'env-key';
-                    keyEl.textContent = (item.envKey || 'env').toUpperCase();
-
-                    const metaEl = document.createElement('span');
-                    metaEl.className = 'env-meta';
-                    metaEl.textContent = `${item.username || ''}@${item.host || ''}`;
-
-                    const removeBtn = document.createElement('button');
-                    removeBtn.className = 'saved-env-remove';
-                    removeBtn.textContent = '✕';
-                    removeBtn.title = 'Remove';
-                    removeBtn.onclick = (e) => {
-                        e.stopPropagation();
-                        savedProfiles = savedProfiles.filter(p =>
-                            (p.envKey || '').toLowerCase() !== (item.envKey || '').toLowerCase()
-                        );
-                        persistSavedSshProfiles(savedProfiles);
-                        renderSavedSshProfiles(savedProfiles);
-                    };
-
-                    pill.appendChild(keyEl);
-                    pill.appendChild(metaEl);
-                    pill.appendChild(removeBtn);
-                    sshSavedList.appendChild(pill);
-                });
-            }
-
-            function upsertSavedProfile(entry) {
-                const key = (entry?.envKey || '').toLowerCase();
-                if (!key) return;
-                const existingIdx = savedProfiles.findIndex(
-                    p => (p.envKey || '').toLowerCase() === key
-                );
-                const payload = {
-                    envKey: entry.envKey,
-                    host: entry.host,
-                    port: entry.port || 22,
-                    username: entry.username
-                };
-                if (existingIdx >= 0) {
-                    savedProfiles[existingIdx] = { ...savedProfiles[existingIdx], ...payload };
-                } else {
-                    savedProfiles.push(payload);
-                }
-                persistSavedSshProfiles(savedProfiles);
-                renderSavedSshProfiles(savedProfiles);
-            }
-
-            const savedSsh = (() => {
-                try {
-                    const raw = localStorage.getItem('ahmadIDE:ssh');
-                    return raw ? JSON.parse(raw) : null;
-                } catch (e) {
-                    return null;
-                }
-            })();
-            savedProfiles = readSavedSshProfiles();
-            if (savedSsh && Object.keys(savedSsh).length) {
-                const exists = savedProfiles.some(
-                    p => (p.envKey || '').toLowerCase() === (savedSsh.envKey || '').toLowerCase()
-                );
-                if (!exists) {
-                    savedProfiles.push(savedSsh);
-                    persistSavedSshProfiles(savedProfiles);
-                }
-            }
-            renderSavedSshProfiles(savedProfiles);
-
-            if (savedSsh) {
-                fillSshForm(savedSsh);
-            } else if (savedProfiles.length) {
-                fillSshForm(savedProfiles[0]);
-            }
-            if (sshEnvInput && !sshEnvInput.value) sshEnvInput.value = 'cc';
-
-            const markSshStatus = (text, severity = 'info') => {
-                if (!sshFormStatus) return;
-                sshFormStatus.textContent = text;
-                sshFormStatus.style.background = severity === 'error'
-                    ? 'rgba(248,113,113,0.18)'
-                    : 'rgba(91,213,255,0.12)';
-                sshFormStatus.style.color = severity === 'error'
-                    ? '#fecdd3'
-                    : '#38bdf8';
-            };
-
-            const openConnectionsPanel = (focusSsh = false) => {
-                connectionsPanel?.classList.remove('hidden');
-                connectionsOverlay?.classList.remove('hidden');
-                renderSavedSshProfiles(savedProfiles);
-                if (focusSsh && sshHostInput) {
-                    setTimeout(() => sshHostInput.focus(), 40);
-                }
-            };
-
-            const closeConnectionsPanel = () => {
-                connectionsPanel?.classList.add('hidden');
-                connectionsOverlay?.classList.add('hidden');
-            };
-
-
-            async function refreshDockerList() {
-                if (dockerListEl) dockerListEl.textContent = 'Loading...';
-                await window.ahmadIDE.setConnection('docker');
-                setConnStatus('Docker (local)', 'info');
-                appendOutput('🐳 Listing containers...', terminalState);
-                const res = await window.ahmadIDE.listDocker();
-                if (res.ok) {
-                    if (!res.containers.length) {
-                        if (dockerListEl) dockerListEl.textContent = 'No running containers.';
-                        appendOutput('No running containers.', terminalState);
-                    } else {
-                        res.containers.forEach(c =>
-                            appendOutput(`- ${c.name} (${c.id}) :: ${c.status}`, terminalState)
-                        );
-                        renderDocker(res.containers, routineState, editor, {
-                            onSelect: async () => {
-                                closeConnectionsPanel();
-                                appendOutput('✓ Docker target selected', terminalState);
-                                await loadRoutineList(
-                                    routineState,
-                                    editor,
-                                    routineSearch?.value || ''
-                                );
-                            }
-                        });
-                    }
-                } else {
-                    if (dockerListEl) dockerListEl.textContent = res.error || res.stderr || 'Docker error';
-                    appendOutput(`✗ Docker error: ${res.error || res.stderr}`, terminalState);
-                }
-            }
-
-            async function handleSshConnect() {
-                if (!sshHostInput || !sshUserInput || !sshPassInput || !sshPortInput) return;
-                const host = sshHostInput.value.trim();
-                const username = sshUserInput.value.trim();
-                const password = sshPassInput.value;
-                const port = parseInt(sshPortInput.value || '22', 10) || 22;
-                const envKey = (sshEnvInput?.value || 'cc').trim() || 'cc';
-
-                if (!host || !username || !password) {
-                    markSshStatus('Host, user, and password are required', 'error');
-                    return;
-                }
-
-                markSshStatus(`Connecting to ${username}@${host}:${port}...`, 'info');
-                if (sshConnectBtn) sshConnectBtn.disabled = true;
-                appendOutput(`🔌 SSH connecting to ${username}@${host}:${port}...`, terminalState);
-
-                const res = await window.ahmadIDE.sshConnect({
-                    host,
-                    port,
-                    username,
-                    password,
-                    envKey
-                });
-
-                if (res.ok) {
-                    const entry = { host, port, username, envKey };
-                    await window.ahmadIDE.setConnection('ssh', {
-                        ssh: { ...entry, password }
-                    });
-                    setConnStatus('SSH connected', 'success');
-                    markSshStatus('SSH connected', 'success');
-                    appendOutput('✓ SSH connected', terminalState);
-                    try {
-                        localStorage.setItem('ahmadIDE:ssh', JSON.stringify(entry));
-                    } catch (e) {
-                        // ignore persistence errors
-                    }
-                    upsertSavedProfile(entry);
-                    await loadRoutineList(routineState, editor);
-                    closeConnectionsPanel();
-                } else {
-                    const msg = res.error || res.stderr || 'SSH connect failed';
-                    markSshStatus(msg, 'error');
-                    setConnStatus('SSH error', 'error');
-                    appendOutput(`✗ SSH connect failed: ${msg}`, terminalState);
-                }
-
-                if (sshConnectBtn) sshConnectBtn.disabled = false;
-            }
-
-            connectionsBtn?.addEventListener('click', () => {
-                openConnectionsPanel();
-                refreshDockerList();
-            });
-
-            refreshDockerBtn?.addEventListener('click', refreshDockerList);
-            useLocalDockerBtn?.addEventListener('click', async () => {
-                await window.ahmadIDE.setConnection('docker');
-                setConnStatus('Docker (local)', 'info');
-                appendOutput('✓ Using default Docker connection', terminalState);
-                closeConnectionsPanel();
-                await loadRoutineList(routineState, editor);
-            });
-
-            connectionsOverlay?.addEventListener('click', closeConnectionsPanel);
-            closeConnectionsBtn?.addEventListener('click', closeConnectionsPanel);
-            sshConnectBtn?.addEventListener('click', handleSshConnect);
-            sshSaveEnvBtn?.addEventListener('click', () => {
-                if (!sshHostInput || !sshUserInput || !sshEnvInput) return;
-                const host = sshHostInput.value.trim();
-                const username = sshUserInput.value.trim();
-                const port = parseInt(sshPortInput?.value || '22', 10) || 22;
-                const envKey = (sshEnvInput.value || 'cc').trim() || 'cc';
-                if (!host || !username) {
-                    markSshStatus('Host and user required to save.', 'error');
-                    return;
-                }
-                upsertSavedProfile({ host, username, port, envKey });
-                markSshStatus(`Saved ${envKey}`, 'info');
-            });
-            [sshHostInput, sshUserInput, sshPassInput, sshPortInput, sshEnvInput].forEach(input => {
-                input?.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') handleSshConnect();
-                });
-            });
+            connectionsManager.wireConnectionsPanel({ editor, routineState, terminalState });
 
             document.getElementById('closeShortcutsBtn')?.addEventListener('click', closeShortcutsPanel);
             document.getElementById('shortcutsOverlay')?.addEventListener('click', closeShortcutsPanel);
@@ -4012,443 +3067,13 @@
                 const out = document.getElementById('gitOutput');
                 if (out) out.textContent = 'Git ready.';
             });
-            document.getElementById('closeSettingsBtn')?.addEventListener('click', () => {
-                document.getElementById('settingsPanel')?.classList.add('hidden');
-                document.getElementById('settingsOverlay')?.classList.add('hidden');
-            });
+            settingsPanelManager.wireSettingsPanel();
+            projectCreateManager.wireNewProjectPanel();
 
-            // DevTools toggle
-            document.getElementById('toggleDevTools')?.addEventListener('click', async () => {
-                if (window.ahmadIDE && window.ahmadIDE.toggleDevTools) {
-                    await window.ahmadIDE.toggleDevTools();
-                }
-            });
-
-            // New Project panel handlers
-            document.getElementById('closeNewProjectBtn')?.addEventListener('click', closeNewProjectPanel);
-            document.getElementById('newProjectOverlay')?.addEventListener('click', closeNewProjectPanel);
-
-            // Browse button handler - moved to openNewProjectPanel function
-            $('#createProjectBtn').on('click', async () => {
-                const projectName = $('#projectName').val().trim();
-                const projectPath = $('#projectPath').val().trim();
-                const fetchRoutines = $('#fetchRoutines').is(':checked');
-
-                if (!projectName) {
-                    showToast('error', 'Validation', 'Project name is required');
-                    return;
-                }
-
-                if (!projectPath) {
-                    showToast('error', 'Validation', 'Project path is required');
-                    return;
-                }
-
-                $('#projectCreationStatus').text('Creating project...');
-                $('#createProjectBtn').prop('disabled', true);
-
-                try {
-                    const result = await window.ahmadIDE.createProject({
-                        projectName,
-                        projectPath,
-                        fetchRoutines
-                    });
-
-                    if (result.ok) {
-                        showToast('success', 'Project Created', result.message || 'Project created successfully');
-                        $('#projectCreationStatus').text(`Created: ${result.projectPath}`);
-
-                        // Auto-open the project in the file tree
-                        loadProjectIntoTree(result);
-
-                        setTimeout(() => {
-                            closeNewProjectPanel();
-                            // Reset form
-                            $('#projectName').val('');
-                            $('#projectCreationStatus').text('Ready');
-                        }, 2000);
-                    } else {
-                        showToast('error', 'Creation Failed', result.error);
-                        $('#projectCreationStatus').text(`Error: ${result.error}`);
-                    }
-                } catch (err) {
-                    showToast('error', 'Error', err.message);
-                    $('#projectCreationStatus').text(`Error: ${err.message}`);
-                } finally {
-                    $('#createProjectBtn').prop('disabled', false);
-                }
-            });
-            document.getElementById('settingsOverlay')?.addEventListener('click', () => {
-                document.getElementById('settingsPanel')?.classList.add('hidden');
-                document.getElementById('settingsOverlay')?.classList.add('hidden');
-            });
-            const gitOutput = (text) => {
-                const out = document.getElementById('gitOutput');
-                if (out) {
-                    out.textContent += `${text}\n`;
-                    out.scrollTop = out.scrollHeight;
-                }
-            };
-            const gitError = (text) => {
-                const message = normalizeGitError(text);
-                const out = document.getElementById('gitOutput');
-                if (out) {
-                    out.textContent += `✗ ${message}\n`;
-                    out.scrollTop = out.scrollHeight;
-                }
-                showToast('error', 'Git', message);
-            };
-            const setDiffPanes = (left, right) => {
-                const l = document.getElementById('gitDiffLeft');
-                const r = document.getElementById('gitDiffRight');
-                if (l) l.textContent = left || 'No data';
-                if (r) r.textContent = right || 'No data';
-            };
-
-            const renderSideBySideDiff = (diffText) => {
-                const l = document.getElementById('gitDiffLeft');
-                const r = document.getElementById('gitDiffRight');
-                if (!l || !r) return;
-                const lines = (diffText || '').split('\n');
-                const leftLines = [];
-                const rightLines = [];
-                let leftNo = 0;
-                let rightNo = 0;
-                lines.forEach(line => {
-                    if (line.startsWith('+++') || line.startsWith('---')) return;
-                    if (line.startsWith('@@')) {
-                        leftLines.push(`<span class="diff-line diff-hunk">${line}</span>`);
-                        rightLines.push(`<span class="diff-line diff-hunk">${line}</span>`);
-                        const match = line.match(/-([0-9]+)/);
-                        const matchR = line.match(/\+([0-9]+)/);
-                        leftNo = match ? parseInt(match[1], 10) - 1 : leftNo;
-                        rightNo = matchR ? parseInt(matchR[1], 10) - 1 : rightNo;
-                        return;
-                    }
-                    if (line.startsWith('+')) {
-                        rightNo += 1;
-                        rightLines.push(
-                            `<span class="diff-line diff-add"><span class="lineno">${rightNo}</span>${line.replace(/</g, '&lt;')}</span>`
-                        );
-                    } else if (line.startsWith('-')) {
-                        leftNo += 1;
-                        leftLines.push(
-                            `<span class="diff-line diff-del"><span class="lineno">${leftNo}</span>${line.replace(/</g, '&lt;')}</span>`
-                        );
-                    } else {
-                        leftNo += 1;
-                        rightNo += 1;
-                        const safe = line.replace(/</g, '&lt;');
-                        leftLines.push(`<span class="diff-line diff-context"><span class="lineno">${leftNo}</span>${safe}</span>`);
-                        rightLines.push(`<span class="diff-line diff-context"><span class="lineno">${rightNo}</span>${safe}</span>`);
-                    }
-                });
-                l.innerHTML = leftLines.join('') || 'No left changes';
-                r.innerHTML = rightLines.join('') || 'No right changes';
-            };
-
-            const gitSelected = { staged: new Set(), unstaged: new Set() };
-
-            const renderGitChanges = (entries = []) => {
-                const unstagedHost = document.getElementById('gitChangesUnstaged');
-                const stagedHost = document.getElementById('gitChangesStaged');
-                if (unstagedHost) unstagedHost.innerHTML = '';
-                if (stagedHost) stagedHost.innerHTML = '';
-                const render = (host, list, staged) => {
-                    if (!host) return;
-                    if (!list.length) {
-                        host.textContent = staged ? 'No staged files.' : 'No local changes.';
-                        return;
-                    }
-                    list.forEach(ent => {
-                        const row = document.createElement('div');
-                        row.className = 'git-change-row' + (staged ? ' staged' : '');
-                        const checkbox = document.createElement('input');
-                        checkbox.type = 'checkbox';
-                        checkbox.checked = staged ? gitSelected.staged.has(ent.path) : gitSelected.unstaged.has(ent.path);
-                        checkbox.addEventListener('change', () => {
-                            const targetSet = staged ? gitSelected.staged : gitSelected.unstaged;
-                            checkbox.checked ? targetSet.add(ent.path) : targetSet.delete(ent.path);
-                        });
-                        const status = document.createElement('span');
-                        status.className = 'git-change-status';
-                        status.textContent = ent.status;
-                        const path = document.createElement('span');
-                        path.className = 'git-change-path';
-                        path.textContent = ent.path;
-                        row.appendChild(checkbox);
-                        row.appendChild(status);
-                        row.appendChild(path);
-                        host.appendChild(row);
-                    });
-                };
-                const stagedList = entries.filter(e => e.staged);
-                const unstagedList = entries.filter(e => !e.staged);
-                render(unstagedHost, unstagedList, false);
-                render(stagedHost, stagedList, true);
-            };
-
-            const renderGitHistory = (lines = []) => {
-                const host = document.getElementById('gitHistoryList');
-                if (!host) return;
-                host.innerHTML = '';
-                if (!lines.length) {
-                    host.textContent = 'No history yet.';
-                    return;
-                }
-                lines.forEach(line => {
-                    const div = document.createElement('div');
-                    div.textContent = line;
-                    host.appendChild(div);
-                });
-            };
-
-            const runGit = async (cmd, opts = {}) => {
-                if (!opts.silent) gitOutput(`$ ${cmd}`);
-                const res = await window.ahmadIDE.git(cmd);
-                if (res.ok) {
-                    if (opts.onSuccess) opts.onSuccess(res.stdout || '');
-                    if (!opts.silent) {
-                        if (res.stdout) gitOutput(res.stdout);
-                        if (res.stderr) gitOutput(res.stderr);
-                    }
-                } else {
-                    gitError(res.error || res.stderr || 'Git command failed');
-                }
-                return res;
-            };
-
-            const refreshGitStatus = async () => {
-                gitSelected.staged.clear();
-                gitSelected.unstaged.clear();
-                const statusRes = await runGit('git status --short --branch', {
-                    onSuccess: (out) => {
-                        const lines = (out || '').split('\n').filter(Boolean);
-                        const entries = [];
-                        lines.forEach(line => {
-                            if (line.startsWith('##')) return; // branch info
-                            const indexStatus = line[0];
-                            const worktreeStatus = line[1];
-                            const path = line.slice(3).trim();
-                            const staged = indexStatus !== ' ' && indexStatus !== '?';
-                            const status = staged ? indexStatus : worktreeStatus;
-                            entries.push({ status, path, staged });
-                        });
-                        renderGitChanges(entries);
-                    }
-                });
-                if (!statusRes.ok) return statusRes;
-                return runGit('git branch --format="%(refname:short)"', {
-                    silent: true,
-                    onSuccess: (out) => {
-                        const select = document.getElementById('gitBranchSelect');
-                        if (!select) return;
-                        select.innerHTML = '';
-                        (out || '').split('\n').filter(Boolean).forEach(b => {
-                            const opt = document.createElement('option');
-                            opt.value = b;
-                            opt.textContent = b;
-                            select.appendChild(opt);
-                        });
-                    }
-                });
-                if (statusRes.ok) {
-                    fetchCurrentBranch().catch(() => { });
-                }
-            };
-
-            const loadGitHistory = async () => {
-                await runGit('git log -10 --oneline', {
-                    onSuccess: (out) => renderGitHistory((out || '').split('\n').filter(Boolean))
-                });
-            };
-
-            openGitToolWindow = (opts = {}) => {
-                toggleToolWindowPanel('gitToolPanel', 'bottom');
-                if (!opts.skipRefresh) {
-                    refreshGitStatus().catch(() => { });
-                    loadGitHistory().catch(() => { });
-                }
-            };
-
-            openCommitToolWindow = () => {
-                openGitToolWindow();
-                const msg = document.getElementById('gitCommitMessage');
-                msg?.focus();
-            };
-
-            // Keep legacy alias in sync for older callers
-            openGitPanel = () => openGitToolWindow();
-
-            document.getElementById('gitRefreshBtn')?.addEventListener('click', refreshGitStatus);
-            document.getElementById('gitStatusBtn')?.addEventListener('click', refreshGitStatus);
-            document.getElementById('gitLogBtn')?.addEventListener('click', loadGitHistory);
-            document.getElementById('gitDiffBtn')?.addEventListener('click', () => runGit('git diff --stat'));
-            document.getElementById('gitClearBtn')?.addEventListener('click', () => {
-                document.getElementById('gitOutput').textContent = 'Git ready.';
-            });
-
-            const stageOrUnstage = async (targetSet, staged) => {
-                const files = Array.from(targetSet);
-                if (!files.length) {
-                    gitOutput(staged ? 'No staged selection.' : 'No unstaged selection.');
-                    return;
-                }
-                const cmd = staged
-                    ? `git restore --staged ${files.map(f => `"${f.replace(/"/g, '\\"')}"`).join(' ')}`
-                    : `git add ${files.map(f => `"${f.replace(/"/g, '\\"')}"`).join(' ')}`;
-                await runGit(cmd);
-                await refreshGitStatus();
-            };
-
-            document.getElementById('gitStageSelectedBtn')?.addEventListener('click', () => stageOrUnstage(gitSelected.unstaged, false));
-            document.getElementById('gitUnstageSelectedBtn')?.addEventListener('click', () => stageOrUnstage(gitSelected.staged, true));
-
-            document.getElementById('gitDiffSelectedBtn')?.addEventListener('click', async () => {
-                const path = [...gitSelected.unstaged, ...gitSelected.staged][0];
-                if (!path) {
-                    gitError('Select a file to diff');
-                    return;
-                }
-                await runGit(`git diff -- ${path}`);
-            });
-
-            document.getElementById('gitCommitBtn')?.addEventListener('click', async () => {
-                const msgEl = document.getElementById('gitCommitMessage');
-                const message = msgEl?.value.trim() || '';
-                if (!message) {
-                    gitOutput('✗ Commit message required');
-                    return;
-                }
-                const res = await runGit(`git commit -m "${message.replace(/"/g, '\\"')}"`);
-                if (res?.ok) {
-                    msgEl.value = '';
-                    await refreshGitStatus();
-                    await loadGitHistory();
-                }
-            });
-            document.getElementById('gitPushBtn')?.addEventListener('click', () => runGit('git push'));
-            document.getElementById('gitPullBtn')?.addEventListener('click', () => runGit('git pull'));
-            document.getElementById('gitFetchBtn')?.addEventListener('click', () => runGit('git fetch'));
-            document.getElementById('gitCheckoutBtn')?.addEventListener('click', async () => {
-                const select = document.getElementById('gitBranchSelect');
-                const input = document.getElementById('gitBranchInput');
-                const target = (input?.value.trim()) || (select?.value || '');
-                if (!target) {
-                    gitOutput('✗ No branch specified');
-                    return;
-                }
-                await runGit(`git checkout ${target}`);
-                await refreshGitStatus();
-            });
-            document.getElementById('gitDiffFileBtn')?.addEventListener('click', async () => {
-                const path = document.getElementById('gitDiffPath')?.value.trim();
-                if (!path) {
-                    gitError('No path provided for diff');
-                    return;
-                }
-                const diffRes = await runGit(`git diff -- ${path}`);
-                const headRes = await window.ahmadIDE.git(`git show HEAD:"${path.replace(/"/g, '\\"')}"`);
-                const workRes = await window.ahmadIDE.hostExec(`cat "${path.replace(/"/g, '\\"')}"`);
-                setDiffPanes(
-                    headRes.ok ? headRes.stdout || '(empty)' : '(no HEAD version)',
-                    workRes.ok ? workRes.stdout || '(empty)' : workRes.error || '(cannot read)'
-                );
-                if (diffRes.ok && diffRes.stdout) renderSideBySideDiff(diffRes.stdout);
-            });
-            document.getElementById('gitHistoryFileBtn')?.addEventListener('click', async () => {
-                const path = document.getElementById('gitDiffPath')?.value.trim();
-                if (!path) {
-                    gitError('No path provided for history');
-                    return;
-                }
-                await runGit(`git log --oneline -- ${path}`);
-            });
-            document.getElementById('gitCompareBtn')?.addEventListener('click', async () => {
-                const a = document.getElementById('gitComparePathA')?.value.trim();
-                const b = document.getElementById('gitComparePathB')?.value.trim();
-                if (!a || !b) {
-                    gitError('Provide both paths to compare');
-                    return;
-                }
-                const aRes = await window.ahmadIDE.hostExec(`cat "${a.replace(/"/g, '\\"')}"`);
-                const bRes = await window.ahmadIDE.hostExec(`cat "${b.replace(/"/g, '\\"')}"`);
-                setDiffPanes(
-                    aRes.ok ? aRes.stdout || '(empty)' : aRes.error || '(cannot read)',
-                    bRes.ok ? bRes.stdout || '(empty)' : bRes.error || '(cannot read)'
-                );
-                const diffRes = await runGit(`git diff -- ${a} ${b}`);
-                if (diffRes.ok && diffRes.stdout) renderSideBySideDiff(diffRes.stdout);
-            });
-
-            document.getElementById('toolbarGitBtn')?.addEventListener('click', () => {
-                openGitToolWindow();
-            });
-
-            document.getElementById('toolbarCommitBtn')?.addEventListener('click', () => {
-                openCommitToolWindow();
-            });
-
-            const vcsWidget = document.getElementById('vcsWidget');
-            const vcsToggle = document.getElementById('vcsWidgetBtn');
-            const vcsMenu = document.getElementById('vcsWidgetMenu');
-            const handleVcsMenuAction = (action) => {
-                switch (action) {
-                    case 'commit':
-                        openCommitToolWindow();
-                        break;
-                    case 'history':
-                        openGitToolWindow();
-                        document.getElementById('gitLogBtn')?.click();
-                        break;
-                    case 'push':
-                        document.getElementById('gitPushBtn')
-                            ? document.getElementById('gitPushBtn').click()
-                            : showToast('info', 'Git', 'NOT IMPLEMENTED YET: Push');
-                        break;
-                    case 'pull': {
-                        const pullBtn = document.getElementById('gitPullBtn') || document.getElementById('gitFetchBtn');
-                        if (pullBtn) pullBtn.click();
-                        else showToast('info', 'Git', 'NOT IMPLEMENTED YET: Pull / Fetch');
-                        break;
-                    }
-                    case 'open-git':
-                        openGitToolWindow();
-                        break;
-                    default:
-                        showToast('info', 'Git', `NOT IMPLEMENTED YET: ${action}`);
-                }
-            };
-
-            const closeVcsMenu = () => vcsMenu?.classList.add('hidden');
-
-            vcsToggle?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (!vcsMenu) return;
-                const shouldOpen = vcsMenu.classList.contains('hidden');
-                closeVcsMenu();
-                if (shouldOpen) vcsMenu.classList.remove('hidden');
-            });
-
-            vcsMenu?.querySelectorAll('.vcs-menu-item').forEach((btn) => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    handleVcsMenuAction(btn.getAttribute('data-action'));
-                    closeVcsMenu();
-                });
-            });
-
-            document.addEventListener('click', (e) => {
-                if (vcsWidget && !vcsWidget.contains(e.target)) {
-                    closeVcsMenu();
-                }
-            });
-
-            // Initial refresh when tool window wires up
-            refreshGitStatus();
-            loadGitHistory(); // TODO: add pagination / filters for larger histories
-
-
+            const gitToolWindowApi = gitToolWindowManager.wireGitToolWindow({ fetchCurrentBranch });
+            openGitToolWindow = gitToolWindowApi.openGitToolWindow;
+            openCommitToolWindow = gitToolWindowApi.openCommitToolWindow;
+            openGitPanel = gitToolWindowApi.openGitPanel;
 
             // --- Initial debug / UI state ---
             setDebugButtons(false);
@@ -4467,127 +3092,7 @@
             renderStack([]);
             renderDebugConsole([]);
             resetDebugUI();
-
-            // Ctrl+Hover: Change cursor to pointer only when hovering over valid tag/routine
-            let isCtrlPressed = false;
-            let currentHoverDecoration = [];
-
-            document.addEventListener('keydown', (e) => {
-                if (e.ctrlKey || e.metaKey) {
-                    isCtrlPressed = true;
-                }
-            });
-
-            document.addEventListener('keyup', (e) => {
-                if (!e.ctrlKey && !e.metaKey) {
-                    isCtrlPressed = false;
-                    // Clear cursor override
-                    const editorDom = editor.getDomNode();
-                    if (editorDom) {
-                        editorDom.style.cursor = '';
-                    }
-                    // Clear hover decoration
-                    if (currentHoverDecoration.length > 0) {
-                        editor.deltaDecorations(currentHoverDecoration, []);
-                        currentHoverDecoration = [];
-                    }
-                }
-            });
-
-            // Track mouse movement to detect hovering over clickable targets
-            editor.onMouseMove((e) => {
-                if (!isCtrlPressed || !e.target.position) {
-                    // Clear cursor and decoration if not Ctrl+hovering
-                    const editorDom = editor.getDomNode();
-                    if (editorDom && !isCtrlPressed) {
-                        editorDom.style.cursor = '';
-                    }
-                    if (currentHoverDecoration.length > 0 && !isCtrlPressed) {
-                        editor.deltaDecorations(currentHoverDecoration, []);
-                        currentHoverDecoration = [];
-                    }
-                    return;
-                }
-
-                const model = editor.getModel();
-                if (!model) return;
-
-                const ref = parseRoutineReferenceAtPosition(model, e.target.position);
-
-                if (ref) {
-                    // Valid target detected - change cursor to pointer
-                    const editorDom = editor.getDomNode();
-                    if (editorDom) {
-                        editorDom.style.cursor = 'pointer';
-                    }
-
-                    // Add underline decoration to show it's clickable
-                    const lineContent = model.getLineContent(e.target.position.lineNumber);
-                    const column = e.target.position.column;
-
-                    // Find the exact range of the tag/routine text
-                    let startCol = column;
-                    let endCol = column;
-
-                    // Expand left to find start of word
-                    while (startCol > 1 && /[A-Z0-9%^]/.test(lineContent[startCol - 2])) {
-                        startCol--;
-                    }
-                    // Expand right to find end of word
-                    while (endCol <= lineContent.length && /[A-Z0-9%^]/.test(lineContent[endCol - 1])) {
-                        endCol++;
-                    }
-
-                    currentHoverDecoration = editor.deltaDecorations(currentHoverDecoration, [{
-                        range: new monaco.Range(
-                            e.target.position.lineNumber,
-                            startCol,
-                            e.target.position.lineNumber,
-                            endCol
-                        ),
-                        options: {
-                            inlineClassName: 'ctrl-hover-underline'
-                        }
-                    }]);
-                } else {
-                    // No valid target - reset cursor
-                    const editorDom = editor.getDomNode();
-                    if (editorDom) {
-                        editorDom.style.cursor = '';
-                    }
-                    if (currentHoverDecoration.length > 0) {
-                        editor.deltaDecorations(currentHoverDecoration, []);
-                        currentHoverDecoration = [];
-                    }
-                }
-            });
-
-            // --- Breakpoint gutter toggle + Ctrl+Click navigation ---
-            editor.onMouseDown(async (e) => {
-                const t = e.target.type;
-
-                // Handle breakpoint toggle in gutter
-                if (
-                    t === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN ||
-                    t === monaco.editor.MouseTargetType.GUTTER_LINE_NUMBERS
-                ) {
-                    const line = e.target.position && e.target.position.lineNumber;
-                    if (!line) return;
-                    toggleBreakpoint(line, dbgState, editor);
-                    e.event.preventDefault();
-                    return;
-                }
-
-                // Handle Ctrl+Click navigation
-                const isCtrlPressed = e.event.ctrlKey || e.event.metaKey;
-                if (isCtrlPressed && e.target.position) {
-                    const handled = await goToDeclaration(editor, e.target.position, { silentIfMissing: true });
-                    if (handled) {
-                        e.event.preventDefault();
-                        e.event.stopPropagation();
-                    }
-                }
-            });
+            ctrlHoverManager.bindCtrlHoverAndGutter(editor, dbgState);
         });
     }
 
@@ -4673,137 +3178,8 @@
             : '#38bdf8';
     }
 
-    function loadExtensionState() {
-        try {
-            const raw = localStorage.getItem('ahmadIDE:extensions');
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                extensionsState.enabled = parsed.enabled || {};
-                extensionsState.selectedId = parsed.selectedId || null;
-            }
-        } catch (e) {
-            // ignore storage errors
-        }
-        updateDebugButtonState();
-    }
-
-    function persistExtensionState() {
-        try {
-            localStorage.setItem('ahmadIDE:extensions', JSON.stringify({
-                enabled: extensionsState.enabled,
-                selectedId: extensionsState.selectedId
-            }));
-        } catch (e) {
-            // ignore storage failures
-        }
-    }
-
-    function initExtensionsData() {
-        extensionsState.installed = [
-            {
-                id: 'mumps-lint',
-                name: 'MUMPS Lint',
-                description: 'Runs MUMPS lint checks on save.',
-                icon: '🧹'
-            },
-            {
-                id: 'code-formatter',
-                name: 'Code Formatter',
-                description: 'Formats MUMPS routines using built-in formatter.',
-                icon: '✨'
-            },
-            {
-                id: 'ssh-tools',
-                name: 'SSH Tools',
-                description: 'Adds SSH utilities and quick commands.',
-                icon: '🔑'
-            }
-        ];
-        extensionsState.installed.forEach(ext => {
-            if (extensionsState.enabled[ext.id] === undefined) {
-                extensionsState.enabled[ext.id] = true;
-            }
-        });
-        if (!extensionsState.selectedId && extensionsState.installed.length) {
-            extensionsState.selectedId = extensionsState.installed[0].id;
-        }
-    }
-
-    function renderExtensionsDetail(ext) {
-        const host = document.getElementById('extensionDetail');
-        if (!host) return;
-        if (!ext) {
-            host.innerHTML = '<div class="pane-title">Select an extension</div><div class="pane-subtitle">Details will appear here.</div>';
-            return;
-        }
-        const enabled = !!extensionsState.enabled[ext.id];
-        host.innerHTML = `
-            <div class="detail-title">${ext.name}</div>
-            <div class="detail-desc">${ext.description || 'No description available.'}</div>
-            <div class="detail-status">Status: <strong>${enabled ? 'Enabled' : 'Disabled'}</strong></div>
-            <button class="btn ${enabled ? 'ghost' : 'primary'}" id="extToggleBtn">${enabled ? 'Disable' : 'Enable'}</button>
-        `;
-        document.getElementById('extToggleBtn')?.addEventListener('click', () => {
-            extensionsState.enabled[ext.id] = !enabled;
-            persistExtensionState();
-            renderExtensionsList();
-        });
-    }
-
-    function renderExtensionsList() {
-        const host = document.getElementById('extensionsList');
-        if (!host) return;
-        host.innerHTML = '';
-        if (!extensionsState.installed.length) {
-            host.textContent = 'No extensions installed.';
-            return;
-        }
-        extensionsState.installed.forEach(ext => {
-            const row = document.createElement('div');
-            row.className = 'extension-row';
-            if (extensionsState.selectedId === ext.id) row.classList.add('active');
-            const icon = document.createElement('div');
-            icon.className = 'extension-icon';
-            icon.textContent = ext.icon || '⋯';
-            const meta = document.createElement('div');
-            meta.className = 'extension-meta';
-            const name = document.createElement('div');
-            name.className = 'extension-name';
-            name.textContent = ext.name;
-            const desc = document.createElement('div');
-            desc.className = 'extension-desc';
-            desc.textContent = ext.description || '';
-            meta.appendChild(name);
-            meta.appendChild(desc);
-            const toggle = document.createElement('input');
-            toggle.type = 'checkbox';
-            toggle.className = 'extension-toggle';
-            toggle.checked = !!extensionsState.enabled[ext.id];
-            toggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                extensionsState.enabled[ext.id] = !extensionsState.enabled[ext.id];
-                persistExtensionState();
-                renderExtensionsDetail(ext);
-            });
-            row.appendChild(icon);
-            row.appendChild(meta);
-            row.appendChild(toggle);
-            row.addEventListener('click', () => {
-                extensionsState.selectedId = ext.id;
-                persistExtensionState();
-                renderExtensionsList();
-                renderExtensionsDetail(ext);
-            });
-            host.appendChild(row);
-        });
-        const selected = extensionsState.installed.find(e => e.id === extensionsState.selectedId);
-        renderExtensionsDetail(selected);
-    }
-
     function initExtensionsView() {
-        loadExtensionState();
-        initExtensionsData();
-        renderExtensionsList();
+        return extensionsManager.initExtensionsView();
     }
 
     function highlightLine(editor, lineNumber) {
@@ -4883,263 +3259,31 @@
         return res;
     }
 
-    // ---------- Routines ----------
+	    // ---------- Routines ----------
 
-    function setCurrentRoutine(name) {
-        const normalized = normalizeRoutineTarget(name);
-        activeRoutineName = normalized.path || normalized.base || null;
-        const displayName = normalized.base || (name || 'None');
-        const displayFolder = normalized.folder || 'routines';
-        const label = document.getElementById('currentRoutineLabel');
-        if (label) label.textContent = normalized.base || 'None';
+	    function setCurrentRoutine(name) {
+	        return routinesManager.setCurrentRoutine(name);
+	    }
 
-        // Update PhpStorm-style breadcrumbs
-        const breadcrumbsContainer = document.getElementById('breadcrumbs');
-        if (breadcrumbsContainer) {
-            breadcrumbsContainer.innerHTML = '';
+	    async function loadRoutineList(state, editor, search = '') {
+	        return routinesManager.loadRoutineList(state, editor, search);
+	    }
 
-            // Project level
-            const projectItem = document.createElement('span');
-            projectItem.className = 'breadcrumb-item';
-            projectItem.textContent = 'Project';
-            projectItem.onclick = () => {
-                showToast('info', 'Navigation', 'Project root');
-            };
-            breadcrumbsContainer.appendChild(projectItem);
+	    async function loadRoutineByName(name, state, editor, routinesCache = [], termState) {
+	        return routinesManager.loadRoutineByName(name, state, editor, routinesCache, termState);
+	    }
 
-            if (normalized.base) {
-                // Separator
-                const sep1 = document.createElement('span');
-                sep1.className = 'breadcrumb-separator';
-                sep1.textContent = '›';
-                breadcrumbsContainer.appendChild(sep1);
+	    async function saveRoutineFlow(editor, state, termState) {
+	        return routinesManager.saveRoutineFlow(editor, state, termState);
+	    }
 
-                // Routines folder
-                const routinesItem = document.createElement('span');
-                routinesItem.className = 'breadcrumb-item';
-                routinesItem.textContent = displayFolder;
-                routinesItem.onclick = () => {
-                    showToast('info', 'Navigation', 'Routines folder');
-                };
-                breadcrumbsContainer.appendChild(routinesItem);
+	    async function performSave(name, editor, state, termState) {
+	        return routinesManager.performSave(name, editor, state, termState);
+	    }
 
-                // Separator
-                const sep2 = document.createElement('span');
-                sep2.className = 'breadcrumb-separator';
-                sep2.textContent = '›';
-                breadcrumbsContainer.appendChild(sep2);
-
-                // Current file
-                const fileItem = document.createElement('span');
-                fileItem.className = 'breadcrumb-item active';
-                fileItem.textContent = `${displayName}.m`;
-                breadcrumbsContainer.appendChild(fileItem);
-            }
-        }
-    }
-
-    async function loadRoutineList(state, editor, search = '') {
-        const res = await window.ahmadIDE.listRoutines('');
-        if (res.ok) {
-            state._cacheFull = res.routines;
-            routinesCache = res.routines || routinesCache;
-            setTimeout(() => {
-                renderProjectTree(state._cacheFull || state._lastRoutines || [], state, editor);
-            }, 0);
-        } else {
-            setTimeout(() => renderProjectTree([], state, editor), 0);
-        }
-        state._lastRoutines = res.ok ? res.routines : [];
-    }
-
-    async function loadRoutineByName(name, state, editor, routinesCache = [], termState) {
-        const targetInfo = normalizeRoutineTarget(name);
-        const targetRoutineKey = targetInfo.path || targetInfo.base;
-        if (!targetRoutineKey) return;
-        logger.info('FILE_OPEN', { routine: targetRoutineKey });
-
-        // Check if tab already exists for this routine
-        const existingTab = findOpenTab(targetRoutineKey);
-        if (existingTab) {
-            // Just switch to existing tab
-            switchTab(existingTab.id);
-            return;
-        }
-
-        // Load routine from backend
-        const readRes = await window.ahmadIDE.readRoutine(targetRoutineKey);
-        if (!readRes.ok) {
-            logger.warn('FILE_OPEN_FAIL', { routine: targetRoutineKey, error: readRes.error || readRes.stderr });
-            appendOutput(`✗ Failed to load ${targetRoutineKey}: ${readRes.error || readRes.stderr}`, termState);
-            showToast('error', 'Search', `Could not open ${targetRoutineKey}`);
-            return false;
-        }
-
-        // Create new tab with loaded content
-        createTab(targetRoutineKey, readRes.code || '', state);
-
-        // Validate the freshly loaded model
-        const modelToValidate = editor?.getModel ? editor.getModel() : activeEditor?.getModel?.();
-        if (modelToValidate) {
-            const delayed = () => validateMumps(modelToValidate);
-            if (window.requestIdleCallback) window.requestIdleCallback(delayed, { timeout: 120 });
-            else setTimeout(delayed, 50);
-        }
-
-        logger.info('FILE_OPEN_SUCCESS', { routine: targetRoutineKey });
-        appendOutput(`✓ Loaded routine ${targetRoutineKey}`, termState);
-        return true;
-    }
-
-    async function saveRoutineFlow(editor, state, termState) {
-        let name = state.current;
-        if (!name) {
-            showCustomPrompt('Save Routine', 'Routine name (e.g., TEST1)', async (promptName) => {
-                name = promptName;
-                await performSave(name, editor, state, termState);
-            });
-            return;
-        }
-        logger.info('FILE_SAVE_REQUEST', { routine: name });
-        await performSave(name, editor, state, termState);
-    }
-
-    async function performSave(name, editor, state, termState) {
-        name = name.trim();
-        if (!name) {
-            appendOutput('✗ Save cancelled (no name).', termState);
-            return;
-        }
-        if (mumpsValidator) {
-            // Extract just the routine name (remove folder path if present)
-            const routineNameOnly = name.includes('/') ? name.split('/').pop() : name;
-            const check = mumpsValidator.validateRoutineName(routineNameOnly.toUpperCase());
-            if (!check.valid) {
-                appendOutput(`✗ Invalid routine: ${check.errors.join('; ')}`, termState);
-                return;
-            }
-            // Convert full path to uppercase
-            name = name.toUpperCase();
-        }
-        const code = editor.getValue();
-
-        // Lint with mode: 'edit' - block only on errors (warnings/info are allowed)
-        const linter = window._mumpsLinter || mumpsLinter;
-        if (hasLintRules(linter)) {
-            const lintResult = linter.lint(code || '', { mode: 'edit' });
-            applyLintMarkers(editor.getModel(), lintResult.issues || []);
-            renderProblems((lintResult.issues || []).map(i => ({
-                message: i.message || i.description || '',
-                severity: i.severity || 'info',
-                line: i.line || null,
-                code: i.ruleId || i.code || null
-            })));
-            const summary = lintResult.summary || { errors: 0, warnings: 0, info: 0 };
-            if (summary.errors > 0) {
-                appendOutput(
-                    `✗ Cannot save: ${summary.errors} error(s) found. Warnings and info are allowed.`,
-                    termState
-                );
-                return;
-            }
-        }
-
-        logger.debug('FILE_SAVE', { routine: name });
-        const res = await window.ahmadIDE.saveRoutine(name, code);
-        if (res.ok) {
-            const savedPath = res.folder ? `${res.folder}/${res.routine}` : (res.routine || name);
-            state.current = savedPath;
-            setCurrentRoutine(state.current);
-            appendOutput(`✓ Saved routine ${state.current}`, termState);
-            await window.ahmadIDE.zlinkRoutine(state.current);
-            appendOutput(`✓ ZLINK ${state.current}`, termState);
-            await loadRoutineList(state, editor, '', termState);
-            logger.info('FILE_SAVE_SUCCESS', { routine: savedPath });
-
-            // Clear dirty state for current tab
-            if (activeTabId) {
-                markTabDirty(activeTabId, false);
-                // Update tab name if it changed
-                const currentTab = openTabs.find(t => t.id === activeTabId);
-                if (currentTab) {
-                    currentTab.name = res.routine || currentTab.name;
-                    currentTab.path = savedPath || currentTab.path;
-                    currentTab.folder = res.folder || currentTab.folder;
-                    if (currentTab.state) currentTab.state.current = savedPath;
-                    renderTabs();
-                }
-            }
-        } else {
-            appendOutput(`✗ Save failed: ${res.error || res.stderr}`, termState);
-            logger.error('FILE_SAVE_FAIL', { routine: name, error: res.error || res.stderr });
-        }
-    }
-
-    async function newRoutineFlow(editor, state, termState) {
-        showCustomPrompt('New Routine', 'Routine name (e.g., NEWRTN)', async (name) => {
-            const trimmed = name.trim();
-            if (!trimmed) {
-                appendOutput('✗ New routine cancelled (no name).', termState);
-                return;
-            }
-
-            // Validate length first
-            if (trimmed.length > 16) {
-                appendOutput(`✗ Invalid routine name: Name must be 16 characters or less (got ${trimmed.length})`, termState);
-                showToast('error', 'New Routine', `Name must be 16 characters or less (got ${trimmed.length})`);
-                return;
-            }
-
-            if (mumpsValidator) {
-                const check = mumpsValidator.validateRoutineName(trimmed.toUpperCase());
-                if (!check.valid) {
-                    appendOutput(`✗ Invalid routine: ${check.errors.join('; ')}`, termState);
-                    showToast('error', 'New Routine', check.errors.join('; '));
-                    return;
-                }
-            }
-
-            const routineName = trimmed.toUpperCase();
-
-            // Check if routine already exists
-            const existingRoutine = await window.ahmadIDE.readRoutine(routineName);
-            if (existingRoutine.ok && existingRoutine.code) {
-                // Routine exists - open it instead of creating new one
-                logger.info('FILE_OPEN_EXISTING', { routine: routineName, codeLength: existingRoutine.code.length });
-                appendOutput(`ℹ Routine ${routineName} already exists - opening it`, termState);
-                showToast('info', 'New Routine', `Routine ${routineName} already exists - opened for editing`);
-
-                // Check if tab already exists
-                const targetInfo = normalizeRoutineTarget(routineName);
-                const routineKey = existingRoutine.folder ? `${existingRoutine.folder}/${routineName}` : routineName;
-                const existingTab = findOpenTab(routineKey);
-
-                if (existingTab) {
-                    switchTab(existingTab.id);
-                } else {
-                    // Create tab with existing code
-                    createTab(routineName, existingRoutine.code, state, { folder: existingRoutine.folder });
-                    state.current = existingRoutine.folder ? `${existingRoutine.folder}/${routineName}` : routineName;
-                    setCurrentRoutine(state.current);
-                }
-                return;
-            }
-
-            logger.info('FILE_CREATE', { routine: routineName });
-            const code = `MAIN ; ${routineName} routine\n    WRITE "Hello from ${routineName}!", !\n    QUIT\n`;
-
-            // Create a new tab for the routine
-            createTab(routineName, code, state);
-            state.current = routineName;
-
-            if (editor) {
-                editor.setValue(code);
-            }
-            setCurrentRoutine(routineName);
-            await saveRoutineFlow(editor, state, termState);
-        });
-
-    }
+	    async function newRoutineFlow(editor, state, termState) {
+	        return routinesManager.newRoutineFlow(editor, state, termState);
+	    }
 
     function registerMumpsHover() {
         return debugManager.registerMumpsHover();

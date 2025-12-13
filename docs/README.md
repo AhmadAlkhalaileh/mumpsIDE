@@ -206,8 +206,8 @@ Ahmad IDE is a modern, PhpStorm-inspired Integrated Development Environment buil
 | `AHMAD_IDE_USE_SG` | Use `sg docker` wrapper for Docker commands | `0` |
 | `AHMAD_IDE_ENABLE_NODE_PTY` | Enable node-pty for terminal (requires compilation) | `0` |
 | `AHMAD_IDE_DEBUG_ENGINE` | Debug engine mode (`legacy` or default ZSTEP) | `zstep` |
-| `MDEBUG_HOST` | AHMDBG server host | `127.0.0.1` |
-| `MDEBUG_PORT` | AHMDBG server port | `9200` |
+| `AHMDDG_HOST` | AHMDDG server host | `127.0.0.1` |
+| `AHMDDG_PORT` | AHMDDG server port | `9200` |
 
 ---
 
@@ -596,7 +596,7 @@ TEST    ; Simple test routine
 
 ![Debug Session](screenshots/18-debug-session.png)
 
-Ahmad IDE includes a custom JSON-based debugger called **AHMDBG** (Ahmad JSON Debugger) implemented in pure MUMPS.
+Ahmad IDE includes a custom JSON-based debugger called **AHMDDG** (Ahmad JSON Debugger) implemented in pure MUMPS.
 
 #### Starting Debug Session
 
@@ -646,17 +646,17 @@ Ahmad IDE includes a custom JSON-based debugger called **AHMDBG** (Ahmad JSON De
 - **Modify Locals:** `SET X=100`
 - **Call Functions:** `DO SUBROUTINE^ROUTINE`
 
-#### AHMDBG Protocol
+#### AHMDDG Protocol
 
 **Architecture:**
 ```
 ┌──────────────┐          ┌──────────────┐          ┌──────────────┐
-│  Ahmad IDE   │          │  bridge.js   │          │  AHMDBG.m    │
-│  (renderer)  │  ◄────►  │  (TCP/stdio) │  ◄────►  │  (YottaDB)   │
+│  Ahmad IDE   │          │  bridge.js   │          │  AHMDDG.m    │
+│  (renderer)  │  ◄────►  │  (stdio)     │  ◄────►  │  (YottaDB)   │
 └──────────────┘   IPC    └──────────────┘   JSON   └──────────────┘
 ```
 
-**Commands (IDE → AHMDBG):**
+**Commands (IDE → AHMDDG):**
 ```json
 INTO                                    # Step into
 OVER                                    # Step over
@@ -669,7 +669,7 @@ CLEARBP;TEST;5                          # Clear breakpoint at line 5
 EVAL;WRITE X,!                          # Evaluate expression
 ```
 
-**Events (AHMDBG → IDE):**
+**Events (AHMDDG → IDE):**
 ```json
 {"event":"ready","routine":"TEST","tag":"MAIN"}
 {"event":"stopped","routine":"TEST","line":5,"pos":"MAIN+3^TEST","depth":1,"tag":"MAIN","offset":3}
@@ -682,9 +682,9 @@ EVAL;WRITE X,!                          # Evaluate expression
 
 **ZSTEP Integration:**
 
-AHMDBG uses YottaDB's `$ZSTEP` facility:
+AHMDDG uses YottaDB's `$ZSTEP` facility:
 ```mumps
-SET $ZSTEP="ZSHOW ""V"":^%AHMDBG($J,""VARS"") SET %STP=$$STEPJSON^AHMDBG() ..."
+SET $ZSTEP="ZSHOW ""V"":^%AHMDDG($J,""VARS"") SET %STP=$$STEPJSON^AHMDDG() ..."
 ```
 
 This captures variables at each step and waits for debugger commands via stdin.
@@ -780,9 +780,9 @@ git remote add origin https://github.com/user/repo.git
 **Configuration:**
 - **Container ID:** Detected automatically
 - **YottaDB Path:** `/opt/fis-gtm/YDB136`
-- **Env Key:** `hakeem` (default for Docker)
-- **Globals Path:** `/var/worldvista/prod/hakeem/globals/mumps.gld`
-- **Routines Path:** `/var/worldvista/prod/hakeem/localr`
+- **Env Key:** `prod` (default for Docker)
+- **Globals Path:** `/var/worldvista/prod/globals/mumps.gld`
+- **Routines Path:** `/var/worldvista/prod/localr`
 
 **Docker Commands:**
 IDE wraps commands with `sg docker -c` if `AHMAD_IDE_USE_SG=1`:
@@ -833,7 +833,7 @@ Username `ahmad-cc` → Env key `cc`
 **Command:**
 ```bash
 # Docker
-docker exec <container> bash -c 'ls /var/worldvista/prod/hakeem/localr/*.m'
+docker exec <container> bash -c 'ls /var/worldvista/prod/localr/*.m'
 
 # SSH
 ssh user@host 'ls /var/worldvista/prod/cc/localr/*.m'
@@ -961,13 +961,26 @@ Ahmad IDE 2/
 ├── main.js                 # Electron main process entry point
 ├── bridge.js              # MUMPS runtime bridge (3400+ lines)
 ├── preload.js             # IPC security layer
-├── renderer.js            # UI logic and event handlers (7600+ lines)
+├── renderer.js            # Main UI controller
 ├── index.html             # Main UI layout
 ├── styles.css             # PhpStorm-inspired theme (2000+ lines)
-├── AHMDBG.m               # MUMPS debugger backend (430 lines)
-├── mumps-parser.js        # MUMPS parser (legacy)
+├── AHMDDG.m               # MUMPS debugger backend (JSON-based)
 ├── package.json           # NPM dependencies
 ├── package-lock.json      # Locked dependency versions
+│
+├── src/
+│   └── editor/            # Modular editor components
+│       ├── debug/         # Debug panel and controls
+│       ├── diagnostics/   # Linting and error reporting
+│       ├── git/           # Git integration UI
+│       ├── mumps/         # MUMPS Monaco renderer
+│       ├── problems/      # Problems panel
+│       ├── project/       # Project explorer
+│       ├── routines/      # Routine management
+│       ├── search/        # Search and find functionality
+│       ├── tabs/          # Tab management
+│       ├── terminal/      # Terminal integration
+│       └── ui/            # UI utilities and components
 │
 ├── assets/
 │   └── mumps/
@@ -1225,25 +1238,15 @@ SET $ZSTEP="ZSHOW ""V"":^%AHMDBG($J,""VARS"") SET %STP=$$STEPJSON^AHMDBG() ZSTEP
 15. Repeat until QUIT or HALT
 ```
 
-#### MDebugClient Class
+#### Debug Client
 
-**State Machine:**
-```javascript
-const mdebugStates = {
-  disconnected: 'disconnected',
-  waitingForStart: 'waitingForStart',
-  waitingForVars: 'waitingForVars',
-  waitingForBreakpoints: 'waitingForBreakpoints',
-  waitingForSingleVar: 'waitingForSingleVar',
-  waitingForSingleVarContent: 'waitingForSingleVarContent',
-  waitingForErrorReport: 'waitingForErrorReport',
-  waitingForHints: 'waitingForHints',
-  waitingForGlobals: 'waitingForGlobals'
-};
-```
+**Communication:**
+- Uses stdin/stdout for JSON protocol
+- No TCP connection required
+- Direct process spawning
 
 **Methods:**
-- `connect(retries)` - Connect to AHMDBG server
+- `start()` - Start AHMDDG process
 - `step(type)` - Send step command ('into', 'over', 'out')
 - `continue()` - Send CONTINUE command
 - `stop()` - Send HALT command
@@ -1251,7 +1254,7 @@ const mdebugStates = {
 - `clearBreakpoint(file, line)` - Clear breakpoint
 - `getVariables()` - Request variables via GETVARS
 - `eval(code)` - Evaluate code via EVAL;...
-- `_onData(data)` - Process incoming data
+- `_onData(data)` - Process incoming JSON from stdout
 - `_processLine(line)` - Parse JSON events
 
 ---
@@ -1317,7 +1320,7 @@ const logger = {
 - `TERMINAL_CREATE_ERROR` - Terminal creation failed
 - `MAIN_UNCAUGHT_EXCEPTION` - Unhandled exception
 - `MAIN_UNHANDLED_REJECTION` - Unhandled promise rejection
-- `MDEBUG` - Debug server events
+- `AHMDDG` - Debug server events
 
 **Output:**
 ```json
@@ -1605,9 +1608,9 @@ npx electron-builder --mac
 **Symptoms:** Debug session runs without pausing
 
 **Solutions:**
-- Ensure AHMDBG.m is compiled: Check `/tmp/ahmad_dbg/AHMDBG.o`
-- Verify port 9200 is open: `netstat -antp | grep 9200`
-- Restart AHMDBG server: Kill existing `pkill -9 -f AHMDBG`
+- Ensure AHMDDG.m is compiled: Check `/tmp/ahmad_dbg/AHMDDG.o`
+- Check debug process is running: `ps aux | grep AHMDDG`
+- Restart debug session: Stop and start again
 - Check YottaDB environment variables
 
 #### 5. Monaco editor not loading
@@ -1641,13 +1644,13 @@ npx electron-builder --mac
 - Limit terminal scrollback buffer
 - Use hardware acceleration if GPU is stable
 
-#### 8. AHMDBG "Port not open" error
+#### 8. AHMDDG debugger fails to start
 
-**Symptoms:** `AHMDBG server failed to bind on 127.0.0.1:9200`
+**Symptoms:** Debug session fails to start
 
 **Solutions:**
-1. Check if port is in use: `netstat -antp | grep 9200`
-2. Kill zombie processes: `pkill -9 -f AHMDBG`
+1. Check debug process: `ps aux | grep AHMDDG`
+2. Kill zombie processes: `pkill -9 -f AHMDDG`
 3. Wait for cleanup: `sleep 2` then retry
 4. Check YottaDB log: `/tmp/ahmad_dbg/`
 5. Verify YottaDB path: `ls /opt/fis-gtm/YDB136/mumps`
@@ -1685,7 +1688,7 @@ DEBUG=* npm start
 
 **Key log patterns:**
 ```
-[MDEBUG] - Debug server events
+[AHMDDG] - Debug server events
 [IPC_REQUEST] - IPC calls from renderer
 [SSH] - SSH connection events
 [TERMINAL_CREATE_ERROR] - Terminal issues
@@ -1812,10 +1815,10 @@ Below is a complete list of all screenshots that should be captured and placed i
 ```
 Container ID: 8c21cf79fb67
 YottaDB: /opt/fis-gtm/YDB136
-Env Key: hakeem
-Base: /var/worldvista/prod/hakeem
-Globals: /var/worldvista/prod/hakeem/globals/mumps.gld
-Routines: /var/worldvista/prod/hakeem/localr
+Env Key: prod
+Base: /var/worldvista/prod
+Globals: /var/worldvista/prod/globals/mumps.gld
+Routines: /var/worldvista/prod/localr
 ```
 
 **SSH (example):**

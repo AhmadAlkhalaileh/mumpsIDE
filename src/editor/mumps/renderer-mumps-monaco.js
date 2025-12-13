@@ -263,7 +263,9 @@
 
             monacoRef.languages.registerCompletionItemProvider('mumps', {
                 triggerCharacters: [' ', '$', '^', '.'],
-                provideCompletionItems: () => ({ suggestions: buildDataset() })
+                provideCompletionItems: (model, position, context, token) => {
+                    return { suggestions: buildDataset() };
+                }
             });
         }
 

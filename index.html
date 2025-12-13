@@ -5,11 +5,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>Ahmad IDE</title>
-    <link rel="stylesheet" href="./styles.css?v=20251209-performance">
-</head>
+	    <meta http-equiv="Pragma" content="no-cache">
+	    <meta http-equiv="Expires" content="0">
+	    <title>Ahmad IDE</title>
+	    <link rel="stylesheet" href="./styles/base.css?v=20251209-performance">
+	    <link rel="stylesheet" href="./styles/context-menu.css?v=20251209-performance">
+	    <link rel="stylesheet" href="./styles/layout.css?v=20251209-performance">
+	    <link rel="stylesheet" href="./styles/project-tree.css?v=20251209-performance">
+	    <link rel="stylesheet" href="./styles/tabs.css?v=20251209-performance">
+	    <link rel="stylesheet" href="./styles/toolbar.css?v=20251209-performance">
+	    <link rel="stylesheet" href="./styles/panels-terminal.css?v=20251209-performance">
+	    <link rel="stylesheet" href="./styles/debug-problems.css?v=20251209-performance">
+	    <link rel="stylesheet" href="./styles/search.css?v=20251209-performance">
+	    <link rel="stylesheet" href="./styles/connections.css?v=20251209-performance">
+	    <link rel="stylesheet" href="./styles/git.css?v=20251209-performance">
+	    <link rel="stylesheet" href="./styles/extensions.css?v=20251209-performance">
+	</head>
 
 <body>
     <div class="app-shell">
@@ -783,9 +794,20 @@
 		    <script src="./src/editor/search/renderer-search.js"></script>
 		    <script src="./src/editor/debug/renderer-debug.js"></script>
 		    <script src="./src/editor/problems/renderer-problems.js"></script>
-		    <script src="./src/editor/diagnostics/renderer-diagnostics.js"></script>
-		    <script src="./src/editor/mumps/renderer-mumps-monaco.js"></script>
-		    <script src="./renderer.js"></script>
-		</body>
+			    <script src="./src/editor/diagnostics/renderer-diagnostics.js"></script>
+			    <script src="./src/editor/extensions/renderer-extensions.js"></script>
+			    <script src="./src/editor/git/renderer-git-toolwindow.js"></script>
+			    <script src="./src/editor/git/renderer-git-settings.js"></script>
+			    <script src="./src/editor/connections/renderer-connections.js"></script>
+			    <script src="./src/editor/project/renderer-project-create.js"></script>
+			    <script src="./src/editor/project/renderer-project-context-menu.js"></script>
+			    <script src="./src/editor/project/renderer-project-tree.js"></script>
+			    <script src="./src/editor/routines/renderer-routines.js"></script>
+			    <script src="./src/editor/ui/renderer-editor-context-menu.js"></script>
+			    <script src="./src/editor/ui/renderer-settings-panel.js"></script>
+			    <script src="./src/editor/ui/renderer-ctrl-hover.js"></script>
+			    <script src="./src/editor/mumps/renderer-mumps-monaco.js"></script>
+			    <script src="./renderer.js"></script>
+			</body>
 
 		</html>

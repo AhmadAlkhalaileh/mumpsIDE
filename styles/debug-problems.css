@@ -1,0 +1,451 @@
+.panel.debug-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow: hidden;
+    flex: 1;
+    background: #313335 !important;
+}
+
+/* SUSPECTED UNUSED STYLE – verify in DOM/templates before deleting. Legacy toolwindow rail/content/buttons replaced by tool-window-bar. */
+.toolwindows-rail,
+.toolwindows-content,
+.toolwindow-btn {
+    display: none;
+}
+
+.toolwindow-icon-multi {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.service-chip {
+    position: absolute;
+    bottom: -4px;
+    padding: 2px 4px;
+    border-radius: 8px;
+    font-size: 9px;
+    line-height: 1;
+    background: #2d2f30 !important;
+    border: 1px solid #323232;
+    color: #808080 !important;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    pointer-events: none;
+}
+
+.service-chip-docker {
+    left: -4px;
+}
+
+.toolwindow-btn.active .service-chip,
+.toolwindow-btn:hover .service-chip {
+    color: #bbbbbb !important;
+    border-color: #4a9eff;
+}
+
+.toolwindow-btn:hover {
+    background: #2d2f30 !important;
+    color: #bbbbbb !important;
+}
+
+.toolwindow-btn.active {
+    background: #313335 !important;
+    color: #bbbbbb !important;
+    border-left-color: #4a9eff;
+}
+
+.panel.debug-panel.hidden,
+.panel.terminal.hidden {
+    display: none;
+}
+
+.toolwindows-bar {
+    position: relative;
+    z-index: 2;
+}
+
+.debug-tabs {
+    display: inline-flex;
+    gap: 8px;
+    background: #313335 !important;
+    border: 1px solid #323232;
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 8px;
+}
+
+.debug-tab {
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--muted);
+    border: 1px solid transparent;
+    font-weight: 700;
+}
+
+.debug-tab.active {
+    background: rgba(214, 127, 60, 0.16);
+    color: var(--text);
+    border-color: rgba(214, 127, 60, 0.35);
+}
+
+.debug-tabpanes {
+    border: 1px solid #323232;
+    border-radius: 10px;
+    background: #2b2b2b !important;
+    padding: 8px;
+    min-height: 200px;
+}
+
+.debug-tabpane {
+    display: none;
+}
+
+.debug-tabpane.active {
+    display: block;
+}
+
+.pane-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.pane-title {
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.pane-subtitle {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.pane-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.debug-columns {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.debug-col {
+    background: var(--panel-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    min-height: 140px;
+}
+
+.terminal-tabs {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    padding: 2px 6px;
+    border-radius: 8px;
+    background: #313335 !important;
+    border: 1px solid #323232;
+    overflow-x: auto;
+    max-width: 100%;
+    scrollbar-width: thin;
+    min-height: 32px;
+    flex: 1;
+}
+
+.terminal-tab {
+    padding: 6px 8px;
+    border-radius: 7px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    font-size: 12px;
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.terminal-tab.active {
+    background: rgba(214, 127, 60, 0.14);
+    color: var(--text);
+    border-color: rgba(240, 194, 123, 0.28);
+}
+
+.terminal-tab.exited {
+    opacity: 0.6;
+}
+
+.terminal-tab .tab-close {
+    font-size: 12px;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.terminal-tab .tab-close:hover {
+    color: var(--text);
+}
+
+.xterm {
+    position: relative;
+    user-select: none;
+    -ms-user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    font-family: var(--font-code);
+    font-size: var(--font-size-code);
+    color: #bbbbbb;
+    background-color: #2b2b2b !important;
+}
+
+.xterm.focus,
+.xterm:focus {
+    outline: 1px solid var(--accent-soft-border);
+}
+
+.xterm .xterm-helpers {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 5;
+}
+
+.xterm .xterm-helper-textarea {
+    position: absolute;
+    opacity: 0;
+    left: -9999em;
+    top: 0;
+    width: 0;
+    height: 0;
+    z-index: -5;
+    caret-color: transparent;
+}
+
+.xterm .composition-view {
+    background: var(--terminal-bg);
+    color: var(--text);
+    display: none;
+    position: absolute;
+    white-space: nowrap;
+    z-index: 1;
+}
+
+.xterm .composition-view.active {
+    display: block;
+}
+
+.xterm .xterm-viewport {
+    background-color: var(--terminal-bg);
+    overflow-y: auto;
+    cursor: text;
+}
+
+.xterm .xterm-screen {
+    position: relative;
+}
+
+.xterm .xterm-rows {
+    position: absolute;
+    inset: 0;
+    padding: 0 2px;
+}
+
+.xterm-char-measure-element {
+    visibility: hidden;
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: auto;
+    width: auto;
+    white-space: nowrap;
+}
+
+.xterm .xterm-scroll-area {
+    visibility: hidden;
+}
+
+.xterm-decoration-container {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 6;
+}
+
+.xterm .xterm-decoration {
+    position: absolute;
+}
+
+.xterm .xterm-selection div {
+    position: absolute;
+    background: var(--selection-bg);
+}
+
+.xterm-viewport::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 6px;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+}
+
+.panel.terminal .pane-header {
+    flex-shrink: 0;
+}
+
+.breakpoint-glyph {
+    background-color: #ef4444;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-left: 4px;
+}
+
+.debug-line {
+    background: var(--accent-soft) !important;
+}
+
+.debug-glyph {
+    background: var(--accent-2);
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.problems-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.problems-list li {
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+}
+
+.debug-panel .problems-list li {
+    border-bottom: none;
+}
+
+.problem-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.problem-icon {
+    font-size: 14px;
+    width: 16px;
+    text-align: center;
+}
+
+.problem-item.error .problem-text {
+    color: #fca5a5;
+}
+
+.problem-item.warning .problem-text {
+    color: #fcd34d;
+}
+
+.problem-item.info .problem-text {
+    color: var(--muted);
+}
+
+.debug-output {
+    height: 120px;
+    background: var(--terminal-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px;
+    overflow-y: auto;
+    font-family: var(--font-code);
+    font-size: 12px;
+    white-space: pre-wrap;
+    color: var(--text);
+}
+
+.debug-console-input {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.debug-console-input input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--panel);
+    color: var(--text);
+}
+
+.debug-columns {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.debug-col {
+    background: var(--panel-soft);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    min-height: 140px;
+}
+
+.locals-toggle {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    border-radius: 4px;
+    width: 18px;
+    height: 18px;
+    margin-right: 6px;
+    cursor: pointer;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0;
+}
+
+.locals-toggle:hover {
+    color: var(--text);
+    border-color: var(--accent-blue);
+}
+
+.locals-array-label {
+    cursor: pointer;
+    color: #4ec9b0;
+}
+
+.locals-children {
+    list-style: none;
+    padding-left: 20px;
+    margin: 6px 0 0;
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    z-index: 3000;
+}
+

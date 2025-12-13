@@ -1,0 +1,431 @@
+/* ============================================
+   PhpStorm-style Context Menu
+   ============================================ */
+.context-menu,
+.routines-context-menu {
+    position: fixed;
+    z-index: 5000;
+    min-width: 200px;
+    background: var(--panel-strong);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    padding: 4px 0;
+    font-size: 12px;
+}
+.context-menu { display: none; }
+
+.context-menu .ctx-item,
+.routines-context-menu .ctx-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px 4px 8px;
+    color: var(--text);
+    cursor: pointer;
+    min-height: 24px;
+    position: relative;
+}
+.context-menu .ctx-item:hover,
+.routines-context-menu .ctx-item:hover { background: var(--tree-selected); }
+
+.context-menu .ctx-item.disabled,
+.routines-context-menu .ctx-item.disabled { opacity: 0.4; cursor: default; }
+
+.context-menu .ctx-item.disabled:hover,
+.routines-context-menu .ctx-item.disabled:hover { background: transparent; }
+
+.context-menu .ctx-separator,
+.routines-context-menu .ctx-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 8px;
+}
+
+/* Context menu icon */
+.ctx-icon {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--muted);
+}
+
+.ctx-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Context menu label */
+.ctx-label {
+    flex: 1;
+    white-space: nowrap;
+}
+
+/* Context menu shortcut */
+.ctx-shortcut {
+    color: var(--muted);
+    font-size: 11px;
+    margin-left: auto;
+    padding-left: 16px;
+}
+
+/* Context menu submenu arrow */
+.ctx-arrow {
+    color: var(--muted);
+    font-size: 10px;
+    margin-left: auto;
+}
+
+/* Submenu styling */
+.ctx-item.has-submenu {
+    position: relative;
+}
+
+.ctx-submenu {
+    position: absolute;
+    left: 100%;
+    top: 0;
+    min-width: 180px;
+    background: var(--panel-strong);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    padding: 4px 0;
+    display: none;
+}
+
+.ctx-item.has-submenu:hover>.ctx-submenu {
+    display: block;
+}
+
+/* Custom Prompt Dialog */
+.prompt-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 6000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.prompt-dialog {
+    background: var(--panel-strong);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    min-width: 400px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.prompt-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 16px;
+}
+
+.prompt-input {
+    width: 100%;
+    padding: 10px 12px;
+    margin-bottom: 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--terminal-bg);
+    color: var(--text);
+    font-size: 14px;
+    font-family: var(--font-ui);
+    outline: none;
+}
+
+.prompt-input:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 3px rgba(74, 159, 232, 0.1);
+}
+
+.prompt-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.prompt-ok,
+.prompt-cancel {
+    min-width: 80px;
+}
+
+.context-menu .git-parent {
+    position: relative;
+}
+
+.git-submenu {
+    position: absolute;
+    top: 0;
+    left: 100%;
+    margin-left: 4px;
+    display: none;
+}
+
+.git-parent:hover .git-submenu {
+    display: block;
+}
+
+.toast-container {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    display: grid;
+    gap: 8px;
+    z-index: 5000;
+}
+
+.toast {
+    min-width: 280px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+    background: var(--panel);
+    color: var(--text);
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+}
+
+.toast.error {
+    border-color: rgba(248, 113, 113, 0.35);
+    background: rgba(248, 113, 113, 0.12);
+    color: #fecdd3;
+}
+
+.toast.info {
+    border-color: rgba(91, 213, 255, 0.2);
+}
+
+.toast .toast-icon {
+    font-size: 16px;
+}
+
+.toast .toast-body {
+    flex: 1;
+}
+
+.toast .toast-title {
+    font-weight: 700;
+    margin-bottom: 2px;
+}
+
+.toast .toast-close {
+    cursor: pointer;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.brand-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    font-size: 14px;
+}
+
+.brand-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.brand-name {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.brand-sub {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.03em;
+}
+
+.topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 14px;
+    background: #3c3f41 !important;
+    border-bottom: 1px solid #323232;
+    position: relative;
+    z-index: 90;
+}
+
+.toolbar-section {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.toolbar-section.toolbar-right {
+    margin-left: auto;
+}
+
+.toolbar-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.run-debug-widget {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: #2d2f30 !important;
+    border: 1px solid #323232;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.run-config-control {
+    position: relative;
+}
+
+.run-config-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    min-width: 220px;
+    background: var(--panel-strong);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+    padding: 8px;
+    display: grid;
+    gap: 6px;
+    z-index: 200;
+}
+
+.run-config-header {
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--text);
+}
+
+.run-config-item {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: left;
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+    transition: all 0.12s ease;
+}
+
+.run-config-item:hover {
+    background: var(--hover-bg);
+    border-color: var(--border);
+}
+
+.run-config-item.active {
+    background: var(--selection-bg);
+    border-color: var(--border);
+}
+
+.run-config-item.disabled {
+    opacity: 0.6;
+    cursor: default;
+    border-color: transparent;
+    background: transparent;
+    pointer-events: none;
+}
+
+.run-config-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 2px 0;
+}
+
+.toolbar-btn .btn-label {
+    margin-left: 6px;
+    font-weight: 700;
+    font-size: 12px;
+}
+
+.dropdown-btn {
+    min-width: 28px;
+    padding: 6px;
+}
+
+.header-toolbar .toolbar-btn {
+    height: 32px;
+}
+
+.vcs-widget {
+    position: relative;
+}
+
+.vcs-widget .vcs-toggle {
+    padding-right: 8px;
+}
+
+.vcs-widget .chevron-icon {
+    opacity: 0.6;
+}
+
+.vcs-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    min-width: 200px;
+    background: var(--panel-strong);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+    padding: 6px;
+    display: grid;
+    gap: 4px;
+    z-index: 200;
+}
+
+.vcs-menu-item {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 8px 10px;
+    text-align: left;
+    color: var(--text);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+    transition: all 0.12s ease;
+}
+
+.vcs-menu-item:hover {
+    background: var(--hover-bg);
+    border-color: var(--border);
+}
+
+.vcs-menu-separator {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
+

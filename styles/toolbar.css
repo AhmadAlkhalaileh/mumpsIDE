@@ -1,0 +1,233 @@
+/* PhpStorm-style breadcrumbs */
+.crumbs {
+    font-size: 13px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.breadcrumb-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.breadcrumb-item:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+
+.breadcrumb-item.active {
+    color: var(--text-bright);
+    background: var(--selection-bg);
+}
+
+.breadcrumb-separator {
+    color: var(--muted);
+    opacity: 0.5;
+    font-size: 12px;
+    user-select: none;
+}
+
+.actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+/* PhpStorm-style toolbar buttons */
+.toolbar-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 8px;
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 6px;
+    background: transparent !important;
+    color: #808080 !important;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+}
+
+.toolbar-btn:hover {
+    background: #2d2f30 !important;
+    color: #bbbbbb !important;
+    border-color: #323232;
+}
+
+.toolbar-btn svg {
+    width: 16px;
+    height: 16px;
+    opacity: 0.8;
+}
+
+.toolbar-btn:hover svg {
+    opacity: 1;
+}
+
+.toolbar-btn.primary {
+    background: linear-gradient(135deg, var(--accent-green), #4a9d50);
+    border-color: var(--accent-green);
+}
+
+.toolbar-btn.primary:hover {
+    background: linear-gradient(135deg, #6bc56f, #5fb865);
+    box-shadow: 0 4px 12px rgba(95, 184, 101, 0.3);
+}
+
+.toolbar-btn.primary svg {
+    opacity: 1;
+    filter: brightness(1.1);
+}
+
+.toolbar-separator {
+    width: 1px;
+    height: 24px;
+    background: var(--border);
+    margin: 0 4px;
+}
+
+.debug-icons {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.icon-btn {
+    padding: 6px 8px;
+    min-width: 32px;
+    text-align: center;
+    font-size: 14px;
+    line-height: 1;
+}
+
+.debug-float {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--panel-strong);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px;
+    display: flex;
+    gap: 4px;
+    z-index: 3000;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.15);
+}
+
+.debug-float.hidden {
+    display: none;
+}
+
+.debug-float.inactive {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.debug-float button {
+    background: #313335 !important;
+    color: #bbbbbb !important;
+    border: 1px solid #323232;
+    border-radius: 4px;
+    padding: 4px 6px;
+    cursor: pointer;
+}
+
+.editor-frame {
+    flex: 1;
+    background: #2b2b2b;
+    border: none;
+    border-radius: 0;
+    min-height: 0;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+#editor {
+    height: 100%;
+    width: 100%;
+    min-height: 200px;
+    background: var(--editor-bg);
+}
+
+#debugStartBtn {
+    position: relative;
+    overflow: visible;
+}
+
+#debugStartBtn.armed::after,
+#debugStartBtn.live::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+#debugStartBtn.armed::after {
+    background: #5fb865; /* green indicator when armed */
+}
+
+#debugStartBtn.live::after {
+    background: #d67f3c; /* orange indicator when a session is live */
+}
+
+.monaco-editor,
+.monaco-editor .margin {
+    background: #2b2b2b !important;
+    color: #bbbbbb !important;
+}
+
+/* SCROLL PERFORMANCE - CSS containment for better scrolling */
+.monaco-editor {
+    contain: strict !important;
+    /* Isolate layout/paint/style calculations */
+    will-change: contents !important;
+    /* Hint to browser for optimization */
+}
+
+.monaco-editor .view-lines {
+    contain: content !important;
+}
+
+.monaco-editor .lines-content {
+    contain: layout style !important;
+}
+
+.monaco-editor .overflow-guard {
+    /* Allow hover tooltips to float outside the editor without being clipped */
+    contain: content !important;
+    overflow: visible !important;
+}
+
+.monaco-editor .margin {
+    background: #313335 !important;
+}
+
+.monaco-editor .margin-view-overlays {
+    background: #313335 !important;
+}
+
+.monaco-editor .line-numbers,
+.monaco-editor .glyph-margin {
+    color: #808080 !important;
+}
+
+.monaco-editor .current-line {
+    background-color: #214283 !important;
+}
+

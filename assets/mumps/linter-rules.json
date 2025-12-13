@@ -73,9 +73,9 @@
       "autofix": false
     },
     "M013-LONG-LINE": {
-      "severity": "info",
-      "message": "Line exceeds 80 characters ({length} chars)",
-      "description": "Long lines can be hard to read",
+      "severity": "warning",
+      "message": "Line exceeds 255 characters ({length} chars) - MUMPS standard limit",
+      "description": "MUMPS standard specifies maximum line length of 255 characters for portability",
       "autofix": false
     },
     "M014-DUPLICATE-CODE": {
@@ -165,12 +165,12 @@
     "M028-INVALID-LABEL": {
       "severity": "error",
       "message": "Invalid label name '{label}'",
-      "description": "Labels must be 1–16 uppercase alphanumeric characters starting with a letter or %",
+      "description": "Labels must be 1–16 alphanumeric characters starting with a letter or %",
       "autofix": false
     }
   },
   "config": {
-    "maxLineLength": 80,
+    "maxLineLength": 255,
     "maxNestingDepth": 3,
     "checkUnusedVariables": false,
     "checkUnusedLabels": true,

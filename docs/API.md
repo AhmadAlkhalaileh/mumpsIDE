@@ -978,9 +978,9 @@ window.ahmadIDE.onTerminalExit(({ id, code }) => {
 
 ## Debug Protocol
 
-Communication between IDE and AHMDBG.m debugger.
+Communication between IDE and AHMDDG.m debugger.
 
-### Commands (IDE → AHMDBG via stdin)
+### Commands (IDE → AHMDDG via stdin)
 
 **Format:** Plain text commands, one per line
 
@@ -998,7 +998,7 @@ Communication between IDE and AHMDBG.m debugger.
 
 ---
 
-### Events (AHMDBG → IDE via stdout)
+### Events (AHMDDG → IDE via stdout)
 
 **Format:** JSON objects, one per line
 

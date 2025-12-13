@@ -1,0 +1,215 @@
+/* ============================================
+   PhpStorm-style Editor Tabs
+   ============================================ */
+.tabbar {
+    display: flex;
+    align-items: center;
+    background: #3c3f41 !important;
+    border-bottom: 1px solid #323232;
+    height: 28px;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+/* Scrollable tab container */
+.tab-container {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+    gap: 0;
+    height: 100%;
+}
+
+.tab-container::-webkit-scrollbar {
+    height: 3px;
+}
+
+.tab-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tab-container::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
+}
+
+.tab-container::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+}
+
+/* Tab actions (dropdown menu for overflow) */
+.tab-actions {
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    border-left: 1px solid var(--border);
+    height: 100%;
+}
+
+.tab-actions-btn {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    padding: 4px 6px;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+.tab-actions-btn:hover {
+    background: var(--hover-bg);
+    color: var(--text);
+}
+
+/* Individual tab (PhpStorm style) */
+.tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    height: 100%;
+    min-width: 80px;
+    max-width: 200px;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    cursor: pointer;
+    user-select: none;
+    flex-shrink: 0;
+    transition: background 0.1s ease;
+}
+
+.tab:last-of-type {
+    border-right: none;
+}
+
+.tab:hover {
+    background: var(--hover-bg);
+}
+
+/* Active tab (PhpStorm: lighter background, no bottom border) */
+.tab.active {
+    background: var(--editor-bg);
+    color: var(--text);
+    border-bottom: 2px solid var(--editor-bg);
+    margin-bottom: -1px;
+}
+
+/* Tab icon */
+.tab-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tab-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Tab name */
+.tab-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+
+/* Modified indicator (PhpStorm: asterisk or dot) */
+.tab.modified .tab-name::after {
+    content: ' •';
+    color: var(--accent-blue);
+}
+
+/* Close button (PhpStorm: small X on right) */
+.tab-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    font-size: 14px;
+    line-height: 1;
+    color: var(--muted);
+    opacity: 0;
+    transition: all 0.1s ease;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.tab:hover .tab-close,
+.tab.active .tab-close {
+    opacity: 0.6;
+}
+
+.tab .tab-close:hover {
+    opacity: 1;
+    background: var(--hover-bg);
+    color: var(--text);
+}
+
+/* Modified tab always shows close button (with different indicator) */
+.tab.modified .tab-close {
+    opacity: 0.8;
+}
+
+.tab.modified .tab-close::before {
+    content: '●';
+    font-size: 8px;
+    position: absolute;
+    color: var(--accent-blue);
+}
+
+.tab.modified:hover .tab-close::before {
+    display: none;
+}
+
+.tab.modified:hover .tab-close {
+    opacity: 1;
+}
+
+/* Ghost tab (New button) */
+.tab.ghost {
+    color: var(--muted);
+    min-width: auto;
+    background: transparent;
+    border: none;
+    padding: 0 12px;
+    font-size: 11px;
+}
+
+.tab.ghost:hover {
+    color: var(--text);
+    background: var(--hover-bg);
+}
+
+/* Menu actions area */
+.menu-actions {
+    margin-left: auto;
+    display: flex;
+    gap: 6px;
+}
+
+.action-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    background: #3c3f41 !important;
+    border-bottom: 1px solid #323232;
+    padding: 4px 8px;
+    height: 32px;
+    flex-shrink: 0;
+}
+

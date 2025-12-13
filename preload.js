@@ -1,12 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-// Try to expose xterm Terminal class if available
-try {
-    const { Terminal } = require('xterm');
-    contextBridge.exposeInMainWorld('Terminal', Terminal);
-} catch (e) {
-    console.warn('xterm not found in preload', e);
-}
+// Note: xterm is a browser library loaded via <script> tags in the renderer
+// Do NOT try to require it here - it's not a Node.js module
 
 contextBridge.exposeInMainWorld('ahmadIDE', {
     // Environment

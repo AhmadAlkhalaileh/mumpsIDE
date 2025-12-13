@@ -1,0 +1,95 @@
+.extensions-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 12px;
+    height: 100%;
+}
+
+.extensions-list {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel-2);
+    padding: 8px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.extension-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 8px;
+    background: var(--panel-soft);
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+
+.extension-row:hover {
+    border-color: var(--accent-blue);
+}
+
+.extension-row.active {
+    border-color: var(--accent-blue);
+    background: var(--accent-soft);
+}
+
+.extension-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: var(--accent-soft);
+    color: var(--accent-blue);
+    font-weight: 700;
+}
+
+.extension-meta {
+    flex: 1;
+}
+
+.extension-name {
+    font-weight: 700;
+}
+
+.extension-desc {
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.extension-toggle {
+    margin-left: auto;
+}
+
+.extensions-detail {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--panel-strong);
+    padding: 12px;
+    overflow: auto;
+}
+
+.extensions-detail .detail-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.extensions-detail .detail-desc {
+    color: var(--muted);
+    margin-bottom: 12px;
+}
+
+.extensions-detail .detail-status {
+    margin-bottom: 12px;
+}
+
+/* Ctrl+Click hover underline for tags and routines */
+.ctrl-hover-underline {
+    text-decoration: underline;
+    text-decoration-color: var(--accent-blue);
+    text-underline-offset: 2px;
+}

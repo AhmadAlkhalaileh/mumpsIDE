@@ -188,8 +188,8 @@ bridge.js (3400+ lines)
 │  ├─ Linting (local parser)
 │  └─ Routine I/O (read/write/zlink)
 ├─ Debugging
-│  ├─ AHMDBG server lifecycle
-│  ├─ MDebugClient (TCP client)
+│  ├─ AHMDDG lifecycle (stdio)
+│  ├─ Debug client (JSON protocol)
 │  ├─ Breakpoint management
 │  └─ Variable inspection
 ├─ Git Integration
@@ -212,47 +212,50 @@ utils/
 ### Renderer Process Components
 
 ```
-renderer.js (7600+ lines)
+renderer.js (Main controller)
 ├─ State Management
 │  ├─ Global state object
 │  ├─ Current connection config
 │  ├─ Active debug session
 │  └─ Terminal sessions map
-├─ Editor Module
-│  ├─ Monaco editor initialization
-│  ├─ Language definition (MUMPS)
-│  ├─ Theme registration
-│  ├─ Breakpoint decorations
-│  └─ Event handlers (keypress, save, etc.)
-├─ Tab Management
+└─ Module initialization
+
+src/editor/ (Modular components)
+├─ mumps/
+│  ├─ Monaco MUMPS renderer
+│  ├─ Language definition
+│  └─ Syntax highlighting
+├─ tabs/
 │  ├─ Tab creation/closing
-│  ├─ Active tab tracking
-│  └─ Tab content switching
-├─ Terminal Module
-│  ├─ xterm.js initialization
-│  ├─ PTY session management
-│  ├─ Multi-tab support
-│  └─ Data handlers (input/output)
-├─ Debug UI
-│  ├─ Debug bar (floating controls)
+│  └─ Tab management
+├─ terminal/
+│  ├─ xterm.js integration
+│  └─ PTY session management
+├─ debug/
+│  ├─ Debug bar controls
 │  ├─ Variables panel
 │  ├─ Breakpoints panel
-│  ├─ Call stack panel
-│  └─ Console/REPL
-├─ Git UI
-│  ├─ Status/changes display
+│  └─ Call stack panel
+├─ git/
+│  ├─ Git status/changes
 │  ├─ Commit workflow
-│  ├─ Diff viewer
-│  └─ Branch management
-├─ Project Explorer
-│  ├─ Tree view rendering
-│  ├─ Filtering
-│  └─ Context menu
-└─ UI Utilities
+│  └─ Diff viewer
+├─ project/
+│  ├─ Project tree view
+│  └─ Filtering
+├─ routines/
+│  ├─ Routine I/O
+│  └─ ZLINK operations
+├─ diagnostics/
+│  └─ Linting integration
+├─ problems/
+│  └─ Problems panel UI
+├─ search/
+│  └─ Find/Replace
+└─ ui/
    ├─ Toast notifications
    ├─ Modal dialogs
-   ├─ Keyboard shortcuts
-   └─ Panel toggles
+   └─ Keyboard shortcuts
 
 index.html
 ├─ Layout structure
@@ -475,10 +478,10 @@ sg docker -c "docker exec abc123 bash -c 'command'"
 
 **Environment Setup:**
 ```bash
-export gtmgbldir="/var/worldvista/prod/hakeem/globals/mumps.gld"
-export gtmroutines="/var/worldvista/prod/hakeem/localr /opt/fis-gtm/YDB136"
-export ydb_gbldir="/var/worldvista/prod/hakeem/globals/mumps.gld"
-export ydb_routines="/var/worldvista/prod/hakeem/localr /opt/fis-gtm/YDB136"
+export gtmgbldir="/var/worldvista/prod/globals/mumps.gld"
+export gtmroutines="/var/worldvista/prod/localr /opt/fis-gtm/YDB136"
+export ydb_gbldir="/var/worldvista/prod/globals/mumps.gld"
+export ydb_routines="/var/worldvista/prod/localr /opt/fis-gtm/YDB136"
 ```
 
 ---
@@ -551,28 +554,28 @@ await runHostCommand(`rm -f ${tempFile}`);
 
 ## Debugging Architecture
 
-### AHMDBG.m Design
+### AHMDDG.m Design
 
 **Execution Model:**
 ```
 IDE (renderer.js)
     ↓ IPC
 Main (bridge.js)
-    ↓ MDebugClient
-    ↓ TCP socket OR stdio
-AHMDBG.m (YottaDB)
+    ↓ stdio (stdin/stdout)
+    ↓ JSON protocol
+AHMDDG.m (YottaDB)
     ↓ $ZSTEP
 User's MUMPS code
 ```
 
 **$ZSTEP Integration:**
 ```mumps
-SET $ZSTEP="ZSHOW ""V"":^%AHMDBG($J,""VARS"") SET %STP=$$STEPJSON^AHMDBG() ZSTEP:%STP=""I"" INTO ZSTEP:%STP=""O"" OVER ZSTEP:%STP=""F"" OUTOF ZCONTINUE:%STP=""C"" HALT:%STP=""H"""
+SET $ZSTEP="ZSHOW ""V"":^%AHMDDG($J,""VARS"") SET %STP=$$STEPJSON^AHMDDG() ZSTEP:%STP=""I"" INTO ZSTEP:%STP=""O"" OVER ZSTEP:%STP=""F"" OUTOF ZCONTINUE:%STP=""C"" HALT:%STP=""H"""
 ```
 
 **Breakdown:**
-1. `ZSHOW "V":^%AHMDBG($J,"VARS")` - Capture variables to global
-2. `SET %STP=$$STEPJSON^AHMDBG()` - Call step handler (returns "I"/"O"/"F"/"C"/"H")
+1. `ZSHOW "V":^%AHMDDG($J,"VARS")` - Capture variables to global
+2. `SET %STP=$$STEPJSON^AHMDDG()` - Call step handler (returns "I"/"O"/"F"/"C"/"H")
 3. `ZSTEP:%STP="I" INTO` - If %STP is "I", do ZSTEP INTO
 4. `ZSTEP:%STP="O" OVER` - If %STP is "O", do ZSTEP OVER
 5. `ZSTEP:%STP="F" OUTOF` - If %STP is "F", do ZSTEP OUTOF
@@ -586,8 +589,8 @@ STEPJSON()
     SET USR=$SELECT($STACK>0:$STACK-1,1:$STACK)  ; Get user frame
     SET POS=$STACK(USR,"PLACE")                   ; Get position
     SET ROU=$PIECE(POS,"^",2)                     ; Extract routine
-    ; Skip AHMDBG itself
-    IF ROU="AHMDBG" QUIT "I"
+    ; Skip AHMDDG itself
+    IF ROU="AHMDDG" QUIT "I"
     ; Parse position
     SET TAG=$PIECE($PIECE(POS,"^"),"+",1)
     SET OFF=+$PIECE($PIECE(POS,"^"),"+",2)
@@ -638,7 +641,7 @@ ZBREAK -*
 **Capture Variables:**
 ```mumps
 ; In $ZSTEP action (before calling STEPJSON):
-ZSHOW "V":^%AHMDBG($J,"VARS")
+ZSHOW "V":^%AHMDDG($J,"VARS")
 ```
 
 **Send Variables:**
@@ -647,8 +650,8 @@ SENDVARS
     USE $PRINCIPAL
     WRITE "{""event"":""vars"",""vars"":{"
     SET I=""
-    FOR  SET I=$ORDER(^%AHMDBG($J,"VARS","V",I)) QUIT:I=""  DO
-    . SET LINE=^%AHMDBG($J,"VARS","V",I)
+    FOR  SET I=$ORDER(^%AHMDDG($J,"VARS","V",I)) QUIT:I=""  DO
+    . SET LINE=^%AHMDDG($J,"VARS","V",I)
     . ; Parse: VAR=value
     . SET VAR=$PIECE(LINE,"=",1)
     . SET VAL=$PIECE(LINE,"=",2,999)
@@ -956,7 +959,7 @@ setInterval(() => {
 **Alternatives:**
 - TCP with custom binary protocol (complex)
 - VSCode Debug Adapter Protocol (DAP) (overkill)
-- MDEBUG TCP protocol (legacy, complex)
+- Legacy TCP protocols (complex, harder to maintain)
 
 **JSON Benefits:**
 - Easy to parse in both JavaScript and MUMPS

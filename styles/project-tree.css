@@ -1,0 +1,368 @@
+/* ============================================
+   PhpStorm-style Project Tree
+   ============================================ */
+.project-tree {
+    flex: 1;
+    background: transparent;
+    padding: 2px 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-size: 13px;
+}
+
+/* Filter input in project panel */
+#projectPanel .filter-input {
+    margin: 0 8px 6px 8px;
+    flex-shrink: 0;
+}
+
+/* Tree item base styles (PhpStorm) */
+.tree-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    margin: 0 2px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    color: var(--text);
+    white-space: nowrap;
+    min-height: 22px;
+    user-select: none;
+}
+
+/* PhpStorm selection (single clean highlight) */
+.tree-item.selected {
+    background: var(--tree-selected);
+    color: var(--tree-selected-text);
+}
+
+.tree-item.active {
+    background: var(--tree-selected);
+    color: var(--tree-selected-text);
+}
+
+/* Hover state (lighter than selection) */
+.tree-item:hover:not(.selected):not(.active) {
+    background: var(--hover-bg);
+}
+
+/* Tree expand/collapse arrow (PhpStorm uses simple triangles) */
+.tree-arrow {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--muted);
+    font-size: 10px;
+    transition: transform 0.15s ease;
+}
+
+.tree-arrow.expanded {
+    transform: rotate(90deg);
+}
+
+.tree-arrow.empty {
+    visibility: hidden;
+}
+
+.tree-arrow svg {
+    width: 10px;
+    height: 10px;
+    fill: currentColor;
+}
+
+/* Legacy tree-toggle support */
+.tree-toggle {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--muted);
+    flex-shrink: 0;
+}
+
+.tree-toggle:hover {
+    color: var(--text);
+}
+
+/* Folder styles */
+.tree-item.folder {
+    color: var(--text);
+}
+
+.tree-item.disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* Tree children indentation (PhpStorm uses consistent 16px) */
+.tree-children {
+    margin-left: 16px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Tree label */
+.tree-label {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Tree icon container */
+.tree-icon {
+    width: 16px;
+    height: 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.tree-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Legacy icon class */
+.tree-item .icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+/* PhpStorm-style file type icons */
+.tree-item .file-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+/* Language-specific colors (PhpStorm style) */
+.tree-item .file-icon.php {
+    background: #a57bb8;
+    color: #fff;
+}
+
+.tree-item .file-icon.js {
+    background: #f0c24b;
+    color: #1b120e;
+}
+
+.tree-item .file-icon.ts {
+    background: #3178c6;
+    color: #fff;
+}
+
+.tree-item .file-icon.html {
+    background: #e67e22;
+    color: #fff;
+}
+
+.tree-item .file-icon.css {
+    background: #4fa3ec;
+    color: #fff;
+}
+
+.tree-item .file-icon.scss {
+    background: #c76395;
+    color: #fff;
+}
+
+.tree-item .file-icon.less {
+    background: #2a5491;
+    color: #fff;
+}
+
+.tree-item .file-icon.json {
+    background: #98c379;
+    color: #1b120e;
+}
+
+.tree-item .file-icon.xml {
+    background: #e37933;
+    color: #fff;
+}
+
+.tree-item .file-icon.yaml {
+    background: #cb171e;
+    color: #fff;
+}
+
+.tree-item .file-icon.md {
+    background: #519aba;
+    color: #fff;
+}
+
+.tree-item .file-icon.py {
+    background: #3572a5;
+    color: #fff;
+}
+
+.tree-item .file-icon.java {
+    background: #b07219;
+    color: #fff;
+}
+
+.tree-item .file-icon.go {
+    background: #00add8;
+    color: #fff;
+}
+
+.tree-item .file-icon.rs {
+    background: #dea584;
+    color: #1b120e;
+}
+
+.tree-item .file-icon.cpp {
+    background: #f34b7d;
+    color: #fff;
+}
+
+.tree-item .file-icon.c {
+    background: #555555;
+    color: #fff;
+}
+
+.tree-item .file-icon.sql {
+    background: #e38c00;
+    color: #fff;
+}
+
+.tree-item .file-icon.sh {
+    background: #89e051;
+    color: #1b120e;
+}
+
+.tree-item .file-icon.mumps {
+    background: linear-gradient(135deg, #f0a35c, #d67f3c);
+    color: #19100c;
+}
+
+/* Special files */
+.tree-item .file-icon.special {
+    background: transparent;
+    font-size: 14px;
+    border: none;
+}
+
+/* Default file icon */
+.tree-item .file-icon.default {
+    background: #6c757d;
+    color: #fff;
+}
+
+.icon {
+    width: 16px;
+    height: 16px;
+    display: inline-block;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+.icon-root {
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' xmlns='http://www.w3.org/2000/svg'%3E%3Crect rx='3' ry='3' width='16' height='16' fill='%23c47a45'/%3E%3Cpath d='M3 6h10v7H3z' fill='%23e7c9a5' opacity='.8'/%3E%3C/svg%3E");
+}
+
+.icon-folder {
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='16' height='12' y='3' rx='3' ry='3' fill='%23b07a52'/%3E%3Crect width='7' height='3' x='2' y='1' rx='1' ry='1' fill='%23d8b48c'/%3E%3C/svg%3E");
+}
+
+.icon-web {
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='8' cy='8' r='7' fill='%2357a3d8'/%3E%3Cpath d='M3 8h10M8 1c2 3 2 9 0 12M8 1C6 4 6 12 8 15' stroke='%23e7f2ff' stroke-width='1.2' fill='none'/%3E%3C/svg%3E");
+}
+
+.icon-mumps {
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop stop-color='%23f0a35c' offset='0'/%3E%3Cstop stop-color='%23d67f3c' offset='1'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='16' height='16' rx='3' ry='3' fill='url(%23g)'/%3E%3Cpath d='M4 12V4l2.6 4.5L9.2 4v8' stroke='%2319100c' stroke-width='1.1' fill='none' stroke-linecap='round'/%3E%3Cpath d='M10 6c1.2-.6 2.7 0 3 1.2.3 1.2-.5 2.3-1.6 2.6-1.1.3-2.1-.1-2.7-1' stroke='%2319100c' stroke-width='1' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+.icon-php {
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='16' height='16' rx='3' ry='3' fill='%237564a6'/%3E%3Ctext x='3' y='12' font-size='7' fill='%23f5edff' font-family='monospace'%3Ephp%3C/text%3E%3C/svg%3E");
+}
+
+.icon-html {
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='16' height='16' rx='3' ry='3' fill='%23e67e22'/%3E%3Ctext x='2' y='12' font-size='7' fill='%23fff1e0' font-family='monospace'%3Ehtml%3C/text%3E%3C/svg%3E");
+}
+
+.icon-js {
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='16' height='16' rx='3' ry='3' fill='%23f0c24b'/%3E%3Ctext x='4' y='12' font-size='8' fill='%231b120e' font-family='monospace'%3Ejs%3C/text%3E%3C/svg%3E");
+}
+
+.icon-css {
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='16' height='16' rx='3' ry='3' fill='%234fa3ec'/%3E%3Ctext x='2' y='12' font-size='7' fill='%23e9f5ff' font-family='monospace'%3Ecss%3C/text%3E%3C/svg%3E");
+}
+
+.icon-json {
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='16' height='16' rx='3' ry='3' fill='%2398c379'/%3E%3Ctext x='1' y='12' font-size='7' fill='%23f6fff0' font-family='monospace'%3Ejson%3C/text%3E%3C/svg%3E");
+}
+
+.icon-git {
+    background-image: url("data:image/svg+xml,%3Csvg width='16' height='16' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='16' height='16' rx='3' ry='3' fill='%23d24141'/%3E%3Ccircle cx='6' cy='5' r='1.8' fill='%23fceaea'/%3E%3Ccircle cx='10' cy='11' r='1.8' fill='%23fceaea'/%3E%3Cpath d='M6 5l4 6' stroke='%23fceaea' stroke-width='1.4'/%3E%3C/svg%3E");
+}
+
+.icon-term {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='16' height='16' rx='3' ry='3' fill='%232a1c14'/%3E%3Cpath d='M4 5l3 3-3 3' stroke='%23f0c27b' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M8 11h4' stroke='%23b8a99a' stroke-width='1.2'/%3E%3C/svg%3E");
+}
+
+.icon-debug {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='16' height='16' rx='3' ry='3' fill='%23251a13'/%3E%3Ccircle cx='8' cy='8' r='4' stroke='%23f0c27b' stroke-width='1.2' fill='none'/%3E%3Cpath d='M8 4v8M4 8h8' stroke='%23f0c27b' stroke-width='1.2'/%3E%3C/svg%3E");
+}
+
+.icon-problem {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='16' height='16' rx='3' ry='3' fill='%23261a14'/%3E%3Cpath d='M8 4l4 8H4z' fill='%23d24141'/%3E%3Cpath d='M8 6v3' stroke='%23fceaea' stroke-width='1.2'/%3E%3Ccircle cx='8' cy='10.5' r='0.8' fill='%23fceaea'/%3E%3C/svg%3E");
+}
+
+.icon-service {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='16' height='16' rx='3' ry='3' fill='%23281c14'/%3E%3Cpath d='M6 3.5h4l1 2h-6zM4 6h8v6H4z' stroke='%23f0c27b' stroke-width='1.1' fill='none'/%3E%3C/svg%3E");
+}
+
+.panel-title {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 8px;
+    padding: 4px 8px;
+}
+
+/* PhpStorm-style filter input */
+.filter-input {
+    width: 100%;
+    padding: 6px 8px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    border: 1px solid #323232;
+    background: #3c3f41 !important;
+    color: #bbbbbb !important;
+    font-size: 12px;
+    outline: none;
+    transition: all 0.15s ease;
+}
+
+.filter-input:focus {
+    border-color: #4a9eff;
+    background: #2b2b2b !important;
+}
+
+/* Legacy .main - now using .editor-area */
+.main {
+    display: none;
+}
+

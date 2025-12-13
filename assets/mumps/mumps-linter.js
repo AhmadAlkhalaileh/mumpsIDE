@@ -22,7 +22,7 @@ class MUMPSLinter {
             enforceUppercase: true,
             checkUnusedLabels: true,
             checkUnusedVariables: false,  // M001 is only informational
-            maxLineLength: 132,
+            maxLineLength: 255,
             maxNestingDepth: 3,
             checkMagicNumbers: false,
             checkUnreachableAfterQuit: true,
@@ -70,10 +70,18 @@ class MUMPSLinter {
 
     getValidCommands() {
         return [
+            // Standard MUMPS commands (ANSI X11.1)
             'BREAK', 'CLOSE', 'DO', 'ELSE', 'FOR', 'GOTO', 'HALT',
             'HANG', 'IF', 'JOB', 'KILL', 'LOCK', 'MERGE', 'NEW',
             'OPEN', 'QUIT', 'READ', 'SET', 'USE', 'VIEW', 'WRITE',
-            'XECUTE'
+            'XECUTE',
+            // Transaction processing commands
+            'TCOMMIT', 'TRESTART', 'TROLLBACK', 'TSTART',
+            // YottaDB/GT.M Z-commands (extensions)
+            'ZALLOCATE', 'ZBREAK', 'ZCOMPILE', 'ZCONTINUE', 'ZDEALLOCATE',
+            'ZEDIT', 'ZGOTO', 'ZHALT', 'ZHELP', 'ZKILL', 'ZLINK',
+            'ZMESSAGE', 'ZPRINT', 'ZRUPDATE', 'ZSHOW', 'ZSTEP',
+            'ZSYSTEM', 'ZTCOMMIT', 'ZTRIGGER', 'ZTSTART', 'ZWITHDRAW', 'ZWRITE'
         ];
     }
 
@@ -151,13 +159,13 @@ class MUMPSLinter {
                     // OK by definition
                 }
 
-                // Validate label name 1–16 chars, uppercase, [A-Z%][A-Z0-9]*
+                // Validate label name: 1-16 chars, [A-Z%][A-Z0-9]*
                 const match = line.match(/^([A-Z%][A-Z0-9]*)/i);
                 if (match) {
                     const rawLabel = match[1];
                     const upperLabel = rawLabel.toUpperCase();
                     const validPattern = /^[A-Z%][A-Z0-9]*$/;
-                    const tooLong = upperLabel.length > 16;
+                    const tooLong = upperLabel.length > 16; // MUMPS standard: 16 char max
 
                     if (!validPattern.test(upperLabel) || tooLong) {
                         const meta = this.getRuleMeta(
