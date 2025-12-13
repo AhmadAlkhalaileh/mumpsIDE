@@ -25,20 +25,36 @@
     <link rel="stylesheet" href="./styles/connections.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/git.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/extensions.css?v=20251209-performance">
+    <link rel="stylesheet" href="./styles/splash.css?v=20251213">
 
     <!-- xterm.js CSS -->
     <link rel="stylesheet" href="./node_modules/xterm/css/xterm.css">
 </head>
 
 <body>
+    <!-- Splash Screen -->
+    <div id="splashScreen" class="splash-screen">
+        <div class="splash-content">
+            <div class="splash-logo">
+                <div class="m-logo">M</div>
+            </div>
+            <h1 class="splash-title">MUMPS Language IDE</h1>
+            <p class="splash-subtitle">Developed by Ahmad Alkhalaileh</p>
+            <p class="splash-version">Version 1.0</p>
+            <div class="splash-loader">
+                <div class="loader-bar"></div>
+            </div>
+        </div>
+    </div>
+
     <div class="app-shell">
         <header class="menu-bar">
             <div class="menu-left">
                 <div class="brand">
-                    <div class="brand-icon">🛰️</div>
+                    <div class="brand-icon m-icon">M</div>
                     <div class="brand-meta">
-                        <div class="brand-name">Ahmad IDE</div>
-                        <div class="brand-sub">PhpStorm Brown</div>
+                        <div class="brand-name">MUMPS/M IDE</div>
+                        <div class="brand-sub">Ahmad Alkhalaileh</div>
                     </div>
                 </div>
                 <nav class="menu-cluster" id="mainMenu"></nav>
@@ -467,7 +483,8 @@
                 <div class="pane-subtitle" style="margin-top: 12px;">Docker Configuration (optional)</div>
                 <div class="ssh-form">
                     <input class="ssh-input" id="dockerEnvKeyInput" placeholder="Environment key (e.g., hakeem)">
-                    <input class="ssh-input" id="dockerYdbPathInput" placeholder="YottaDB path (e.g., /opt/fis-gtm/YDB136)">
+                    <input class="ssh-input" id="dockerYdbPathInput"
+                        placeholder="YottaDB path (e.g., /opt/fis-gtm/YDB136)">
                     <input class="ssh-input" id="dockerGldPathInput" placeholder="Global directory path (optional)">
                     <input class="ssh-input" id="dockerRoutinesPathInput" placeholder="Routines path (optional)">
                 </div>
@@ -830,6 +847,23 @@
     <script src="./src/editor/ui/renderer-ctrl-hover.js"></script>
     <script src="./src/editor/mumps/renderer-mumps-monaco.js"></script>
     <script src="./renderer.js"></script>
+
+    <!-- Splash Screen Handler -->
+    <script>
+        (function() {
+            const splashScreen = document.getElementById('splashScreen');
+            if (splashScreen) {
+                // Hide splash screen after 2.5 seconds
+                setTimeout(() => {
+                    splashScreen.classList.add('fade-out');
+                    // Remove from DOM after animation completes
+                    setTimeout(() => {
+                        splashScreen.remove();
+                    }, 600);
+                }, 2500);
+            }
+        })();
+    </script>
 </body>
 
 </html>
