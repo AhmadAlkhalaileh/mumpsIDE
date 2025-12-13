@@ -174,22 +174,22 @@
     let routineState = null; // shared routine state for search/navigation helpers
     let routineStateRef = null; // shared ref for project search
     let dbgStateRef = null; // shared debug state reference for helpers outside init scope
-	    let currentDebugSession = null; // current debug session (shared with debug module)
-	    let debugManager = null; // debug module instance (src/editor/debug/renderer-debug.js)
-	    let problemsManager = null; // problems UI module instance (src/editor/problems/renderer-problems.js)
-		    let diagnosticsManager = null; // lint/diagnostics module instance (src/editor/diagnostics/renderer-diagnostics.js)
-		    let mumpsMonacoManager = null; // monaco+mumps bootstrap module instance (src/editor/mumps/renderer-mumps-monaco.js)
-		    let gitToolWindowManager = null; // git tool window module instance (src/editor/git/renderer-git-toolwindow.js)
-		    let gitSettingsManager = null; // git settings panel module instance (src/editor/git/renderer-git-settings.js)
-		    let connectionsManager = null; // connections panel module instance (src/editor/connections/renderer-connections.js)
-		    let extensionsManager = null; // extensions view module instance (src/editor/extensions/renderer-extensions.js)
-		    let projectCreateManager = null; // new project creation module instance (src/editor/project/renderer-project-create.js)
-		    let projectTreeManager = null; // project tree module instance (src/editor/project/renderer-project-tree.js)
-		    let projectContextMenuManager = null; // project tree context menu module instance (src/editor/project/renderer-project-context-menu.js)
-		    let editorContextMenuManager = null; // editor context menu module instance (src/editor/ui/renderer-editor-context-menu.js)
-		    let settingsPanelManager = null; // settings panel UI module instance (src/editor/ui/renderer-settings-panel.js)
-		    let ctrlHoverManager = null; // ctrl+hover and gutter module instance (src/editor/ui/renderer-ctrl-hover.js)
-		    let routinesManager = null; // routines module instance (src/editor/routines/renderer-routines.js)
+    let currentDebugSession = null; // current debug session (shared with debug module)
+    let debugManager = null; // debug module instance (src/editor/debug/renderer-debug.js)
+    let problemsManager = null; // problems UI module instance (src/editor/problems/renderer-problems.js)
+    let diagnosticsManager = null; // lint/diagnostics module instance (src/editor/diagnostics/renderer-diagnostics.js)
+    let mumpsMonacoManager = null; // monaco+mumps bootstrap module instance (src/editor/mumps/renderer-mumps-monaco.js)
+    let gitToolWindowManager = null; // git tool window module instance (src/editor/git/renderer-git-toolwindow.js)
+    let gitSettingsManager = null; // git settings panel module instance (src/editor/git/renderer-git-settings.js)
+    let connectionsManager = null; // connections panel module instance (src/editor/connections/renderer-connections.js)
+    let extensionsManager = null; // extensions view module instance (src/editor/extensions/renderer-extensions.js)
+    let projectCreateManager = null; // new project creation module instance (src/editor/project/renderer-project-create.js)
+    let projectTreeManager = null; // project tree module instance (src/editor/project/renderer-project-tree.js)
+    let projectContextMenuManager = null; // project tree context menu module instance (src/editor/project/renderer-project-context-menu.js)
+    let editorContextMenuManager = null; // editor context menu module instance (src/editor/ui/renderer-editor-context-menu.js)
+    let settingsPanelManager = null; // settings panel UI module instance (src/editor/ui/renderer-settings-panel.js)
+    let ctrlHoverManager = null; // ctrl+hover and gutter module instance (src/editor/ui/renderer-ctrl-hover.js)
+    let routinesManager = null; // routines module instance (src/editor/routines/renderer-routines.js)
 
     // ========== MUMPS Reference Parser (shared utility) ==========
     // Parse routine/tag reference at cursor position (supports TAG^RTN, ^RTN, DO TAG)
@@ -804,230 +804,230 @@
         }
     });
 
-	    problemsManager = createProblemsManager({
-	        state: { maxProblemItems },
-	        deps: {
-	            revealLine,
-	            normalizeSeverity: (...args) => diagnosticsManager.normalizeSeverity(...args),
-	            setActiveDebugTab,
-	            getActiveDebugTab: () => activeDebugTab
-	        }
-	    });
+    problemsManager = createProblemsManager({
+        state: { maxProblemItems },
+        deps: {
+            revealLine,
+            normalizeSeverity: (...args) => diagnosticsManager.normalizeSeverity(...args),
+            setActiveDebugTab,
+            getActiveDebugTab: () => activeDebugTab
+        }
+    });
 
-	    // MUMPS Monaco bootstrap moved to src/editor/mumps/renderer-mumps-monaco.js
-	    const createMumpsMonacoManager = window.AhmadIDEModules?.mumpsMonaco?.createMumpsMonacoManager;
-	    if (!createMumpsMonacoManager) {
-	        logger.error('MUMPS_MONACO_MODULE_MISSING', { path: './src/editor/mumps/renderer-mumps-monaco.js' });
-	        throw new Error('MUMPS Monaco module missing: ./src/editor/mumps/renderer-mumps-monaco.js');
-	    }
-	    mumpsMonacoManager = createMumpsMonacoManager({
-	        deps: {
-	            $,
-	            getMonaco: () => (typeof monaco !== 'undefined' ? monaco : null)
-	        }
-	    });
+    // MUMPS Monaco bootstrap moved to src/editor/mumps/renderer-mumps-monaco.js
+    const createMumpsMonacoManager = window.AhmadIDEModules?.mumpsMonaco?.createMumpsMonacoManager;
+    if (!createMumpsMonacoManager) {
+        logger.error('MUMPS_MONACO_MODULE_MISSING', { path: './src/editor/mumps/renderer-mumps-monaco.js' });
+        throw new Error('MUMPS Monaco module missing: ./src/editor/mumps/renderer-mumps-monaco.js');
+    }
+    mumpsMonacoManager = createMumpsMonacoManager({
+        deps: {
+            $,
+            getMonaco: () => (typeof monaco !== 'undefined' ? monaco : null)
+        }
+    });
 
-	    // Git tool window moved to src/editor/git/renderer-git-toolwindow.js
-	    const createGitToolWindowManager = window.AhmadIDEModules?.git?.createGitToolWindowManager;
-	    if (!createGitToolWindowManager) {
-	        logger.error('GIT_TOOL_WINDOW_MODULE_MISSING', { path: './src/editor/git/renderer-git-toolwindow.js' });
-	        throw new Error('Git Tool Window module missing: ./src/editor/git/renderer-git-toolwindow.js');
-	    }
-		    gitToolWindowManager = createGitToolWindowManager({
-		        deps: {
-		            showToast,
-		            normalizeGitError: (...args) => normalizeGitError(...args),
-		            toggleToolWindowPanel
-		        }
-		    });
+    // Git tool window moved to src/editor/git/renderer-git-toolwindow.js
+    const createGitToolWindowManager = window.AhmadIDEModules?.git?.createGitToolWindowManager;
+    if (!createGitToolWindowManager) {
+        logger.error('GIT_TOOL_WINDOW_MODULE_MISSING', { path: './src/editor/git/renderer-git-toolwindow.js' });
+        throw new Error('Git Tool Window module missing: ./src/editor/git/renderer-git-toolwindow.js');
+    }
+    gitToolWindowManager = createGitToolWindowManager({
+        deps: {
+            showToast,
+            normalizeGitError: (...args) => normalizeGitError(...args),
+            toggleToolWindowPanel
+        }
+    });
 
-		    // Git settings panel moved to src/editor/git/renderer-git-settings.js
-		    const createGitSettingsManager = window.AhmadIDEModules?.git?.createGitSettingsManager;
-		    if (!createGitSettingsManager) {
-		        logger.error('GIT_SETTINGS_MODULE_MISSING', { path: './src/editor/git/renderer-git-settings.js' });
-		        throw new Error('Git Settings module missing: ./src/editor/git/renderer-git-settings.js');
-		    }
-		    gitSettingsManager = createGitSettingsManager({
-		        deps: {
-		            $,
-		            showToast,
-		            getCurrentProject: () => currentProject
-		        }
-		    });
+    // Git settings panel moved to src/editor/git/renderer-git-settings.js
+    const createGitSettingsManager = window.AhmadIDEModules?.git?.createGitSettingsManager;
+    if (!createGitSettingsManager) {
+        logger.error('GIT_SETTINGS_MODULE_MISSING', { path: './src/editor/git/renderer-git-settings.js' });
+        throw new Error('Git Settings module missing: ./src/editor/git/renderer-git-settings.js');
+    }
+    gitSettingsManager = createGitSettingsManager({
+        deps: {
+            $,
+            showToast,
+            getCurrentProject: () => currentProject
+        }
+    });
 
-		    // Connections panel moved to src/editor/connections/renderer-connections.js
-		    const createConnectionsManager = window.AhmadIDEModules?.connections?.createConnectionsManager;
-		    if (!createConnectionsManager) {
-		        logger.error('CONNECTIONS_MODULE_MISSING', { path: './src/editor/connections/renderer-connections.js' });
-		        throw new Error('Connections module missing: ./src/editor/connections/renderer-connections.js');
-		    }
-				    connectionsManager = createConnectionsManager({
-				        deps: {
-				            appendOutput,
-				            loadRoutineList: (...args) => loadRoutineList(...args),
-				            renderDocker: (...args) => renderDocker(...args),
-				            setConnStatus: (...args) => setConnStatus(...args),
-				            getRoutineSearchValue: () => {
-				                try {
-				                    if (typeof routineSearch !== 'undefined' && routineSearch && routineSearch.value != null) {
-				                        return routineSearch.value || '';
-				                    }
-				                } catch (e) {
-				                    // ignore global lookup errors
-				                }
-				                return document.getElementById('routineSearch')?.value || '';
-				            }
-				        }
-				    });
+    // Connections panel moved to src/editor/connections/renderer-connections.js
+    const createConnectionsManager = window.AhmadIDEModules?.connections?.createConnectionsManager;
+    if (!createConnectionsManager) {
+        logger.error('CONNECTIONS_MODULE_MISSING', { path: './src/editor/connections/renderer-connections.js' });
+        throw new Error('Connections module missing: ./src/editor/connections/renderer-connections.js');
+    }
+    connectionsManager = createConnectionsManager({
+        deps: {
+            appendOutput,
+            loadRoutineList: (...args) => loadRoutineList(...args),
+            renderDocker: (...args) => renderDocker(...args),
+            setConnStatus: (...args) => setConnStatus(...args),
+            getRoutineSearchValue: () => {
+                try {
+                    if (typeof routineSearch !== 'undefined' && routineSearch && routineSearch.value != null) {
+                        return routineSearch.value || '';
+                    }
+                } catch (e) {
+                    // ignore global lookup errors
+                }
+                return document.getElementById('routineSearch')?.value || '';
+            }
+        }
+    });
 
-				    // Extensions view moved to src/editor/extensions/renderer-extensions.js
-				    const createExtensionsManager = window.AhmadIDEModules?.extensions?.createExtensionsManager;
-				    if (!createExtensionsManager) {
-				        logger.error('EXTENSIONS_MODULE_MISSING', { path: './src/editor/extensions/renderer-extensions.js' });
-				        throw new Error('Extensions module missing: ./src/editor/extensions/renderer-extensions.js');
-				    }
-				    extensionsManager = createExtensionsManager({
-				        deps: {
-				            updateDebugButtonState: (...args) => updateDebugButtonState(...args)
-				        }
-				    });
+    // Extensions view moved to src/editor/extensions/renderer-extensions.js
+    const createExtensionsManager = window.AhmadIDEModules?.extensions?.createExtensionsManager;
+    if (!createExtensionsManager) {
+        logger.error('EXTENSIONS_MODULE_MISSING', { path: './src/editor/extensions/renderer-extensions.js' });
+        throw new Error('Extensions module missing: ./src/editor/extensions/renderer-extensions.js');
+    }
+    extensionsManager = createExtensionsManager({
+        deps: {
+            updateDebugButtonState: (...args) => updateDebugButtonState(...args)
+        }
+    });
 
-				    // New Project panel moved to src/editor/project/renderer-project-create.js
-				    const createProjectCreateManager = window.AhmadIDEModules?.projectCreate?.createProjectCreateManager;
-				    if (!createProjectCreateManager) {
-				        logger.error('PROJECT_CREATE_MODULE_MISSING', { path: './src/editor/project/renderer-project-create.js' });
-			        throw new Error('Project Create module missing: ./src/editor/project/renderer-project-create.js');
-			    }
-			    projectCreateManager = createProjectCreateManager({
-			        deps: {
-			            $,
-			            showToast,
-			            loadProjectIntoTree: (...args) => loadProjectIntoTree(...args)
-			        }
-			    });
+    // New Project panel moved to src/editor/project/renderer-project-create.js
+    const createProjectCreateManager = window.AhmadIDEModules?.projectCreate?.createProjectCreateManager;
+    if (!createProjectCreateManager) {
+        logger.error('PROJECT_CREATE_MODULE_MISSING', { path: './src/editor/project/renderer-project-create.js' });
+        throw new Error('Project Create module missing: ./src/editor/project/renderer-project-create.js');
+    }
+    projectCreateManager = createProjectCreateManager({
+        deps: {
+            $,
+            showToast,
+            loadProjectIntoTree: (...args) => loadProjectIntoTree(...args)
+        }
+    });
 
-			    // Project tree context menu moved to src/editor/project/renderer-project-context-menu.js
-			    const createProjectContextMenuManager = window.AhmadIDEModules?.projectContextMenu?.createProjectContextMenuManager;
-			    if (!createProjectContextMenuManager) {
-			        logger.error('PROJECT_CONTEXT_MENU_MODULE_MISSING', { path: './src/editor/project/renderer-project-context-menu.js' });
-	        throw new Error('Project Context Menu module missing: ./src/editor/project/renderer-project-context-menu.js');
-	    }
-	    projectContextMenuManager = createProjectContextMenuManager({
-	        deps: {
-	            $,
-	            showToast,
-	            showCustomPrompt,
-	            createTab,
-	            setCurrentRoutine: (...args) => setCurrentRoutine(...args),
-	            loadRoutineByName: (...args) => loadRoutineByName(...args),
-	            loadRoutineList: (...args) => loadRoutineList(...args),
-	            getCurrentProject: () => currentProject,
-	            openGitToolWindow: (...args) => openGitToolWindow(...args),
-	            runGitQuickCmd: (...args) => runGitQuickCmd(...args)
-	        }
-	    });
+    // Project tree context menu moved to src/editor/project/renderer-project-context-menu.js
+    const createProjectContextMenuManager = window.AhmadIDEModules?.projectContextMenu?.createProjectContextMenuManager;
+    if (!createProjectContextMenuManager) {
+        logger.error('PROJECT_CONTEXT_MENU_MODULE_MISSING', { path: './src/editor/project/renderer-project-context-menu.js' });
+        throw new Error('Project Context Menu module missing: ./src/editor/project/renderer-project-context-menu.js');
+    }
+    projectContextMenuManager = createProjectContextMenuManager({
+        deps: {
+            $,
+            showToast,
+            showCustomPrompt,
+            createTab,
+            setCurrentRoutine: (...args) => setCurrentRoutine(...args),
+            loadRoutineByName: (...args) => loadRoutineByName(...args),
+            loadRoutineList: (...args) => loadRoutineList(...args),
+            getCurrentProject: () => currentProject,
+            openGitToolWindow: (...args) => openGitToolWindow(...args),
+            runGitQuickCmd: (...args) => runGitQuickCmd(...args)
+        }
+    });
 
-	    // Editor context menu moved to src/editor/ui/renderer-editor-context-menu.js
-	    const createEditorContextMenuManager = window.AhmadIDEModules?.ui?.createEditorContextMenuManager;
-	    if (!createEditorContextMenuManager) {
-	        logger.error('EDITOR_CONTEXT_MENU_MODULE_MISSING', { path: './src/editor/ui/renderer-editor-context-menu.js' });
-	        throw new Error('Editor Context Menu module missing: ./src/editor/ui/renderer-editor-context-menu.js');
-	    }
-			    editorContextMenuManager = createEditorContextMenuManager({
-			        deps: {
-			            $,
-			            showToast,
-			            getActiveEditor: () => activeEditor,
-			            parseRoutineReferenceAtPosition,
-			            getActiveRoutine,
-			            runGitContextAction: (...args) => runGitContextAction(...args),
-			            goToDeclaration: (...args) => goToDeclaration(...args)
-			        }
-			    });
+    // Editor context menu moved to src/editor/ui/renderer-editor-context-menu.js
+    const createEditorContextMenuManager = window.AhmadIDEModules?.ui?.createEditorContextMenuManager;
+    if (!createEditorContextMenuManager) {
+        logger.error('EDITOR_CONTEXT_MENU_MODULE_MISSING', { path: './src/editor/ui/renderer-editor-context-menu.js' });
+        throw new Error('Editor Context Menu module missing: ./src/editor/ui/renderer-editor-context-menu.js');
+    }
+    editorContextMenuManager = createEditorContextMenuManager({
+        deps: {
+            $,
+            showToast,
+            getActiveEditor: () => activeEditor,
+            parseRoutineReferenceAtPosition,
+            getActiveRoutine,
+            runGitContextAction: (...args) => runGitContextAction(...args),
+            goToDeclaration: (...args) => goToDeclaration(...args)
+        }
+    });
 
-			    // Settings panel UI moved to src/editor/ui/renderer-settings-panel.js
-			    const createSettingsPanelManager = window.AhmadIDEModules?.ui?.createSettingsPanelManager;
-			    if (!createSettingsPanelManager) {
-			        logger.error('SETTINGS_PANEL_MODULE_MISSING', { path: './src/editor/ui/renderer-settings-panel.js' });
-			        throw new Error('Settings Panel module missing: ./src/editor/ui/renderer-settings-panel.js');
-			    }
-			    settingsPanelManager = createSettingsPanelManager();
+    // Settings panel UI moved to src/editor/ui/renderer-settings-panel.js
+    const createSettingsPanelManager = window.AhmadIDEModules?.ui?.createSettingsPanelManager;
+    if (!createSettingsPanelManager) {
+        logger.error('SETTINGS_PANEL_MODULE_MISSING', { path: './src/editor/ui/renderer-settings-panel.js' });
+        throw new Error('Settings Panel module missing: ./src/editor/ui/renderer-settings-panel.js');
+    }
+    settingsPanelManager = createSettingsPanelManager();
 
-			    // Ctrl+hover + gutter click moved to src/editor/ui/renderer-ctrl-hover.js
-			    const createCtrlHoverManager = window.AhmadIDEModules?.ui?.createCtrlHoverManager;
-			    if (!createCtrlHoverManager) {
-			        logger.error('CTRL_HOVER_MODULE_MISSING', { path: './src/editor/ui/renderer-ctrl-hover.js' });
-		        throw new Error('Ctrl Hover module missing: ./src/editor/ui/renderer-ctrl-hover.js');
-		    }
-		    ctrlHoverManager = createCtrlHoverManager({
-		        deps: {
-		            getMonaco: () => (typeof monaco !== 'undefined' ? monaco : null),
-		            parseRoutineReferenceAtPosition,
-		            goToDeclaration: (...args) => goToDeclaration(...args),
-		            toggleBreakpoint: (...args) => toggleBreakpoint(...args)
-		        }
-		    });
+    // Ctrl+hover + gutter click moved to src/editor/ui/renderer-ctrl-hover.js
+    const createCtrlHoverManager = window.AhmadIDEModules?.ui?.createCtrlHoverManager;
+    if (!createCtrlHoverManager) {
+        logger.error('CTRL_HOVER_MODULE_MISSING', { path: './src/editor/ui/renderer-ctrl-hover.js' });
+        throw new Error('Ctrl Hover module missing: ./src/editor/ui/renderer-ctrl-hover.js');
+    }
+    ctrlHoverManager = createCtrlHoverManager({
+        deps: {
+            getMonaco: () => (typeof monaco !== 'undefined' ? monaco : null),
+            parseRoutineReferenceAtPosition,
+            goToDeclaration: (...args) => goToDeclaration(...args),
+            toggleBreakpoint: (...args) => toggleBreakpoint(...args)
+        }
+    });
 
-		    // Project tree moved to src/editor/project/renderer-project-tree.js
-		    const createProjectTreeManager = window.AhmadIDEModules?.projectTree?.createProjectTreeManager;
-		    if (!createProjectTreeManager) {
-		        logger.error('PROJECT_TREE_MODULE_MISSING', { path: './src/editor/project/renderer-project-tree.js' });
-	        throw new Error('Project Tree module missing: ./src/editor/project/renderer-project-tree.js');
-	    }
-	    projectTreeManager = createProjectTreeManager({
-	        state: {
-	            collapsedTreeNodes,
-	            mumpsFileIconSvg
-	        },
-	        deps: {
-	            $,
-	            normalizeRoutineTarget,
-	            loadRoutineByName: (...args) => loadRoutineByName(...args),
-	            showProjectContextMenu: (...args) => showProjectContextMenu(...args),
-	            getCurrentProject: () => currentProject,
-	            getActiveEditor: () => activeEditor,
-	            getRoutineFilterTerm: () => routineFilterTerm,
-	            getRoutineState: () => routineState
-	        }
-	    });
+    // Project tree moved to src/editor/project/renderer-project-tree.js
+    const createProjectTreeManager = window.AhmadIDEModules?.projectTree?.createProjectTreeManager;
+    if (!createProjectTreeManager) {
+        logger.error('PROJECT_TREE_MODULE_MISSING', { path: './src/editor/project/renderer-project-tree.js' });
+        throw new Error('Project Tree module missing: ./src/editor/project/renderer-project-tree.js');
+    }
+    projectTreeManager = createProjectTreeManager({
+        state: {
+            collapsedTreeNodes,
+            mumpsFileIconSvg
+        },
+        deps: {
+            $,
+            normalizeRoutineTarget,
+            loadRoutineByName: (...args) => loadRoutineByName(...args),
+            showProjectContextMenu: (...args) => showProjectContextMenu(...args),
+            getCurrentProject: () => currentProject,
+            getActiveEditor: () => activeEditor,
+            getRoutineFilterTerm: () => routineFilterTerm,
+            getRoutineState: () => routineState
+        }
+    });
 
-	    // Routines moved to src/editor/routines/renderer-routines.js
-	    const createRoutinesManager = window.AhmadIDEModules?.routines?.createRoutinesManager;
-	    if (!createRoutinesManager) {
-	        logger.error('ROUTINES_MODULE_MISSING', { path: './src/editor/routines/renderer-routines.js' });
-	        throw new Error('Routines module missing: ./src/editor/routines/renderer-routines.js');
-	    }
-	    routinesManager = createRoutinesManager({
-	        deps: {
-	            logger,
-	            showToast,
-	            appendOutput,
-	            showCustomPrompt,
-	            normalizeRoutineTarget,
-	            setActiveRoutineName: (v) => { activeRoutineName = v; },
-	            getRoutinesCache: () => routinesCache,
-	            setRoutinesCache: (v) => { routinesCache = v; },
-	            renderProjectTree: (...args) => renderProjectTree(...args),
-	            getActiveEditor: () => activeEditor,
-	            findOpenTab,
-	            switchTab,
-	            createTab,
-	            getActiveTabId: () => activeTabId,
-	            getOpenTabs: () => openTabs,
-	            markTabDirty,
-	            renderTabs,
-	            validateMumps: (...args) => validateMumps(...args),
-	            hasLintRules: (...args) => hasLintRules(...args),
-	            applyLintMarkers: (...args) => applyLintMarkers(...args),
-	            renderProblems: (...args) => renderProblems(...args),
-	            mumpsValidator,
-	            mumpsLinter
-	        }
-	    });
+    // Routines moved to src/editor/routines/renderer-routines.js
+    const createRoutinesManager = window.AhmadIDEModules?.routines?.createRoutinesManager;
+    if (!createRoutinesManager) {
+        logger.error('ROUTINES_MODULE_MISSING', { path: './src/editor/routines/renderer-routines.js' });
+        throw new Error('Routines module missing: ./src/editor/routines/renderer-routines.js');
+    }
+    routinesManager = createRoutinesManager({
+        deps: {
+            logger,
+            showToast,
+            appendOutput,
+            showCustomPrompt,
+            normalizeRoutineTarget,
+            setActiveRoutineName: (v) => { activeRoutineName = v; },
+            getRoutinesCache: () => routinesCache,
+            setRoutinesCache: (v) => { routinesCache = v; },
+            renderProjectTree: (...args) => renderProjectTree(...args),
+            getActiveEditor: () => activeEditor,
+            findOpenTab,
+            switchTab,
+            createTab,
+            getActiveTabId: () => activeTabId,
+            getOpenTabs: () => openTabs,
+            markTabDirty,
+            renderTabs,
+            validateMumps: (...args) => validateMumps(...args),
+            hasLintRules: (...args) => hasLintRules(...args),
+            applyLintMarkers: (...args) => applyLintMarkers(...args),
+            renderProblems: (...args) => renderProblems(...args),
+            mumpsValidator,
+            mumpsLinter
+        }
+    });
 
-	    function showConfirmDialog(title, message, onConfirm) {
-	        const overlay = $('<div class="prompt-overlay"></div>');
-	        const dialog = $('<div class="prompt-dialog"></div>');
+    function showConfirmDialog(title, message, onConfirm) {
+        const overlay = $('<div class="prompt-overlay"></div>');
+        const dialog = $('<div class="prompt-dialog"></div>');
         dialog.html(`
             <div class="prompt-title">${title}</div>
             <div class="prompt-message">${message}</div>
@@ -1086,17 +1086,17 @@
         });
     }
 
-	    // ============================================
-	    // PhpStorm-style Project Tree Context Menu
-	    // ============================================
+    // ============================================
+    // PhpStorm-style Project Tree Context Menu
+    // ============================================
 
-	    function showProjectContextMenu(x, y, options = {}) {
-	        return projectContextMenuManager.showProjectContextMenu(x, y, options);
-	    }
+    function showProjectContextMenu(x, y, options = {}) {
+        return projectContextMenuManager.showProjectContextMenu(x, y, options);
+    }
 
-	    function showRoutinesFolderContextMenu(x, y, routineStateRef, editorRef) {
-	        return projectContextMenuManager.showRoutinesFolderContextMenu(x, y, routineStateRef, editorRef);
-	    }
+    function showRoutinesFolderContextMenu(x, y, routineStateRef, editorRef) {
+        return projectContextMenuManager.showRoutinesFolderContextMenu(x, y, routineStateRef, editorRef);
+    }
 
     function getFileIcon(filename) {
         const ext = filename.split('.').pop().toLowerCase();
@@ -1175,22 +1175,22 @@
         return iconMap[ext] || { icon: '📄', cls: 'default' };
     }
 
-	    // Project tree moved to src/editor/project/renderer-project-tree.js
-	    function renderProjectTreeLoading(message = 'Loading routines…') {
-	        return projectTreeManager.renderProjectTreeLoading(message);
-	    }
+    // Project tree moved to src/editor/project/renderer-project-tree.js
+    function renderProjectTreeLoading(message = 'Loading routines…') {
+        return projectTreeManager.renderProjectTreeLoading(message);
+    }
 
-	    function renderProjectTree(routines = [], routineStateRef = null, editorRef = null) {
-	        return projectTreeManager.renderProjectTree(routines, routineStateRef, editorRef);
-	    }
+    function renderProjectTree(routines = [], routineStateRef = null, editorRef = null) {
+        return projectTreeManager.renderProjectTree(routines, routineStateRef, editorRef);
+    }
 
     function defaultShortcut(actionId) {
         return shortcutDefaults[actionId] || null;
     }
 
-	    function setCollapseStateAll(collapsed) {
-	        return projectTreeManager.setCollapseStateAll(collapsed);
-	    }
+    function setCollapseStateAll(collapsed) {
+        return projectTreeManager.setCollapseStateAll(collapsed);
+    }
 
     function registerKeybinding(editor, label, actionId, handler, binding) {
         if (!editor || !handler) return;
@@ -1218,9 +1218,9 @@
     // MUST be defined BEFORE any code that references it (hoisting doesn't work for nested scopes)
 
 
-	    function bindEditorContextMenu(editor) {
-	        return editorContextMenuManager.bindEditorContextMenu(editor);
-	    }
+    function bindEditorContextMenu(editor) {
+        return editorContextMenuManager.bindEditorContextMenu(editor);
+    }
 
     async function goToDeclaration(editor, position = null, options = {}) {
         const { silentIfMissing = false } = options;
@@ -1738,9 +1738,9 @@
         editor.setSelection(new monaco.Selection(insertLine, 1, insertLine + lines.length - 1, lines[lines.length - 1].length + 1));
     }
 
-	    async function loadAutocompleteData() {
-	        return mumpsMonacoManager.loadAutocompleteData();
-	    }
+    async function loadAutocompleteData() {
+        return mumpsMonacoManager.loadAutocompleteData();
+    }
 
     function wireMenuBar(editor, routineState, terminalState) {
         const clickEl = (id) => {
@@ -2297,8 +2297,8 @@
                 contextmenu: false,
                 // Performance optimizations
                 renderValidationDecorations: 'on',
-                quickSuggestions: false,  // Disable for speed
-                suggestOnTriggerCharacters: false,
+                quickSuggestions: { other: true, comments: false, strings: false },
+                suggestOnTriggerCharacters: true,
                 folding: false,  // Disable code folding for performance
                 foldingHighlight: false,
                 showFoldingControls: 'never',
@@ -2967,7 +2967,7 @@
                     }
                 });
 
-            // DEBUG BUTTON: arm/disarm debugger (Run starts it)
+                // DEBUG BUTTON: arm/disarm debugger (Run starts it)
                 $('#debugStartBtn').on('click', () => {
                     const $btn = $('#debugStartBtn');
                     // If a session is active, stop it
@@ -3226,21 +3226,21 @@
 
     // ---------- MUMPS Language Registration ----------
 
-	    function sampleMumps() {
-	        return mumpsMonacoManager.sampleMumps();
-	    }
+    function sampleMumps() {
+        return mumpsMonacoManager.sampleMumps();
+    }
 
-	    function registerMumpsLanguage() {
-	        return mumpsMonacoManager.registerMumpsLanguage();
-	    }
+    function registerMumpsLanguage() {
+        return mumpsMonacoManager.registerMumpsLanguage();
+    }
 
-	    function registerMumpsThemes() {
-	        return mumpsMonacoManager.registerMumpsThemes();
-	    }
+    function registerMumpsThemes() {
+        return mumpsMonacoManager.registerMumpsThemes();
+    }
 
-	    function registerMumpsCompletion(data) {
-	        return mumpsMonacoManager.registerMumpsCompletion(data);
-	    }
+    function registerMumpsCompletion(data) {
+        return mumpsMonacoManager.registerMumpsCompletion(data);
+    }
 
     function markerSeverity(sev) {
         return diagnosticsManager.markerSeverity(sev);
@@ -3281,31 +3281,31 @@
         return res;
     }
 
-	    // ---------- Routines ----------
+    // ---------- Routines ----------
 
-	    function setCurrentRoutine(name) {
-	        return routinesManager.setCurrentRoutine(name);
-	    }
+    function setCurrentRoutine(name) {
+        return routinesManager.setCurrentRoutine(name);
+    }
 
-	    async function loadRoutineList(state, editor, search = '') {
-	        return routinesManager.loadRoutineList(state, editor, search);
-	    }
+    async function loadRoutineList(state, editor, search = '') {
+        return routinesManager.loadRoutineList(state, editor, search);
+    }
 
-	    async function loadRoutineByName(name, state, editor, routinesCache = [], termState) {
-	        return routinesManager.loadRoutineByName(name, state, editor, routinesCache, termState);
-	    }
+    async function loadRoutineByName(name, state, editor, routinesCache = [], termState) {
+        return routinesManager.loadRoutineByName(name, state, editor, routinesCache, termState);
+    }
 
-	    async function saveRoutineFlow(editor, state, termState) {
-	        return routinesManager.saveRoutineFlow(editor, state, termState);
-	    }
+    async function saveRoutineFlow(editor, state, termState) {
+        return routinesManager.saveRoutineFlow(editor, state, termState);
+    }
 
-	    async function performSave(name, editor, state, termState) {
-	        return routinesManager.performSave(name, editor, state, termState);
-	    }
+    async function performSave(name, editor, state, termState) {
+        return routinesManager.performSave(name, editor, state, termState);
+    }
 
-	    async function newRoutineFlow(editor, state, termState) {
-	        return routinesManager.newRoutineFlow(editor, state, termState);
-	    }
+    async function newRoutineFlow(editor, state, termState) {
+        return routinesManager.newRoutineFlow(editor, state, termState);
+    }
 
     function registerMumpsHover() {
         return debugManager.registerMumpsHover();
