@@ -130,15 +130,12 @@ parts:
     source: https://nodejs.org/dist/v18.18.0/node-v18.18.0-linux-x64.tar.xz
     override-build: |
       set -eux
-      tar xf $SNAPCRAFT_PART_SRC/node-v18.18.0-linux-x64.tar.xz
-      mkdir -p $SNAPCRAFT_PART_INSTALL/bin
-      mkdir -p $SNAPCRAFT_PART_INSTALL/lib
-      mkdir -p $SNAPCRAFT_PART_INSTALL/include
-      mkdir -p $SNAPCRAFT_PART_INSTALL/share
-      cp -r node-v18.18.0-linux-x64/bin/* $SNAPCRAFT_PART_INSTALL/bin/
-      cp -r node-v18.18.0-linux-x64/lib/* $SNAPCRAFT_PART_INSTALL/lib/
-      cp -r node-v18.18.0-linux-x64/include/* $SNAPCRAFT_PART_INSTALL/include/
-      cp -r node-v18.18.0-linux-x64/share/* $SNAPCRAFT_PART_INSTALL/share/
+      # Snapcraft extracts the source automatically into $SNAPCRAFT_PART_SRC
+      # The tarball contains a top-level directory: node-v18.18.0-linux-x64
+      
+      # Copy all contents from that directory to the install directory
+      # equivalent to merging bin, lib, include, share
+      cp -r $SNAPCRAFT_PART_SRC/node-v18.18.0-linux-x64/* $SNAPCRAFT_PART_INSTALL/
 
 slots:
   dbus-daemon:
