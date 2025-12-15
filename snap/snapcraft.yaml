@@ -50,22 +50,16 @@ apps:
 
 parts:
   mumps-ide:
-    plugin: dump
-    source: ..
-    organize:
-      "*": app/
-    prime:
-      - -app/.git/**
-      - -app/snap/**
-      - -app/**/*.log
-      - -app/*.log
+    plugin: nil
+    source: .
+    # If snapcraft.yaml is inside ./snap, change source to: ..
 
-    # Needed to build native node modules (node-pty, etc.) inside LXD
     build-packages:
       - python3
       - make
       - g++
       - pkg-config
+      - rsync
 
     after:
       - node
@@ -73,21 +67,66 @@ parts:
     override-build: |
       set -eux
 
-      # Add our custom Node to PATH
+      # Use custom Node from node part (staged)
       export PATH="$SNAPCRAFT_STAGE/bin:$PATH"
 
-      # Install ALL dependencies (including devDependencies) so Electron is included
-      cd "$SNAPCRAFT_PART_SRC"
-      export NODE_ENV=development
-      export NPM_CONFIG_PRODUCTION=false
-      npm ci --include=dev
+      echo "SNAPCRAFT_PART_SRC=$SNAPCRAFT_PART_SRC"
 
-      # Ensure icon ends up in the right place for the desktop file
+      # Find package.json anywhere up to 4 levels deep
+      PKG_JSON="$(find "$SNAPCRAFT_PART_SRC" -maxdepth 4 -name package.json -print -quit || true)"
+      if [ -z "$PKG_JSON" ]; then
+        echo "ERROR: package.json not found under: $SNAPCRAFT_PART_SRC"
+        echo "Top-level contents:"
+        ls -la "$SNAPCRAFT_PART_SRC"
+        exit 1
+      fi
+
+      APPDIR="$(dirname "$PKG_JSON")"
+
+      # Compute relative path from source root -> app dir (used in launcher)
+      if [ "$APPDIR" = "$SNAPCRAFT_PART_SRC" ]; then
+        APP_SUBDIR=""
+      else
+        APP_SUBDIR="${APPDIR#"$SNAPCRAFT_PART_SRC"/}"
+      fi
+
+      echo "Using app directory: $APPDIR"
+      echo "App subdir inside snap: $APP_SUBDIR"
+
+      cd "$APPDIR"
+      export NODE_ENV=development
+
+      # Make npm more resilient (helps on slow/flaky links)
+      export NODE_OPTIONS="--dns-result-order=ipv4first"
+      export NPM_CONFIG_REGISTRY="https://registry.npmjs.org/"
+      export NPM_CONFIG_FETCH_RETRIES="5"
+      export NPM_CONFIG_FETCH_RETRY_MINTIMEOUT="20000"
+      export NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT="120000"
+      export NPM_CONFIG_NETWORK_TIMEOUT="600000"
+
+      # Install deps: use ci if lock exists, otherwise install
+      if [ -f package-lock.json ]; then
+        npm ci --include=dev --no-audit --no-fund --prefer-offline
+      else
+        npm install --include=dev --no-audit --no-fund --prefer-offline
+      fi
+
+      # Copy full project into $SNAP/app (includes node_modules wherever they are)
+      mkdir -p "$SNAPCRAFT_PART_INSTALL/app"
+      rsync -a \
+        --exclude='.git' \
+        --exclude='snap' \
+        --exclude='**/*.log' \
+        --exclude='*.log' \
+        "$SNAPCRAFT_PART_SRC"/ \
+        "$SNAPCRAFT_PART_INSTALL/app/"
+
+      # Icon
       mkdir -p "$SNAPCRAFT_PART_INSTALL/meta/gui"
       if [ -f "$SNAPCRAFT_PART_SRC/icon.png" ]; then
         cp -f "$SNAPCRAFT_PART_SRC/icon.png" "$SNAPCRAFT_PART_INSTALL/meta/gui/icon.png"
-      elif [ -f "$SNAPCRAFT_PART_SRC/app/icon.png" ]; then
-        cp -f "$SNAPCRAFT_PART_SRC/app/icon.png" "$SNAPCRAFT_PART_INSTALL/meta/gui/icon.png"
+      elif [ -f "$APPDIR/icon.png" ]; then
+        cp -f "$APPDIR/icon.png" "$SNAPCRAFT_PART_INSTALL/meta/gui/icon.png"
       fi
 
       # Desktop file
@@ -103,16 +142,30 @@ parts:
       StartupWMClass=MUMPS IDE
       EOF
 
-      # Launcher script (run the real Electron binary inside electron package)
+      # Launcher script: points to the folder that actually contains package.json
       mkdir -p "$SNAPCRAFT_PART_INSTALL/bin"
-      cat > "$SNAPCRAFT_PART_INSTALL/bin/mumps-ide" << 'EOF'
+      cat > "$SNAPCRAFT_PART_INSTALL/bin/mumps-ide" << EOF
       #!/bin/sh
       set -eu
-      exec "$SNAP/app/node_modules/electron/dist/electron" "$SNAP/app" "$@" --no-sandbox --disable-gpu
+
+      APP_SUBDIR="$APP_SUBDIR"
+      if [ -n "\$APP_SUBDIR" ]; then
+        APP_DIR="\$SNAP/app/\$APP_SUBDIR"
+      else
+        APP_DIR="\$SNAP/app"
+      fi
+
+      ELECTRON="\$APP_DIR/node_modules/electron/dist/electron"
+
+      if [ ! -x "\$ELECTRON" ]; then
+        echo "ERROR: Electron binary not found at: \$ELECTRON"
+        echo "Tip: Ensure 'electron' is installed during snap build."
+        exit 1
+      fi
+
+      exec "\$ELECTRON" "\$APP_DIR" "\$@" --no-sandbox --disable-gpu
       EOF
       chmod +x "$SNAPCRAFT_PART_INSTALL/bin/mumps-ide"
-
-      snapcraftctl build
 
     stage-packages:
       - libnss3
@@ -127,14 +180,36 @@ parts:
 
   node:
     plugin: nil
-    source: https://nodejs.org/dist/v18.18.0/node-v18.18.0-linux-x64.tar.xz
+    build-packages:
+      - curl
+      - xz-utils
+      - ca-certificates
     override-build: |
       set -eux
-      ls -la $SNAPCRAFT_PART_SRC
-      
-      # Copy contents from the extracted directory (whatever it is named) to install
-      cd $SNAPCRAFT_PART_SRC
-      cp -r node*/* $SNAPCRAFT_PART_INSTALL/
+
+      NODE_VER="v18.18.0"
+      NODE_DIR="node-${NODE_VER}-linux-x64"
+      NODE_TAR="${NODE_DIR}.tar.xz"
+
+      cd "$SNAPCRAFT_PART_BUILD"
+
+      echo "Downloading Node $NODE_VER..."
+      curl -fsSL -o "$NODE_TAR" "https://nodejs.org/dist/${NODE_VER}/${NODE_TAR}"
+
+      echo "Extracting..."
+      tar -xf "$NODE_TAR"
+
+      if [ ! -d "$NODE_DIR" ]; then
+        echo "ERROR: $NODE_DIR not found after extraction"
+        ls -la
+        exit 1
+      fi
+
+      mkdir -p "$SNAPCRAFT_PART_INSTALL"
+      cp -a "$NODE_DIR"/. "$SNAPCRAFT_PART_INSTALL"/
+
+      "$SNAPCRAFT_PART_INSTALL/bin/node" -v
+      "$SNAPCRAFT_PART_INSTALL/bin/npm" -v
 
 slots:
   dbus-daemon:
