@@ -49,8 +49,6 @@ apps:
       ELECTRON_TRASH: gio
 
 parts:
-  # Main application: copy your whole repo (one level up from snap/)
-  # IMPORTANT: no npm install here (avoids ETIMEDOUT + Node version issues in LXD)
   mumps-ide:
     plugin: dump
     source: ..
@@ -61,8 +59,28 @@ parts:
       - -app/snap/**
       - -app/**/*.log
       - -app/*.log
+
+    # Needed to build native node modules (node-pty, etc.) inside LXD
+    build-packages:
+      - python3
+      - make
+      - g++
+      - pkg-config
+
+    after:
+      - node
+
     override-build: |
       set -eux
+
+      # Add our custom Node to PATH
+      export PATH="$SNAPCRAFT_STAGE/bin:$PATH"
+
+      # Install ALL dependencies (including devDependencies) so Electron is included
+      cd "$SNAPCRAFT_PART_SRC"
+      export NODE_ENV=development
+      export NPM_CONFIG_PRODUCTION=false
+      npm ci --include=dev
 
       # Ensure icon ends up in the right place for the desktop file
       mkdir -p "$SNAPCRAFT_PART_INSTALL/meta/gui"
@@ -85,12 +103,12 @@ parts:
       StartupWMClass=MUMPS IDE
       EOF
 
-      # Launcher script
+      # Launcher script (run the real Electron binary inside electron package)
       mkdir -p "$SNAPCRAFT_PART_INSTALL/bin"
       cat > "$SNAPCRAFT_PART_INSTALL/bin/mumps-ide" << 'EOF'
       #!/bin/sh
-      # Run Electron from your packaged node_modules
-      exec "$SNAP/app/node_modules/.bin/electron" "$SNAP/app" "$@" --no-sandbox --disable-gpu
+      set -eu
+      exec "$SNAP/app/node_modules/electron/dist/electron" "$SNAP/app" "$@" --no-sandbox --disable-gpu
       EOF
       chmod +x "$SNAPCRAFT_PART_INSTALL/bin/mumps-ide"
 
@@ -106,6 +124,21 @@ parts:
       - libxtst6
       - libappindicator3-1
       - libsecret-1-0
+
+  node:
+    plugin: nil
+    source: https://nodejs.org/dist/v18.18.0/node-v18.18.0-linux-x64.tar.xz
+    override-build: |
+      set -eux
+      tar xf $SNAPCRAFT_PART_SRC/node-v18.18.0-linux-x64.tar.xz
+      mkdir -p $SNAPCRAFT_PART_INSTALL/bin
+      mkdir -p $SNAPCRAFT_PART_INSTALL/lib
+      mkdir -p $SNAPCRAFT_PART_INSTALL/include
+      mkdir -p $SNAPCRAFT_PART_INSTALL/share
+      cp -r node-v18.18.0-linux-x64/bin/* $SNAPCRAFT_PART_INSTALL/bin/
+      cp -r node-v18.18.0-linux-x64/lib/* $SNAPCRAFT_PART_INSTALL/lib/
+      cp -r node-v18.18.0-linux-x64/include/* $SNAPCRAFT_PART_INSTALL/include/
+      cp -r node-v18.18.0-linux-x64/share/* $SNAPCRAFT_PART_INSTALL/share/
 
 slots:
   dbus-daemon:
