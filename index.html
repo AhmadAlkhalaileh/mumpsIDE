@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" style="background: #2b2b2b;">
 
 <head>
     <meta charset="UTF-8">
@@ -29,6 +29,28 @@
 
     <!-- xterm.js CSS -->
     <link rel="stylesheet" href="./node_modules/xterm/css/xterm.css">
+
+    <!-- xterm.js Library - Load AFTER Monaco to avoid AMD conflicts -->
+    <script>
+    // Wait for Monaco loader to initialize, then load xterm in non-AMD mode
+    (function() {
+        // Disable AMD for xterm loading to avoid Monaco conflicts
+        const originalDefine = window.define;
+        window.define = undefined;
+
+        const xtermScript = document.createElement('script');
+        xtermScript.src = './node_modules/xterm/lib/xterm.js';
+        xtermScript.onload = function() {
+            // Restore define after xterm loads
+            window.define = originalDefine;
+        };
+        xtermScript.onerror = function() {
+            console.error('Failed to load xterm.js');
+            window.define = originalDefine;
+        };
+        document.head.appendChild(xtermScript);
+    })();
+    </script>
 </head>
 
 <body>
@@ -818,9 +840,6 @@
         </button>
     </div>
 
-    <!-- xterm.js library -->
-    <script src="./node_modules/xterm/lib/xterm.js"></script>
-
     <script src="./libs/jquery.min.js"></script>
     <script src="./assets/mumps/mumps-validator.js"></script>
     <script src="./assets/mumps/mumps-linter.js"></script>
@@ -848,20 +867,65 @@
     <script src="./src/editor/mumps/renderer-mumps-monaco.js"></script>
     <script src="./renderer.js"></script>
 
-    <!-- Splash Screen Handler -->
+    <!-- Splash Screen Handler - Wait for Monaco and xterm to load -->
     <script>
         (function () {
             const splashScreen = document.getElementById('splashScreen');
-            if (splashScreen) {
-                // Hide splash screen after 2.5 seconds
-                setTimeout(() => {
-                    splashScreen.classList.add('fade-out');
-                    // Remove from DOM after animation completes
-                    setTimeout(() => {
-                        splashScreen.remove();
-                    }, 600);
-                }, 2500);
+            if (!splashScreen) return;
+
+            let monacoReady = false;
+            let xtermReady = false;
+            let minTimeElapsed = false;
+
+            // Minimum display time (smoother UX)
+            setTimeout(() => {
+                minTimeElapsed = true;
+                tryHideSplash();
+            }, 1500);
+
+            // Maximum wait time (fallback if modules fail to load)
+            setTimeout(() => {
+                console.warn('Splash timeout - forcing hide after 5s');
+                hideSplash();
+            }, 5000);
+
+            // Wait for Monaco to be ready
+            function waitForMonaco() {
+                if (typeof monaco !== 'undefined' && monaco.editor) {
+                    monacoReady = true;
+                    tryHideSplash();
+                } else {
+                    setTimeout(waitForMonaco, 100);
+                }
             }
+
+            // Wait for xterm to be ready
+            function waitForXterm() {
+                if (typeof Terminal !== 'undefined') {
+                    xtermReady = true;
+                    tryHideSplash();
+                } else {
+                    setTimeout(waitForXterm, 100);
+                }
+            }
+
+            function tryHideSplash() {
+                // Only hide when all modules ready AND minimum time passed
+                if (monacoReady && xtermReady && minTimeElapsed) {
+                    hideSplash();
+                }
+            }
+
+            function hideSplash() {
+                splashScreen.classList.add('fade-out');
+                setTimeout(() => {
+                    splashScreen.remove();
+                }, 600);
+            }
+
+            // Start waiting for critical modules
+            waitForMonaco();
+            waitForXterm();
         })();
     </script>
 </body>

@@ -6,6 +6,13 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Snap build artifacts
+parts/
+prime/
+stage/
+*.snap
+.snapcraft/
+
 # Env files
 .env
 .env.local

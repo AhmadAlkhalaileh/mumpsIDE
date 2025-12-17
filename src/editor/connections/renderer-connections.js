@@ -257,8 +257,17 @@
                         });
                     }
                 } else {
-                    if (dockerListEl) dockerListEl.textContent = res.error || res.stderr || 'Docker error';
-                    appendOutput(`✗ Docker error: ${res.error || res.stderr}`, terminalState);
+                    // Show detailed permission error message
+                    if (res.permissionError && res.message) {
+                        if (dockerListEl) {
+                            dockerListEl.innerHTML = `<div style="color: #f48771; white-space: pre-wrap; font-family: monospace; padding: 12px; background: rgba(244, 135, 113, 0.1); border-radius: 4px; border-left: 3px solid #f48771;">${res.message}</div>`;
+                        }
+                        appendOutput(`✗ ${res.error}`, terminalState);
+                        appendOutput(res.message, terminalState);
+                    } else {
+                        if (dockerListEl) dockerListEl.textContent = res.error || res.stderr || 'Docker error';
+                        appendOutput(`✗ Docker error: ${res.error || res.stderr}`, terminalState);
+                    }
                 }
             }
 
@@ -304,10 +313,19 @@
                     await loadRoutineList(routineState, editor);
                     closeConnectionsPanel();
                 } else {
-                    const msg = res.error || res.stderr || 'SSH connect failed';
-                    markSshStatus(msg, 'error');
-                    setConnStatus('SSH error', 'error');
-                    appendOutput(`✗ SSH connect failed: ${msg}`, terminalState);
+                    // Show detailed permission error message
+                    if (res.permissionError && res.message) {
+                        markSshStatus('Permission denied - see instructions below', 'error');
+                        setConnStatus('SSH permission error', 'error');
+                        appendOutput(`✗ ${res.error}`, terminalState);
+                        appendOutput('', terminalState);
+                        appendOutput(res.message, terminalState);
+                    } else {
+                        const msg = res.error || res.stderr || 'SSH connect failed';
+                        markSshStatus(msg, 'error');
+                        setConnStatus('SSH error', 'error');
+                        appendOutput(`✗ SSH connect failed: ${msg}`, terminalState);
+                    }
                 }
 
                 if (sshConnectBtn) sshConnectBtn.disabled = false;

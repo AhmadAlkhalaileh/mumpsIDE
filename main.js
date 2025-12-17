@@ -6,6 +6,11 @@ const fs = require('fs');
 const { logger } = require('./utils/logger');
 const bridge = require('./bridge');
 
+// Suppress harmless Electron warnings
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+
 let nodePty = null;
 const enableNodePty = process.env.AHMAD_IDE_ENABLE_NODE_PTY === '1';
 
@@ -78,7 +83,12 @@ function createWindow() {
 // Simple exec helper
 function runCommand(cmd) {
     return new Promise((resolve) => {
-        exec(cmd, { timeout: 8000 }, (err, stdout, stderr) => {
+        // In snap environment, explicitly set PATH to include system binaries
+        const env = {
+            ...process.env,
+            PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' + (process.env.PATH ? ':' + process.env.PATH : '')
+        };
+        exec(cmd, { timeout: 8000, env }, (err, stdout, stderr) => {
             if (err) {
                 resolve({ ok: false, error: err.message, stderr, stdout });
             } else {
@@ -88,9 +98,11 @@ function runCommand(cmd) {
     });
 }
 
-// Wrap docker commands with sg docker (if using sg)
+// Run docker commands directly (no sg wrapper needed in snap)
 function wrapDockerCmd(cmd) {
-    return `sg docker -c "${cmd.replace(/"/g, '\\"')}"`;
+    // In snap, docker is bundled at $SNAP/usr/bin/docker
+    const dockerPath = process.env.SNAP ? `${process.env.SNAP}/usr/bin/docker` : 'docker';
+    return cmd.replace(/^docker\s/, `${dockerPath} `);
 }
 
 const summarizePayload = (payload) => {
@@ -225,10 +237,52 @@ ipcHandle('debug:stop:mdebug', async (_event, payload) => {
 
 // Docker list
 ipcHandle('docker:list', async () => {
-    const res = await runCommand(
-        wrapDockerCmd('docker ps --format "{{.ID}}|{{.Names}}|{{.Status}}"')
-    );
-    if (!res.ok) return res;
+    const dockerCmd = wrapDockerCmd('docker ps --format "{{.ID}}|{{.Names}}|{{.Status}}"');
+    console.log('[DEBUG] Docker command:', dockerCmd);
+
+    const res = await runCommand(dockerCmd);
+
+    console.log('[DEBUG] Docker result:', JSON.stringify({
+        ok: res.ok,
+        error: res.error,
+        stderr: res.stderr,
+        stdout: res.stdout?.substring(0, 100)
+    }));
+
+    // Check for permission errors
+    if (!res.ok) {
+        const errorMsg = (res.error || res.stderr || '').toLowerCase();
+        if (errorMsg.includes('permission denied') || errorMsg.includes('connect') || errorMsg.includes('socket')) {
+            return {
+                ok: false,
+                permissionError: true,
+                error: 'Docker permission denied',
+                message: 'Docker access requires permissions. Please run:\n\n' +
+                        '1. Connect snap interface:\n' +
+                        '   sudo snap connect mumps-ide:docker\n\n' +
+                        '2. Add your user to docker group:\n' +
+                        '   sudo usermod -aG docker $USER\n' +
+                        '   newgrp docker\n\n' +
+                        '3. Restart the IDE',
+                details: res.stderr || res.error
+            };
+        }
+        if (errorMsg.includes('not found') || errorMsg.includes('command not found')) {
+            return {
+                ok: false,
+                error: 'Docker not installed',
+                message: 'DEBUG INFO:\n' +
+                        'Command: ' + dockerCmd + '\n' +
+                        'Error: ' + res.error + '\n' +
+                        'Stderr: ' + res.stderr + '\n' +
+                        'Stdout: ' + res.stdout + '\n\n' +
+                        'PATH: ' + process.env.PATH,
+                details: res.stderr || res.error
+            };
+        }
+        return res;
+    }
+
     const containers = res.stdout
         .trim()
         .split('\n')
@@ -242,7 +296,42 @@ ipcHandle('docker:list', async () => {
 
 // SSH
 ipcHandle('ssh:connect', async (_event, payload) => {
-    return bridge.sshConnect(payload || {});
+    console.log('[DEBUG] SSH connect payload:', JSON.stringify({
+        host: payload?.host,
+        port: payload?.port,
+        username: payload?.username,
+        hasPassword: !!payload?.password
+    }));
+
+    const res = await bridge.sshConnect(payload || {});
+
+    console.log('[DEBUG] SSH result:', JSON.stringify({
+        ok: res.ok,
+        error: res.error,
+        sessionId: res.sessionId
+    }));
+
+    // Check for SSH permission errors
+    if (!res.ok && res.error) {
+        const errorMsg = res.error.toLowerCase();
+        if (errorMsg.includes('permission denied') || errorMsg.includes('eacces')) {
+            return {
+                ok: false,
+                permissionError: true,
+                error: 'SSH permission denied',
+                message: 'SSH access requires permissions. Please run:\n\n' +
+                        '1. Connect snap interface:\n' +
+                        '   sudo snap connect mumps-ide:ssh-keys\n\n' +
+                        '2. Check SSH key permissions:\n' +
+                        '   chmod 600 ~/.ssh/id_rsa\n' +
+                        '   chmod 644 ~/.ssh/id_rsa.pub\n\n' +
+                        '3. Restart the IDE',
+                details: res.error
+            };
+        }
+    }
+
+    return res;
 });
 
 ipcHandle('ssh:exec', async (_event, payload) => {

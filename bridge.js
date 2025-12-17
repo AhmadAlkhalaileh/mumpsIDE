@@ -6,6 +6,11 @@ const { logger } = require('./utils/logger');
 const { log: dbgLog } = require('./utils/debug-log');
 const net = require('net');
 const { EventEmitter } = require('events');
+
+// In snap environment, ensure PATH includes system binaries
+if (process.env.SNAP) {
+  process.env.PATH = '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' + (process.env.PATH ? ':' + process.env.PATH : '');
+}
 let SSHClient = undefined;
 let sshLoadError = null;
 let mdebugEnsureLock = false;
@@ -872,7 +877,9 @@ function wrapDockerCmd(cmd) {
   if (process.env.AHMAD_IDE_USE_SG === '1') {
     return `sg docker -c "${cmd.replace(/"/g, '\\"')}"`;
   }
-  return cmd;
+  // In snap, docker is bundled at $SNAP/usr/bin/docker
+  const dockerPath = process.env.SNAP ? `${process.env.SNAP}/usr/bin/docker` : 'docker';
+  return cmd.replace(/^docker\s/, `${dockerPath} `);
 }
 
 function buildYdbEnv(cfg = {}, opts = {}) {

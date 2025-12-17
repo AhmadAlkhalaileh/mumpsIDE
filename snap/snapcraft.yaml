@@ -1,7 +1,11 @@
 name: mumps-ide
 base: core22
-version: '1.0'
+version: '1.4'
+title: MUMPS IDE
 summary: MUMPS Language IDE - Professional development environment for MUMPS/M
+license: Proprietary
+contact: ahmad@example.com
+website: https://github.com/ahmadalkhalaileh
 description: |
   MUMPS Language IDE is a modern, feature-rich integrated development
   environment for MUMPS (M) programming language. Built with Electron
@@ -22,7 +26,7 @@ description: |
   Developed by Ahmad Alkhalaileh
 
 grade: stable
-confinement: strict
+confinement: devmode
 
 architectures:
   - build-on: amd64
@@ -30,142 +34,166 @@ architectures:
 apps:
   mumps-ide:
     command: bin/mumps-ide
-    extensions: [gnome]
-    plugs:
-      - home
-      - network
-      - network-bind
-      - desktop
-      - desktop-legacy
-      - wayland
-      - x11
-      - opengl
-      - browser-support
-      - ssh-keys
-      - docker
-      - removable-media
     environment:
       DISABLE_WAYLAND: '1'
       ELECTRON_TRASH: gio
+      ELECTRON_ENABLE_LOGGING: '1'
+      ELECTRON_FORCE_IS_PACKAGED: '1'
 
 parts:
   mumps-ide:
-    plugin: nil
+    plugin: dump
     source: .
-    # If snapcraft.yaml is inside ./snap, change source to: ..
 
     build-packages:
-      - python3
-      - make
-      - g++
-      - pkg-config
       - rsync
-
-    after:
-      - node
 
     override-build: |
       set -eux
 
-      # Use custom Node from node part (staged)
-      export PATH="$SNAPCRAFT_STAGE/bin:$PATH"
+      echo "=== Starting MUMPS IDE Build ==="
 
-      echo "SNAPCRAFT_PART_SRC=$SNAPCRAFT_PART_SRC"
+      # Navigate to source
+      cd "${SNAPCRAFT_PART_SRC}"
 
-      # Find package.json anywhere up to 4 levels deep
-      PKG_JSON="$(find "$SNAPCRAFT_PART_SRC" -maxdepth 4 -name package.json -print -quit || true)"
-      if [ -z "$PKG_JSON" ]; then
-        echo "ERROR: package.json not found under: $SNAPCRAFT_PART_SRC"
-        echo "Top-level contents:"
-        ls -la "$SNAPCRAFT_PART_SRC"
+      echo "=== Current directory: $(pwd) ==="
+      echo "=== Checking for node_modules ==="
+
+      if [ ! -d "node_modules" ] || [ ! -f "node_modules/electron/dist/electron" ]; then
+        echo "ERROR: node_modules not found or incomplete!"
+        echo "Please run this command BEFORE building the snap:"
+        echo ""
+        echo "  npm install --include=dev"
+        echo ""
+        echo "This will install all dependencies including Electron locally."
+        echo "Then run the snap build again."
         exit 1
       fi
 
-      APPDIR="$(dirname "$PKG_JSON")"
+      echo "=== Verifying electron installation ==="
+      ls -lh node_modules/electron/dist/electron
 
-      # Compute relative path from source root -> app dir (used in launcher)
-      if [ "$APPDIR" = "$SNAPCRAFT_PART_SRC" ]; then
-        APP_SUBDIR=""
-      else
-        APP_SUBDIR="${APPDIR#"$SNAPCRAFT_PART_SRC"/}"
-      fi
+      echo "=== Copying application to snap ==="
+      mkdir -p "${SNAPCRAFT_PART_INSTALL}/app"
 
-      echo "Using app directory: $APPDIR"
-      echo "App subdir inside snap: $APP_SUBDIR"
-
-      cd "$APPDIR"
-      export NODE_ENV=development
-
-      # Make npm more resilient (helps on slow/flaky links)
-      export NODE_OPTIONS="--dns-result-order=ipv4first"
-      export NPM_CONFIG_REGISTRY="https://registry.npmjs.org/"
-      export NPM_CONFIG_FETCH_RETRIES="5"
-      export NPM_CONFIG_FETCH_RETRY_MINTIMEOUT="20000"
-      export NPM_CONFIG_FETCH_RETRY_MAXTIMEOUT="120000"
-      export NPM_CONFIG_NETWORK_TIMEOUT="600000"
-
-      # Install deps: use ci if lock exists, otherwise install
-      if [ -f package-lock.json ]; then
-        npm ci --include=dev --no-audit --no-fund --prefer-offline
-      else
-        npm install --include=dev --no-audit --no-fund --prefer-offline
-      fi
-
-      # Copy full project into $SNAP/app (includes node_modules wherever they are)
-      mkdir -p "$SNAPCRAFT_PART_INSTALL/app"
-      rsync -a \
+      # Copy everything except snap directory and build artifacts
+      rsync -av \
         --exclude='.git' \
+        --exclude='.github' \
         --exclude='snap' \
-        --exclude='**/*.log' \
+        --exclude='parts' \
+        --exclude='prime' \
+        --exclude='stage' \
+        --exclude='docs' \
+        --exclude='.gitignore' \
+        --exclude='.gitattributes' \
         --exclude='*.log' \
-        "$SNAPCRAFT_PART_SRC"/ \
-        "$SNAPCRAFT_PART_INSTALL/app/"
+        --exclude='*.snap' \
+        --exclude='.snapcraft' \
+        --exclude='*.md' \
+        "${SNAPCRAFT_PART_SRC}"/ \
+        "${SNAPCRAFT_PART_INSTALL}/app/"
 
-      # Icon
-      mkdir -p "$SNAPCRAFT_PART_INSTALL/meta/gui"
-      if [ -f "$SNAPCRAFT_PART_SRC/icon.png" ]; then
-        cp -f "$SNAPCRAFT_PART_SRC/icon.png" "$SNAPCRAFT_PART_INSTALL/meta/gui/icon.png"
-      elif [ -f "$APPDIR/icon.png" ]; then
-        cp -f "$APPDIR/icon.png" "$SNAPCRAFT_PART_INSTALL/meta/gui/icon.png"
+      echo "=== Installing icon ==="
+      mkdir -p "${SNAPCRAFT_PART_INSTALL}/meta/gui"
+
+      # Try to find and copy icon
+      ICON_FOUND=false
+      for icon_path in \
+        "${SNAPCRAFT_PART_SRC}/icon.png" \
+        "${SNAPCRAFT_PART_SRC}/assets/icon.png" \
+        "${SNAPCRAFT_PART_SRC}/resources/icon.png"; do
+        if [ -f "${icon_path}" ]; then
+          cp -f "${icon_path}" "${SNAPCRAFT_PART_INSTALL}/meta/gui/icon.png"
+          echo "Icon copied from: ${icon_path}"
+          ICON_FOUND=true
+          break
+        fi
+      done
+
+      if [ "${ICON_FOUND}" = "false" ]; then
+        echo "Warning: No icon.png found, creating placeholder"
+        printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82' > "${SNAPCRAFT_PART_INSTALL}/meta/gui/icon.png"
       fi
 
-      # Desktop file
-      cat > "$SNAPCRAFT_PART_INSTALL/meta/gui/mumps-ide.desktop" << 'EOF'
+      echo "=== Creating desktop file ==="
+      cat > "${SNAPCRAFT_PART_INSTALL}/meta/gui/mumps-ide.desktop" <<DESKTOP_EOF
       [Desktop Entry]
       Name=MUMPS IDE
       Comment=Professional IDE for MUMPS/M Programming
       Exec=mumps-ide %U
-      Icon=${SNAP}/meta/gui/icon.png
+      Icon=\${SNAP}/meta/gui/icon.png
       Terminal=false
       Type=Application
       Categories=Development;IDE;
       StartupWMClass=MUMPS IDE
-      EOF
+      DESKTOP_EOF
 
-      # Launcher script: points to the folder that actually contains package.json
-      mkdir -p "$SNAPCRAFT_PART_INSTALL/bin"
-      cat > "$SNAPCRAFT_PART_INSTALL/bin/mumps-ide" << EOF
+      echo "=== Creating launcher script ==="
+      mkdir -p "${SNAPCRAFT_PART_INSTALL}/bin"
+
+      cat > "${SNAPCRAFT_PART_INSTALL}/bin/mumps-ide" <<'LAUNCHER_EOF'
       #!/bin/sh
       set -eu
 
-      APP_SUBDIR="$APP_SUBDIR"
-      if [ -n "\$APP_SUBDIR" ]; then
-        APP_DIR="\$SNAP/app/\$APP_SUBDIR"
-      else
-        APP_DIR="\$SNAP/app"
-      fi
+      APP_DIR="${SNAP}/app"
+      ELECTRON="${APP_DIR}/node_modules/electron/dist/electron"
 
-      ELECTRON="\$APP_DIR/node_modules/electron/dist/electron"
+      # Fix locale
+      export LANG="${LANG:-en_US.UTF-8}"
+      export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 
-      if [ ! -x "\$ELECTRON" ]; then
-        echo "ERROR: Electron binary not found at: \$ELECTRON"
-        echo "Tip: Ensure 'electron' is installed during snap build."
+      # GTK theme settings
+      export GTK_THEME="${GTK_THEME:-Adwaita}"
+      export GTK_USE_PORTAL=0
+      export GTK_MODULES=""
+      export GTK_PATH="${SNAP}/usr/lib/x86_64-linux-gnu/gtk-3.0"
+
+      # Disable problematic GTK modules
+      unset GTK2_RC_FILES
+
+      # Disable GPU sandbox for better compatibility
+      export ELECTRON_DISABLE_SANDBOX=1
+
+      # Fix freeze on first launch - disable GPU acceleration if needed
+      # Users can remove these flags if their GPU works fine
+      export LIBGL_ALWAYS_SOFTWARE=1
+
+      # Git configuration
+      export GIT_EXEC_PATH="${SNAP}/usr/lib/git-core"
+      export PATH="${SNAP}/usr/bin:${SNAP}/bin:${PATH}"
+
+      # Disable accessibility bridge warnings
+      export NO_AT_BRIDGE=1
+
+      # Create config directory if it doesn't exist
+      mkdir -p "${SNAP_USER_COMMON}/.config"
+
+      if [ ! -x "${ELECTRON}" ]; then
+        echo "ERROR: Electron binary not found at: ${ELECTRON}"
         exit 1
       fi
 
-      exec "\$ELECTRON" "\$APP_DIR" "\$@" --no-sandbox --disable-gpu
-      EOF
-      chmod +x "$SNAPCRAFT_PART_INSTALL/bin/mumps-ide"
+      # Run electron with optimized flags for snap environment
+      exec "${ELECTRON}" "${APP_DIR}" "$@" \
+        --no-sandbox \
+        --disable-gpu \
+        --disable-gpu-sandbox \
+        --disable-software-rasterizer \
+        --disable-dev-shm-usage \
+        --in-process-gpu \
+        --disable-accelerated-2d-canvas \
+        --num-raster-threads=1 \
+        2>&1
+      LAUNCHER_EOF
+
+      chmod +x "${SNAPCRAFT_PART_INSTALL}/bin/mumps-ide"
+
+      echo "=== Build complete ==="
+      echo "Installed files:"
+      ls -la "${SNAPCRAFT_PART_INSTALL}/bin/"
+      echo "App directory size:"
+      du -sh "${SNAPCRAFT_PART_INSTALL}/app" || true
 
     stage-packages:
       - libnss3
@@ -177,42 +205,20 @@ parts:
       - libxtst6
       - libappindicator3-1
       - libsecret-1-0
-
-  node:
-    plugin: nil
-    build-packages:
-      - curl
-      - xz-utils
+      - libatk1.0-0
+      - libatk-bridge2.0-0
+      - libcups2
+      - libdrm2
+      - libgbm1
+      - libgtk-3-0
       - ca-certificates
-    override-build: |
-      set -eux
-
-      NODE_VER="v18.18.0"
-      NODE_DIR="node-${NODE_VER}-linux-x64"
-      NODE_TAR="${NODE_DIR}.tar.xz"
-
-      cd "$SNAPCRAFT_PART_BUILD"
-
-      echo "Downloading Node $NODE_VER..."
-      curl -fsSL -o "$NODE_TAR" "https://nodejs.org/dist/${NODE_VER}/${NODE_TAR}"
-
-      echo "Extracting..."
-      tar -xf "$NODE_TAR"
-
-      if [ ! -d "$NODE_DIR" ]; then
-        echo "ERROR: $NODE_DIR not found after extraction"
-        ls -la
-        exit 1
-      fi
-
-      mkdir -p "$SNAPCRAFT_PART_INSTALL"
-      cp -a "$NODE_DIR"/. "$SNAPCRAFT_PART_INSTALL"/
-
-      "$SNAPCRAFT_PART_INSTALL/bin/node" -v
-      "$SNAPCRAFT_PART_INSTALL/bin/npm" -v
-
-slots:
-  dbus-daemon:
-    interface: dbus
-    bus: session
-    name: com.ahmadalkhalaileh.mumpsIDE
+      - fonts-liberation
+      - fonts-noto
+      - fontconfig
+      - libfontconfig1
+      - adwaita-icon-theme
+      - gnome-themes-standard
+      - git
+      - openssh-client
+      - sshpass
+      - docker.io

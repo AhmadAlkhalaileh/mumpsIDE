@@ -142,8 +142,8 @@
             }
         }
     };
-    const defaultIdeTheme = 'jb-light';
-    const defaultCodeTheme = 'mumps-light';
+    const defaultIdeTheme = 'earth';
+    const defaultCodeTheme = 'mumps-earth';
     const codeThemes = ['mumps-light', 'mumps-earth', 'mumps-dark'];
     let currentCodeTheme = (() => {
         try {
