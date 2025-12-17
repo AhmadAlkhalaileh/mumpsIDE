@@ -1,4 +1,4 @@
-# Ahmad IDE - Complete Documentation
+# Mumps Studio - Complete Documentation
 
 **Version:** 1.0.0
 **Author:** Ahmad
@@ -23,7 +23,7 @@
 
 ## Overview
 
-Ahmad IDE is a modern, PhpStorm-inspired Integrated Development Environment built specifically for **MUMPS (M)** language development. It provides a complete development workflow including code editing, debugging, execution, version control, and remote connection management through Docker and SSH.
+Mumps Studio is a modern, PhpStorm-inspired Integrated Development Environment built specifically for **MUMPS (M)** language development. It provides a complete development workflow including code editing, debugging, execution, version control, and remote connection management through Docker and SSH.
 
 ### Key Highlights
 
@@ -82,7 +82,7 @@ Ahmad IDE is a modern, PhpStorm-inspired Integrated Development Environment buil
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                  Ahmad IDE                          │
+│                  Mumps Studio                       │
 ├─────────────────────────────────────────────────────┤
 │  Electron (v27.1.0)                                 │
 │  ├─ Main Process (Node.js)                          │
@@ -181,7 +181,7 @@ Ahmad IDE is a modern, PhpStorm-inspired Integrated Development Environment buil
 1. **Clone or extract the project:**
    ```bash
    cd ~/Desktop
-   cd "Ahmad IDE 2"
+   cd "Mumps Studio"
    ```
 
 2. **Install dependencies:**
@@ -236,7 +236,7 @@ The IDE follows a PhpStorm-inspired layout with these major sections:
 
 **Location:** Top of window
 **Components:**
-- **Brand Icon** 🛰️ "Ahmad IDE - PhpStorm Brown"
+- **Brand Icon** 🛰️ "Mumps Studio - PhpStorm Brown"
 - **Main Menu** - File, Edit, View, Tools, Git, Help (dynamically populated)
 
 #### Toolbar
@@ -556,7 +556,7 @@ Access via: Press `Shift` twice quickly
 **Example:**
 ```mumps
 TEST    ; Simple test routine
-        WRITE "Hello from Ahmad IDE!",!
+        WRITE "Hello from Mumps Studio!",!
         SET X=42
         WRITE "X = ",X,!
         QUIT
@@ -596,7 +596,7 @@ TEST    ; Simple test routine
 
 ![Debug Session](screenshots/18-debug-session.png)
 
-Ahmad IDE includes a custom JSON-based debugger called **AHMDDG** (Ahmad JSON Debugger) implemented in pure MUMPS.
+Mumps Studio includes a custom JSON-based debugger called **AHMDDG** (Ahmad JSON Debugger) implemented in pure MUMPS.
 
 #### Starting Debug Session
 
@@ -651,7 +651,7 @@ Ahmad IDE includes a custom JSON-based debugger called **AHMDDG** (Ahmad JSON De
 **Architecture:**
 ```
 ┌──────────────┐          ┌──────────────┐          ┌──────────────┐
-│  Ahmad IDE   │          │  bridge.js   │          │  AHMDDG.m    │
+│ Mumps Studio │          │  bridge.js   │          │  AHMDDG.m    │
 │  (renderer)  │  ◄────►  │  (stdio)     │  ◄────►  │  (YottaDB)   │
 └──────────────┘   IPC    └──────────────┘   JSON   └──────────────┘
 ```
@@ -957,7 +957,7 @@ mumps -run %XCMD 'ZLINK "ROUTINE"'
 ### File Structure
 
 ```
-Ahmad IDE 2/
+Mumps Studio/
 ├── main.js                 # Electron main process entry point
 ├── bridge.js              # MUMPS runtime bridge (3400+ lines)
 ├── preload.js             # IPC security layer
@@ -1336,7 +1336,7 @@ const logger = {
 
 **Environment:**
 ```javascript
-await window.ahmadIDE.getEnv()
+await window.mumpsStudio.getEnv()
 // Returns: { platform: 'linux', versions: {...}, cwd: '/path' }
 ```
 
@@ -1504,7 +1504,7 @@ module.exports = { ..., featureAction };
 
 **3. Expose in preload.js:**
 ```javascript
-contextBridge.exposeInMainWorld('ahmadIDE', {
+contextBridge.exposeInMainWorld('mumpsStudio', {
   // ...
   featureAction: (param) => ipcRenderer.invoke('feature:action', { param })
 });
@@ -1512,7 +1512,7 @@ contextBridge.exposeInMainWorld('ahmadIDE', {
 
 **4. Call from renderer.js:**
 ```javascript
-const result = await window.ahmadIDE.featureAction(param);
+const result = await window.mumpsStudio.featureAction(param);
 if (result.ok) {
   // Success
 }

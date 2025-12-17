@@ -1,17 +1,30 @@
-# MUMPS Language IDE
+# Mumps Studio
 
 Professional IDE for MUMPS/M programming language with Docker and SSH support.
 
-Version: **1.3**
+Version: **1.1**
 
 ---
 
-## Features
+## 📚 Quick Links
+
+### For Users
+- **[After Installation Guide](docs/AFTER-INSTALL.md)** - Setup Docker & get started
+- **[User Install Guide](docs/USER-INSTALL-GUIDE.md)** - Installing from Snap Store
+
+### For Developers
+- **[Complete Build, Test & Upload Guide](docs/BUILD-TEST-UPLOAD.md)** - Everything you need
+- **[Snap Store Publishing Guide](docs/SNAP-STORE-GUIDE.md)** - Upload & release process
+- **[Docker Setup Details](docs/DOCKER-SETUP.md)** - Docker configuration
+
+---
+
+## ✨ Features
 
 ✓ Monaco-based code editor with MUMPS syntax highlighting
 ✓ Run and debug MUMPS code with YottaDB integration
 ✓ Docker connectivity - connect to any container
-✓ SSH remote server support
+✓ SSH remote server support with **automatic YottaDB detection**
 ✓ Integrated terminal with xterm.js
 ✓ Git integration for version control
 ✓ Project management and file organization
@@ -20,32 +33,58 @@ Version: **1.3**
 
 ---
 
-## For Developers (Building the Snap)
+## 🚀 Quick Start for Users
 
-### Prerequisites
+### Install from Snap Store
+```bash
+sudo snap install mumps-studio
+```
+
+### Enable Docker Features (Optional)
+```bash
+sudo snap connect mumps-studio:docker-support
+sudo usermod -aG docker $USER
+# Log out and log back in
+```
+
+### Launch
+```bash
+mumps-studio
+```
+
+**See [AFTER-INSTALL.md](docs/AFTER-INSTALL.md) for complete setup instructions.**
+
+---
+
+## 🛠️ Quick Start for Developers
+
+### Build the Snap
 
 ```bash
-sudo snap install snapcraft --classic
+# Install dependencies
 npm install --include=dev
+
+# Build snap
+./build-snap.sh
 ```
-
-### Build Snap
-
-```bash
-./BUILD-SNAP.sh
-```
-
-Creates: `mumps-ide_1.3_amd64.snap`
 
 ### Test Locally
 
 ```bash
-./INSTALL-LOCAL.sh
+sudo snap install --dangerous mumps-studio_1_amd64.snap
+./connect-docker.sh
+mumps-studio
 ```
 
 ### Upload to Snap Store
 
-See: **SNAP-STORE-GUIDE.md**
+```bash
+snapcraft login
+snapcraft upload mumps-studio_1_amd64.snap --release=edge
+snapcraft release mumps-studio 1 stable
+```
+
+**See [BUILD-TEST-UPLOAD.md](docs/BUILD-TEST-UPLOAD.md) for detailed instructions.**
 
 ---
 
@@ -54,15 +93,17 @@ See: **SNAP-STORE-GUIDE.md**
 ### From Snap Store (After Publication)
 
 ```bash
-sudo snap install mumps-ide
+sudo snap install mumps-studio
 ```
 
 ### Setup
 
 ```bash
 # Connect interfaces (if not auto-connected)
-sudo snap connect mumps-ide:docker
-sudo snap connect mumps-ide:ssh-keys
+sudo snap connect mumps-studio:docker
+sudo snap connect mumps-studio:ssh-keys
+sudo snap connect mumps-studio:ssh-public-keys
+sudo snap connect mumps-studio:removable-media
 
 # Add yourself to docker group
 sudo usermod -aG docker $USER
@@ -72,7 +113,7 @@ newgrp docker
 ### Launch
 
 ```bash
-mumps-ide
+mumps-studio
 ```
 
 See: **USER-INSTALL-GUIDE.md** for complete instructions.
@@ -104,7 +145,7 @@ See: **USER-INSTALL-GUIDE.md** for complete instructions.
 ## Project Structure
 
 ```
-mumps-ide/
+mumps-studio/
 ├── BUILD-SNAP.sh              # Build production snap
 ├── INSTALL-LOCAL.sh           # Install for testing
 ├── SNAP-STORE-GUIDE.md        # How to publish to Snap Store
@@ -163,7 +204,7 @@ Proprietary
 
 **Ahmad Alkhalaileh**
 
-- GitHub: https://github.com/ahmadalkhalaileh
+- GitHub: https://github.com/AhmadAlkhalaileh/mumpsIDE
 - Email: ahmad@example.com
 
 ---
@@ -172,8 +213,8 @@ Proprietary
 
 - **Documentation:** See `*.md` files in this directory
 - **Issues:** GitHub Issues
-- **Snap Store:** https://snapcraft.io/mumps-ide (after publication)
+- **Snap Store:** https://snapcraft.io/mumps-studio (after publication)
 
 ---
 
-**Enjoy developing with MUMPS IDE! 🚀**
+**Enjoy developing with Mumps Studio! 🚀**

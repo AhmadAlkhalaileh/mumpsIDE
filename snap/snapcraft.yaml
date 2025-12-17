@@ -1,13 +1,16 @@
-name: mumps-ide
+name: mumps-studio
 base: core22
-version: '1.4'
-title: MUMPS IDE
-summary: MUMPS Language IDE - Professional development environment for MUMPS/M
+version: '1.1'
+title: Mumps Studio
+summary: Mumps Studio - Professional development environment for MUMPS/M
 license: Proprietary
 contact: ahmad@example.com
-website: https://github.com/ahmadalkhalaileh
+website: https://github.com/AhmadAlkhalaileh/mumpsIDE
+source-code: https://github.com/AhmadAlkhalaileh/mumpsIDE
+issues: https://github.com/AhmadAlkhalaileh/mumpsIDE/issues
+icon: icon.png
 description: |
-  MUMPS Language IDE is a modern, feature-rich integrated development
+  Mumps Studio is a modern, feature-rich integrated development
   environment for MUMPS (M) programming language. Built with Electron
   and Monaco Editor, it provides syntax highlighting, debugging, Docker
   and SSH connectivity, and comprehensive project management.
@@ -26,22 +29,34 @@ description: |
   Developed by Ahmad Alkhalaileh
 
 grade: stable
-confinement: devmode
+confinement: strict
 
 architectures:
   - build-on: amd64
 
 apps:
-  mumps-ide:
-    command: bin/mumps-ide
+  mumps-studio:
+    command: bin/mumps-studio
+    extensions: [gnome]
+    plugs:
+      - home
+      - network
+      - network-bind
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+      - opengl
+      - browser-support
+      - ssh-keys
+      - docker-support
+      - removable-media
     environment:
       DISABLE_WAYLAND: '1'
       ELECTRON_TRASH: gio
-      ELECTRON_ENABLE_LOGGING: '1'
-      ELECTRON_FORCE_IS_PACKAGED: '1'
 
 parts:
-  mumps-ide:
+  mumps-studio:
     plugin: dump
     source: .
 
@@ -51,7 +66,7 @@ parts:
     override-build: |
       set -eux
 
-      echo "=== Starting MUMPS IDE Build ==="
+      echo "=== Starting Mumps Studio Build ==="
 
       # Navigate to source
       cd "${SNAPCRAFT_PART_SRC}"
@@ -97,6 +112,12 @@ parts:
       echo "=== Installing icon ==="
       mkdir -p "${SNAPCRAFT_PART_INSTALL}/meta/gui"
 
+      # Snap desktop integration expects the desktop file Icon= name to match
+      # a file in meta/gui (e.g. Icon=mumps-studio -> meta/gui/mumps-studio.png).
+      ICON_DST_NAME="mumps-studio"
+      ICON_DST_PNG="${SNAPCRAFT_PART_INSTALL}/meta/gui/${ICON_DST_NAME}.png"
+      ICON_DST_FALLBACK="${SNAPCRAFT_PART_INSTALL}/meta/gui/icon.png"
+
       # Try to find and copy icon
       ICON_FOUND=false
       for icon_path in \
@@ -104,7 +125,8 @@ parts:
         "${SNAPCRAFT_PART_SRC}/assets/icon.png" \
         "${SNAPCRAFT_PART_SRC}/resources/icon.png"; do
         if [ -f "${icon_path}" ]; then
-          cp -f "${icon_path}" "${SNAPCRAFT_PART_INSTALL}/meta/gui/icon.png"
+          cp -f "${icon_path}" "${ICON_DST_PNG}"
+          cp -f "${icon_path}" "${ICON_DST_FALLBACK}"
           echo "Icon copied from: ${icon_path}"
           ICON_FOUND=true
           break
@@ -113,81 +135,34 @@ parts:
 
       if [ "${ICON_FOUND}" = "false" ]; then
         echo "Warning: No icon.png found, creating placeholder"
-        printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82' > "${SNAPCRAFT_PART_INSTALL}/meta/gui/icon.png"
+        printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82' > "${ICON_DST_PNG}"
+        cp -f "${ICON_DST_PNG}" "${ICON_DST_FALLBACK}"
       fi
 
       echo "=== Creating desktop file ==="
-      cat > "${SNAPCRAFT_PART_INSTALL}/meta/gui/mumps-ide.desktop" <<DESKTOP_EOF
+      cat > "${SNAPCRAFT_PART_INSTALL}/meta/gui/mumps-studio.desktop" <<"EOF"
       [Desktop Entry]
-      Name=MUMPS IDE
+      Name=Mumps Studio
       Comment=Professional IDE for MUMPS/M Programming
-      Exec=mumps-ide %U
-      Icon=\${SNAP}/meta/gui/icon.png
+      Exec=mumps-studio %U
+      Icon=${SNAP}/meta/gui/mumps-studio.png
       Terminal=false
       Type=Application
       Categories=Development;IDE;
-      StartupWMClass=MUMPS IDE
-      DESKTOP_EOF
+      StartupWMClass=mumps-studio
+      EOF
+      sed -i 's/^      //' "${SNAPCRAFT_PART_INSTALL}/meta/gui/mumps-studio.desktop"
 
       echo "=== Creating launcher script ==="
       mkdir -p "${SNAPCRAFT_PART_INSTALL}/bin"
 
-      cat > "${SNAPCRAFT_PART_INSTALL}/bin/mumps-ide" <<'LAUNCHER_EOF'
+      cat > "${SNAPCRAFT_PART_INSTALL}/bin/mumps-studio" <<"LAUNCHER_EOF"
       #!/bin/sh
-      set -eu
-
-      APP_DIR="${SNAP}/app"
-      ELECTRON="${APP_DIR}/node_modules/electron/dist/electron"
-
-      # Fix locale
-      export LANG="${LANG:-en_US.UTF-8}"
-      export LC_ALL="${LC_ALL:-en_US.UTF-8}"
-
-      # GTK theme settings
-      export GTK_THEME="${GTK_THEME:-Adwaita}"
-      export GTK_USE_PORTAL=0
-      export GTK_MODULES=""
-      export GTK_PATH="${SNAP}/usr/lib/x86_64-linux-gnu/gtk-3.0"
-
-      # Disable problematic GTK modules
-      unset GTK2_RC_FILES
-
-      # Disable GPU sandbox for better compatibility
-      export ELECTRON_DISABLE_SANDBOX=1
-
-      # Fix freeze on first launch - disable GPU acceleration if needed
-      # Users can remove these flags if their GPU works fine
-      export LIBGL_ALWAYS_SOFTWARE=1
-
-      # Git configuration
-      export GIT_EXEC_PATH="${SNAP}/usr/lib/git-core"
-      export PATH="${SNAP}/usr/bin:${SNAP}/bin:${PATH}"
-
-      # Disable accessibility bridge warnings
-      export NO_AT_BRIDGE=1
-
-      # Create config directory if it doesn't exist
-      mkdir -p "${SNAP_USER_COMMON}/.config"
-
-      if [ ! -x "${ELECTRON}" ]; then
-        echo "ERROR: Electron binary not found at: ${ELECTRON}"
-        exit 1
-      fi
-
-      # Run electron with optimized flags for snap environment
-      exec "${ELECTRON}" "${APP_DIR}" "$@" \
-        --no-sandbox \
-        --disable-gpu \
-        --disable-gpu-sandbox \
-        --disable-software-rasterizer \
-        --disable-dev-shm-usage \
-        --in-process-gpu \
-        --disable-accelerated-2d-canvas \
-        --num-raster-threads=1 \
-        2>&1
+      exec "$SNAP/app/node_modules/electron/dist/electron" "$SNAP/app" --no-sandbox "$@"
       LAUNCHER_EOF
+      sed -i 's/^      //' "${SNAPCRAFT_PART_INSTALL}/bin/mumps-studio"
 
-      chmod +x "${SNAPCRAFT_PART_INSTALL}/bin/mumps-ide"
+      chmod +x "${SNAPCRAFT_PART_INSTALL}/bin/mumps-studio"
 
       echo "=== Build complete ==="
       echo "Installed files:"

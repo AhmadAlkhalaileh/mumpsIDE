@@ -1,9 +1,29 @@
-#!/bin/bash
-# Build script for MUMPS IDE snap package
-set -e
+#!/usr/bin/env bash
+# Build script for Mumps Studio snap package
+set -euo pipefail
 
-echo "=== MUMPS IDE Snap Build Script ==="
+echo "=== Mumps Studio Snap Build Script ==="
 echo ""
+
+BUILD_MODE="${BUILD_MODE:-lxd}"
+
+# Prefer building in an isolated environment that matches the snap base (core22).
+# This avoids staging libraries from your host OS that may not run on core22.
+if [ "$BUILD_MODE" != "destructive" ] && ! command -v lxc >/dev/null 2>&1; then
+    echo "ERROR: LXD is not installed or not on PATH (missing 'lxc' command)."
+    echo ""
+    echo "Install it with:"
+    echo "  sudo snap install lxd"
+    echo "  sudo lxd init --minimal"
+    echo ""
+    echo "Then rerun this script."
+    echo ""
+    echo "If you *must* build on the host, you can run:"
+    echo "  BUILD_MODE=destructive ./build-snap.sh"
+    echo "But this is not recommended unless your host matches the snap base (Ubuntu 22.04)."
+    echo ""
+    exit 1
+fi
 
 # Check if dependencies are installed
 if [ ! -d "node_modules" ] || [ ! -f "node_modules/electron/dist/electron" ]; then
@@ -40,7 +60,12 @@ echo ""
 # Build the snap
 echo "Building snap package (this may take several minutes)..."
 echo ""
-snapcraft --destructive-mode
+if [ "$BUILD_MODE" = "destructive" ]; then
+    echo "WARNING: Using destructive-mode. Prefer LXD builds for core22 compatibility."
+    snapcraft pack --destructive-mode
+else
+    snapcraft pack --use-lxd
+fi
 
 echo ""
 echo "=== Build Complete ==="
@@ -55,14 +80,22 @@ if [ -n "$SNAP_FILE" ]; then
     echo "File size: $(du -h "$SNAP_FILE" | cut -f1)"
     echo ""
     echo "Next steps:"
-    echo "1. Test the snap: sudo snap install --dangerous --devmode $SNAP_FILE"
-    echo "2. Run the app: mumps-ide"
-    echo "3. Remove test install: sudo snap remove mumps-ide"
+    echo "1. Install the snap:"
+    echo "   sudo snap install --dangerous $SNAP_FILE"
+    echo ""
+    echo "2. Connect Docker (REQUIRED for Docker features):"
+    echo "   ./connect-docker.sh"
+    echo "   OR manually:"
+    echo "   sudo snap connect mumps-studio:docker-support"
+    echo "   sudo usermod -aG docker \$USER"
+    echo ""
+    echo "3. Run the app: mumps-studio"
+    echo "4. Remove test install: sudo snap remove mumps-studio"
     echo ""
     echo "To upload to Snap Store:"
     echo "  snapcraft upload $SNAP_FILE"
     echo ""
-    echo "See docs/SNAP-UPLOAD-GUIDE.md for detailed upload instructions"
+    echo "See SNAP-STORE-GUIDE.md for detailed upload instructions"
     echo ""
 else
     echo "ERROR: Snap file not found!"

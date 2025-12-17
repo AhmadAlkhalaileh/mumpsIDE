@@ -9,7 +9,6 @@ const bridge = require('./bridge');
 // Suppress harmless Electron warnings
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 app.commandLine.appendSwitch('disable-gpu-sandbox');
-app.commandLine.appendSwitch('disable-software-rasterizer');
 
 let nodePty = null;
 const enableNodePty = process.env.AHMAD_IDE_ENABLE_NODE_PTY === '1';
@@ -17,13 +16,15 @@ const enableNodePty = process.env.AHMAD_IDE_ENABLE_NODE_PTY === '1';
 // Terminal sessions (simple persistent shell per tab)
 const terminalSessions = new Map();
 
-// GPU has issues on some systems; allow opt-in to software rendering
+// GPU has issues on some systems; in snaps it also depends on interfaces.
+// Default to software rendering in snaps for reliability unless explicitly enabled.
+const isSnap = !!process.env.SNAP;
 const forceSoftwareRendering = process.env.AHMAD_IDE_FORCE_SOFT_RENDER === '1';
-if (forceSoftwareRendering) {
+const enableGpu = process.env.AHMAD_IDE_ENABLE_GPU === '1';
+if (forceSoftwareRendering || (isSnap && !enableGpu)) {
     app.disableHardwareAcceleration();
     app.commandLine.appendSwitch('disable-gpu');
     app.commandLine.appendSwitch('disable-gpu-compositing');
-    app.commandLine.appendSwitch('disable-software-rasterizer');
     app.commandLine.appendSwitch('disable-gpu-sandbox');
 }
 
@@ -59,18 +60,38 @@ function createWindow() {
     const win = new BrowserWindow({
         width: 1400,
         height: 900,
-        show: false,
+        show: false,  // Restore v1.3 behavior
         autoHideMenuBar: true,
         backgroundColor: '#1b120e',
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
             nodeIntegration: false,
-            sandbox: true
+            sandbox: false  // Disable Electron sandbox in snap (snap provides confinement)
         }
     });
 
-    win.loadFile('index.html');
+    const indexHtmlPath = path.join(__dirname, 'index.html');
+    win.loadFile(indexHtmlPath).catch((err) => {
+        const message = err?.message || String(err);
+        logger.error('UI_LOAD_FAILED', { message, stack: err?.stack, indexHtmlPath });
+
+        const safePath = indexHtmlPath.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const safeMessage = message.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const html = `<!doctype html>
+<meta charset="utf-8" />
+<title>Mumps Studio - Startup Error</title>
+<body style="font-family: sans-serif; padding: 16px;">
+  <h2>Mumps Studio failed to start</h2>
+  <p>Could not load the UI file:</p>
+  <pre>${safePath}</pre>
+  <p>Error:</p>
+  <pre>${safeMessage}</pre>
+</body>`;
+
+        win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`).catch(() => {});
+        win.show();
+    });
     win.once('ready-to-show', () => {
         win.maximize();
         win.show();
@@ -257,13 +278,12 @@ ipcHandle('docker:list', async () => {
                 ok: false,
                 permissionError: true,
                 error: 'Docker permission denied',
-                message: 'Docker access requires permissions. Please run:\n\n' +
-                        '1. Connect snap interface:\n' +
-                        '   sudo snap connect mumps-ide:docker\n\n' +
-                        '2. Add your user to docker group:\n' +
+                message: 'Docker permission denied. Quick fix:\n\n' +
+                        '1. Add yourself to docker group:\n' +
                         '   sudo usermod -aG docker $USER\n' +
                         '   newgrp docker\n\n' +
-                        '3. Restart the IDE',
+                        '2. Restart Mumps Studio\n\n' +
+                        'See DOCKER-SETUP.md for detailed instructions.',
                 details: res.stderr || res.error
             };
         }
@@ -321,7 +341,7 @@ ipcHandle('ssh:connect', async (_event, payload) => {
                 error: 'SSH permission denied',
                 message: 'SSH access requires permissions. Please run:\n\n' +
                         '1. Connect snap interface:\n' +
-                        '   sudo snap connect mumps-ide:ssh-keys\n\n' +
+                        '   sudo snap connect mumps-studio:ssh-keys\n\n' +
                         '2. Check SSH key permissions:\n' +
                         '   chmod 600 ~/.ssh/id_rsa\n' +
                         '   chmod 644 ~/.ssh/id_rsa.pub\n\n' +
