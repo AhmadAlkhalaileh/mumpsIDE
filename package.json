@@ -4,6 +4,7 @@
   "description": "",
   "main": "main.js",
   "scripts": {
+    "check:no-cdn": "node scripts/check-no-cdn.js",
     "start": "AHMAD_IDE_USE_SG=1 electron .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

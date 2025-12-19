@@ -231,3 +231,14 @@
     background-color: #214283 !important;
 }
 
+/* ============================================
+   PERFORMANCE MODE (reduce expensive effects)
+   ============================================ */
+.perf-mode .toolbar-btn.primary:hover {
+    box-shadow: none !important;
+}
+
+.perf-mode .debug-float {
+    box-shadow: none !important;
+}
+

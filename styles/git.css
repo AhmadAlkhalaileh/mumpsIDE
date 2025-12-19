@@ -185,3 +185,58 @@
     color: var(--text);
 }
 
+/* ============================================
+   Virtualized lists (large repos)
+   ============================================ */
+.virtual-list {
+    position: relative;
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+.virtual-list-spacer {
+    width: 1px;
+    opacity: 0;
+}
+
+.virtual-list-items {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+}
+
+.virtual-list-row {
+    box-sizing: border-box;
+}
+
+.git-changes-list.virtual-list,
+.git-history-list.virtual-list {
+    display: block;
+    padding: 0;
+}
+
+.git-changes-list.virtual-list .virtual-list-items,
+.git-history-list.virtual-list .virtual-list-items {
+    padding: 8px;
+}
+
+/* Make row heights stable for virtualization */
+.git-change-row {
+    height: 34px;
+}
+
+.git-change-path {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.git-history-row {
+    height: 22px;
+    line-height: 22px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+

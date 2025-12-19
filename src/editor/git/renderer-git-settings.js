@@ -8,14 +8,31 @@
             throw new Error('createGitSettingsManager requires jQuery ($)');
         }
 
+        let lazyHooked = false;
+        let bound = false;
+
         function bindGitSettingsPanel() {
+            if (bound) return;
             const saveBtn = $('#gitSettingsSave');
             const testBtn = $('#gitSettingsTest');
             const statusEl = $('#gitSettingsStatus');
             const nameInput = $('#gitUserName');
             const emailInput = $('#gitUserEmail');
             const remoteInput = $('#gitRemoteUrl');
-            if (!saveBtn.length || !statusEl.length) return;
+            if (!saveBtn.length || !statusEl.length) {
+                // Settings panel may be lazy-mounted.
+                if (!lazyHooked) {
+                    const fr = window.AhmadIDEModules?.app?.featureRegistry;
+                    fr?.onMounted?.('settingsPanel', () => {
+                        lazyHooked = false;
+                        bindGitSettingsPanel();
+                    });
+                    lazyHooked = true;
+                }
+                return;
+            }
+            lazyHooked = true;
+            bound = true;
 
             // Prefill from project .git/config or global/home git config
             (async () => {

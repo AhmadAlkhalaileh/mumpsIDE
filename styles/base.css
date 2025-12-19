@@ -191,6 +191,46 @@ textarea {
     opacity: 0.8;
 }
 
+/* ============================================
+   PERFORMANCE MODE (reduce expensive effects)
+   Enabled via: <body class="perf-mode"> (also applied to <html> early)
+   ============================================ */
+:root.perf-mode body *,
+:root.perf-mode body *::before,
+:root.perf-mode body *::after,
+body.perf-mode *,
+body.perf-mode *::before,
+body.perf-mode *::after {
+    backdrop-filter: none !important;
+}
+
+:root.perf-mode .app-shell::before,
+body.perf-mode .app-shell::before {
+    filter: none !important;
+    opacity: 0 !important;
+}
+
+:root.perf-mode .context-menu,
+:root.perf-mode .routines-context-menu,
+:root.perf-mode .ctx-submenu,
+:root.perf-mode .toast,
+:root.perf-mode .connections-panel,
+:root.perf-mode .prompt-dialog,
+body.perf-mode .context-menu,
+body.perf-mode .routines-context-menu,
+body.perf-mode .ctx-submenu,
+body.perf-mode .toast,
+body.perf-mode .connections-panel,
+body.perf-mode .prompt-dialog {
+    box-shadow: none !important;
+}
+
+:root.perf-mode .btn:hover,
+body.perf-mode .btn:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
 .menu-bar {
     display: flex;
     align-items: center;
@@ -314,4 +354,3 @@ textarea {
     color: var(--muted);
     font-weight: 600;
 }
-

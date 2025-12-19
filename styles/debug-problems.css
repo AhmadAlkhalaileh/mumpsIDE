@@ -449,3 +449,9 @@
     z-index: 3000;
 }
 
+/* ============================================
+   PERFORMANCE MODE (reduce expensive effects)
+   ============================================ */
+.perf-mode .overlay {
+    backdrop-filter: none !important;
+}

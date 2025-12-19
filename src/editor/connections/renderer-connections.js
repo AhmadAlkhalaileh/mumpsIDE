@@ -15,7 +15,44 @@
             return document.getElementById('routineSearch')?.value || '';
         });
 
+        let cachedApi = null;
+        let lazyHooked = false;
+
         function wireConnectionsPanel({ editor, routineState, terminalState } = {}) {
+            if (cachedApi) return cachedApi;
+
+            const featureRegistry = window.AhmadIDEModules?.app?.featureRegistry;
+            const ensureMounted = () => {
+                try {
+                    featureRegistry?.ensureById?.('connectionsPanel');
+                } catch (_) {
+                    // ignore
+                }
+            };
+
+            const connectionsBtn = document.getElementById('toggleConnections');
+            if (connectionsBtn && !connectionsBtn.dataset.mideConnectionsWired) {
+                connectionsBtn.addEventListener('click', () => {
+                    ensureMounted();
+                    const api = wireConnectionsPanel({ editor, routineState, terminalState });
+                    api?.openConnectionsPanel?.();
+                    api?.refreshDockerList?.();
+                });
+                connectionsBtn.dataset.mideConnectionsWired = '1';
+            }
+
+            // If the panel hasn't been mounted yet, defer wiring until first open.
+            if (!document.getElementById('dockerList')) {
+                if (!lazyHooked && featureRegistry?.onMounted) {
+                    featureRegistry.onMounted('connectionsPanel', () => {
+                        lazyHooked = false;
+                        wireConnectionsPanel({ editor, routineState, terminalState });
+                    });
+                    lazyHooked = true;
+                }
+                return null;
+            }
+
             // --- SSH / Docker handling ---
             const connectionsPanel = document.getElementById('connectionsPanel');
             const connectionsOverlay = document.getElementById('connectionsOverlay');
@@ -36,7 +73,6 @@
             const sshPassInput = document.getElementById('sshPassInput');
             const sshConnectBtn = document.getElementById('sshConnectBtn');
             const sshFormStatus = document.getElementById('sshFormStatus');
-            const connectionsBtn = document.getElementById('toggleConnections');
             const sshSavedList = document.getElementById('sshSavedList');
             const sshSaveEnvBtn = document.getElementById('sshSaveEnvBtn');
 
@@ -331,87 +367,87 @@
                 if (sshConnectBtn) sshConnectBtn.disabled = false;
             }
 
-            connectionsBtn?.addEventListener('click', () => {
-                openConnectionsPanel();
-                refreshDockerList();
-            });
+            if (connectionsPanel && connectionsPanel.dataset.wired !== '1') {
+                connectionsPanel.dataset.wired = '1';
 
-            refreshDockerBtn?.addEventListener('click', refreshDockerList);
-            useLocalDockerBtn?.addEventListener('click', async () => {
-                // Get last selected container ID from localStorage
-                let lastContainerId = null;
-                try {
-                    lastContainerId = localStorage.getItem('ahmadIDE:lastContainerId');
-                } catch (e) {
-                    // ignore
-                }
+                refreshDockerBtn?.addEventListener('click', refreshDockerList);
+                useLocalDockerBtn?.addEventListener('click', async () => {
+                    // Get last selected container ID from localStorage
+                    let lastContainerId = null;
+                    try {
+                        lastContainerId = localStorage.getItem('ahmadIDE:lastContainerId');
+                    } catch (e) {
+                        // ignore
+                    }
 
-                if (!lastContainerId) {
-                    markSshStatus('Please select a container from the list first', 'error');
-                    appendOutput('✗ No container selected. Click on a container above first.', terminalState);
-                    return;
-                }
+                    if (!lastContainerId) {
+                        markSshStatus('Please select a container from the list first', 'error');
+                        appendOutput('✗ No container selected. Click on a container above first.', terminalState);
+                        return;
+                    }
 
-                const config = dockerConfig || {};
-                config.containerId = lastContainerId;
-                await window.ahmadIDE.setConnection('docker', { docker: config });
-                const modeLabel = config.ydbPath ? 'Docker (configured)' : 'Docker (universal)';
-                setConnStatus(modeLabel, 'info');
-                appendOutput(`✓ Using ${modeLabel.toLowerCase()} connection`, terminalState);
-                closeConnectionsPanel();
-                await loadRoutineList(routineState, editor);
-            });
-
-            dockerSaveConfigBtn?.addEventListener('click', () => {
-                const envKey = dockerEnvKeyInput?.value?.trim() || '';
-                const ydbPath = dockerYdbPathInput?.value?.trim() || '';
-                const gldPath = dockerGldPathInput?.value?.trim() || '';
-                const routinesPath = dockerRoutinesPathInput?.value?.trim() || '';
-
-                const config = {};
-                if (envKey) config.envKey = envKey;
-                if (ydbPath) config.ydbPath = ydbPath;
-                if (gldPath) config.gldPath = gldPath;
-                if (routinesPath) config.routinesPath = routinesPath;
-
-                saveDockerConfig(config);
-                dockerConfig = config;
-
-                const hasConfig = Object.keys(config).length > 0;
-                updateDockerConfigStatus(
-                    hasConfig ? 'Docker config saved' : 'Config cleared (universal mode)',
-                    hasConfig ? 'info' : 'info'
-                );
-            });
-
-            connectionsOverlay?.addEventListener('click', closeConnectionsPanel);
-            closeConnectionsBtn?.addEventListener('click', closeConnectionsPanel);
-            sshConnectBtn?.addEventListener('click', handleSshConnect);
-            sshSaveEnvBtn?.addEventListener('click', () => {
-                if (!sshHostInput || !sshUserInput || !sshEnvInput) return;
-                const host = sshHostInput.value.trim();
-                const username = sshUserInput.value.trim();
-                const port = parseInt(sshPortInput?.value || '22', 10) || 22;
-                const envKey = (sshEnvInput.value || 'cc').trim() || 'cc';
-                if (!host || !username) {
-                    markSshStatus('Host and user required to save.', 'error');
-                    return;
-                }
-                upsertSavedProfile({ host, username, port, envKey });
-                markSshStatus(`Saved ${envKey}`, 'info');
-            });
-            [sshHostInput, sshUserInput, sshPassInput, sshPortInput, sshEnvInput].forEach(input => {
-                input?.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') handleSshConnect();
+                    const config = dockerConfig || {};
+                    config.containerId = lastContainerId;
+                    await window.ahmadIDE.setConnection('docker', { docker: config });
+                    const modeLabel = config.ydbPath ? 'Docker (configured)' : 'Docker (universal)';
+                    setConnStatus(modeLabel, 'info');
+                    appendOutput(`✓ Using ${modeLabel.toLowerCase()} connection`, terminalState);
+                    closeConnectionsPanel();
+                    await loadRoutineList(routineState, editor);
                 });
-            });
 
-            return {
+                dockerSaveConfigBtn?.addEventListener('click', () => {
+                    const envKey = dockerEnvKeyInput?.value?.trim() || '';
+                    const ydbPath = dockerYdbPathInput?.value?.trim() || '';
+                    const gldPath = dockerGldPathInput?.value?.trim() || '';
+                    const routinesPath = dockerRoutinesPathInput?.value?.trim() || '';
+
+                    const config = {};
+                    if (envKey) config.envKey = envKey;
+                    if (ydbPath) config.ydbPath = ydbPath;
+                    if (gldPath) config.gldPath = gldPath;
+                    if (routinesPath) config.routinesPath = routinesPath;
+
+                    saveDockerConfig(config);
+                    dockerConfig = config;
+
+                    const hasConfig = Object.keys(config).length > 0;
+                    updateDockerConfigStatus(
+                        hasConfig ? 'Docker config saved' : 'Config cleared (universal mode)',
+                        hasConfig ? 'info' : 'info'
+                    );
+                });
+
+                connectionsOverlay?.addEventListener('click', closeConnectionsPanel);
+                closeConnectionsBtn?.addEventListener('click', closeConnectionsPanel);
+                sshConnectBtn?.addEventListener('click', handleSshConnect);
+                sshSaveEnvBtn?.addEventListener('click', () => {
+                    if (!sshHostInput || !sshUserInput || !sshEnvInput) return;
+                    const host = sshHostInput.value.trim();
+                    const username = sshUserInput.value.trim();
+                    const port = parseInt(sshPortInput?.value || '22', 10) || 22;
+                    const envKey = (sshEnvInput.value || 'cc').trim() || 'cc';
+                    if (!host || !username) {
+                        markSshStatus('Host and user required to save.', 'error');
+                        return;
+                    }
+                    upsertSavedProfile({ host, username, port, envKey });
+                    markSshStatus(`Saved ${envKey}`, 'info');
+                });
+                [sshHostInput, sshUserInput, sshPassInput, sshPortInput, sshEnvInput].forEach(input => {
+                    input?.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter') handleSshConnect();
+                    });
+                });
+            }
+
+            cachedApi = {
                 openConnectionsPanel,
                 closeConnectionsPanel,
                 refreshDockerList,
                 handleSshConnect
             };
+            return cachedApi;
         }
 
         return {

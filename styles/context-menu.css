@@ -158,6 +158,21 @@
     min-width: 80px;
 }
 
+/* ============================================
+   PERFORMANCE MODE (reduce expensive effects)
+   ============================================ */
+.perf-mode .prompt-overlay {
+    backdrop-filter: none !important;
+}
+
+.perf-mode .prompt-dialog,
+.perf-mode .context-menu,
+.perf-mode .ctx-submenu {
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+
 .context-menu .git-parent {
     position: relative;
 }
@@ -428,4 +443,3 @@
     background: var(--border);
     margin: 4px 0;
 }
-

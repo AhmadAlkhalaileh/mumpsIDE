@@ -15,6 +15,16 @@
     gap: 12px;
 }
 
+/* ============================================
+   PERFORMANCE MODE (reduce expensive effects)
+   ============================================ */
+.perf-mode .search-dialog,
+.perf-mode .search-everywhere {
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+}
+
+
 .search-dialog-header {
     display: flex;
     align-items: center;
@@ -270,4 +280,3 @@
     font-size: 12px;
     color: var(--muted);
 }
-

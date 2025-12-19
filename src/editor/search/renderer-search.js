@@ -97,6 +97,105 @@
             };
         })();
 
+        const ensurePanelMounted = (containerId) => {
+            const fr = window.AhmadIDEModules?.app?.featureRegistry;
+            if (!fr || typeof fr.ensureById !== 'function') return false;
+            try {
+                return fr.ensureById(containerId);
+            } catch (_) {
+                return false;
+            }
+        };
+
+        let findReplaceDomWired = false;
+        const wireFindReplaceDomOnce = () => {
+            if (findReplaceDomWired) return;
+            const {
+                dialog,
+                toggleBtn,
+                replaceAllBtn,
+                findInput,
+                replaceInput,
+                caseOption,
+                wholeOption,
+                regexOption
+            } = getFindReplaceElements();
+
+            if (!dialog || !toggleBtn || !findInput) return;
+
+            toggleBtn.addEventListener('click', () => {
+                const nextMode = findReplaceState.mode === 'replace' ? 'find' : 'replace';
+                toggleFindMode(nextMode);
+                executeFindReplacePreview(false);
+            });
+
+            document.getElementById('closeFindDialog')?.addEventListener('click', closeFindReplaceDialog);
+            replaceAllBtn?.addEventListener('click', confirmAndReplaceAll);
+
+            findInput.addEventListener('input', () => searchDebounce(() => executeFindReplacePreview(false), 200));
+            findInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') executeFindReplacePreview(false);
+                if (e.key === 'Escape') closeFindReplaceDialog();
+            });
+
+            replaceInput?.addEventListener('input', () => {
+                if (findReplaceState.mode === 'replace') {
+                    searchDebounce(() => executeFindReplacePreview(false), 280);
+                }
+            });
+            replaceInput?.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') executeFindReplacePreview(e.ctrlKey || e.metaKey);
+                if (e.key === 'Escape') closeFindReplaceDialog();
+            });
+
+            [caseOption, wholeOption, regexOption].forEach((el) => {
+                el?.addEventListener('change', () => executeFindReplacePreview(false));
+            });
+
+            dialog.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    if (findReplaceState.mode === 'replace' && e.ctrlKey) {
+                        confirmAndReplaceAll();
+                    } else {
+                        executeFindReplacePreview(false);
+                    }
+                }
+                if (e.key === 'Escape') closeFindReplaceDialog();
+            });
+
+            findReplaceDomWired = true;
+        };
+
+        let searchEverywhereDomWired = false;
+        const wireSearchEverywhereDomOnce = () => {
+            if (searchEverywhereDomWired) return;
+            const { input } = getSearchEverywhereElements();
+            if (!input) return;
+            input.addEventListener('input', () => renderSearchEverywhereResults(input.value));
+            input.addEventListener('keydown', (e) => {
+                const resultsHost = getSearchEverywhereElements().resultsHost;
+                const items = resultsHost?.querySelectorAll('.search-everywhere-item') || [];
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    searchEverywhereState.selectedIndex = Math.min(items.length - 1, searchEverywhereState.selectedIndex + 1);
+                    renderSearchEverywhereResults(input.value);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    searchEverywhereState.selectedIndex = Math.max(0, searchEverywhereState.selectedIndex - 1);
+                    renderSearchEverywhereResults(input.value);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const refreshedItems = getSearchEverywhereElements().resultsHost?.querySelectorAll('.search-everywhere-item') || [];
+                    const active = refreshedItems[searchEverywhereState.selectedIndex];
+                    const path = active?.dataset?.path;
+                    if (path) openSearchEverywhereResult(path);
+                } else if (e.key === 'Escape') {
+                    closeSearchEverywhere();
+                }
+            });
+            searchEverywhereDomWired = true;
+        };
+
         const getFindReplaceElements = () => ({
             overlay: document.getElementById('findOverlay'),
             dialog: document.getElementById('findDialog'),
@@ -396,6 +495,8 @@
         };
 
         function openFindReplaceDialog(mode = 'find', prefill = '') {
+            ensurePanelMounted('findDialog');
+            wireFindReplaceDomOnce();
             toggleFindMode(mode);
             updateFindScopeLabels();
             const { overlay, dialog, findInput, replaceInput } = getFindReplaceElements();
@@ -449,6 +550,8 @@
         };
 
         const openSearchEverywhere = async (prefill = '') => {
+            ensurePanelMounted('searchEverywhereDialog');
+            wireSearchEverywhereDomOnce();
             const { overlay, dialog, input, resultsHost } = getSearchEverywhereElements();
             overlay?.classList.remove('hidden');
             dialog?.classList.remove('hidden');
@@ -552,4 +655,3 @@
         window.AhmadIDEModules.search.createSearchManager = createSearchManager;
     }
 })();
-

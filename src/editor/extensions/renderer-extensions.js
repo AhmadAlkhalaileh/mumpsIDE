@@ -138,7 +138,17 @@
         function initExtensionsView() {
             loadExtensionState();
             initExtensionsData();
-            renderExtensionsList();
+            // Lazy-mount support: the tool window may not be in the DOM at bootstrap.
+            if (document.getElementById('extensionsList')) {
+                renderExtensionsList();
+                return;
+            }
+            const featureRegistry = window.AhmadIDEModules?.app?.featureRegistry;
+            if (featureRegistry && typeof featureRegistry.onMounted === 'function') {
+                featureRegistry.onMounted('extensionsPanel', () => {
+                    renderExtensionsList();
+                });
+            }
         }
 
         return {

@@ -4,6 +4,13 @@ const { contextBridge, ipcRenderer } = require('electron');
 // Do NOT try to require it here - it's not a Node.js module
 
 contextBridge.exposeInMainWorld('ahmadIDE', {
+    // Runtime hints (safe, no secrets)
+    runtime: {
+        isSnap: !!process.env.SNAP,
+        enableGpuRequested: process.env.AHMAD_IDE_ENABLE_GPU === '1',
+        forceSoftwareRendering: process.env.AHMAD_IDE_FORCE_SOFT_RENDER === '1'
+    },
+
     // Environment
     getEnv: () => ipcRenderer.invoke('env:get'),
 

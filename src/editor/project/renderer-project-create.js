@@ -9,10 +9,14 @@
         }
 
         function openNewProjectPanel() {
+            try {
+                window.AhmadIDEModules?.app?.featureRegistry?.ensureById?.('newProjectPanel');
+            } catch (_) { }
             const panel = document.getElementById('newProjectPanel');
             const overlay = document.getElementById('newProjectOverlay');
             panel?.classList.remove('hidden');
             overlay?.classList.remove('hidden');
+            wireNewProjectPanel();
 
             // Update structure preview when project name changes
             const updatePreview = () => {
@@ -40,6 +44,19 @@
         }
 
         function wireNewProjectPanel() {
+            // New Project panel content may be lazy-mounted.
+            if (!document.getElementById('closeNewProjectBtn')) {
+                if (!wireNewProjectPanel.__lazyHooked) {
+                    const fr = window.AhmadIDEModules?.app?.featureRegistry;
+                    fr?.onMounted?.('newProjectPanel', () => wireNewProjectPanel());
+                    wireNewProjectPanel.__lazyHooked = true;
+                }
+                return;
+            }
+            const panel = document.getElementById('newProjectPanel');
+            if (panel?.dataset?.wired === '1') return;
+            if (panel) panel.dataset.wired = '1';
+
             // New Project panel handlers
             document.getElementById('closeNewProjectBtn')?.addEventListener('click', closeNewProjectPanel);
             document.getElementById('newProjectOverlay')?.addEventListener('click', closeNewProjectPanel);

@@ -476,13 +476,28 @@
     function bindSettingsPanelThemes() {
         const ideSel = document.getElementById('settingsIdeTheme');
         const codeSel = document.getElementById('settingsCodeTheme');
+        if (!ideSel && !codeSel) {
+            // Settings panel is lazy-mounted; bind when it becomes available.
+            if (!bindSettingsPanelThemes.__lazyHooked) {
+                const fr = window.AhmadIDEModules?.app?.featureRegistry;
+                fr?.onMounted?.('settingsPanel', () => bindSettingsPanelThemes());
+                bindSettingsPanelThemes.__lazyHooked = true;
+            }
+            return;
+        }
         if (ideSel) {
             ideSel.value = preferredIdeTheme || defaultIdeTheme;
-            ideSel.addEventListener('change', () => applyIdeTheme(ideSel.value));
+            if (!ideSel.dataset.bound) {
+                ideSel.addEventListener('change', () => applyIdeTheme(ideSel.value));
+                ideSel.dataset.bound = '1';
+            }
         }
         if (codeSel) {
             codeSel.value = currentCodeTheme || defaultCodeTheme;
-            codeSel.addEventListener('change', () => applyCodeTheme(codeSel.value));
+            if (!codeSel.dataset.bound) {
+                codeSel.addEventListener('change', () => applyCodeTheme(codeSel.value));
+                codeSel.dataset.bound = '1';
+            }
         }
     }
 
@@ -2092,6 +2107,13 @@
             return;
         }
 
+        // Lazy-mount heavy panels on first open to reduce DOM/layout/paint cost.
+        try {
+            window.AhmadIDEModules?.app?.featureRegistry?.ensureById?.(panelId);
+        } catch (_) {
+            // ignore mount failures
+        }
+
         // Show the content area and switch panels
         state.visible = true;
         state.activePanel = panelId;
@@ -2202,7 +2224,22 @@
     }
 
     function bindDebugTabs() {
-        document.querySelectorAll('.debug-tab').forEach(tab => {
+        const tabs = document.querySelectorAll('.debug-tab');
+        if (!tabs.length) {
+            // Debug panel is lazy-mounted; bind when it becomes available.
+            if (!bindDebugTabs.__lazyHooked) {
+                const fr = window.AhmadIDEModules?.app?.featureRegistry;
+                fr?.onMounted?.('debugPanel', () => bindDebugTabs());
+                bindDebugTabs.__lazyHooked = true;
+            }
+            return;
+        }
+        if (bindDebugTabs.__bound) {
+            setActiveDebugTab(activeDebugTab);
+            return;
+        }
+        bindDebugTabs.__bound = true;
+        tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 const target = tab.getAttribute('data-tab');
                 setActiveDebugTab(target);
@@ -2713,33 +2750,7 @@
             };
 
             bindSearchShortcuts();
-            $('#svcDockerListBtn')?.on('click', async () => {
-                const out = document.getElementById('svcDockerOutput');
-                if (out) out.textContent = 'Loading...';
-                const res = await window.ahmadIDE.listDocker?.();
-                if (res?.ok) {
-                    out.textContent = res.containers.map(c => `${c.name} (${c.id}) :: ${c.status}`).join('\n') || 'No running containers.';
-                } else {
-                    out.textContent = res?.error || res?.stderr || 'Docker query failed';
-                }
-            });
-            $('#svcDockerRefreshBtn')?.on('click', async () => {
-                $('#svcDockerListBtn').trigger('click');
-            });
-            $('#svcSshRunBtn')?.on('click', async () => {
-                const cmd = ($('#svcSshCmd').val() || '').trim();
-                const out = document.getElementById('svcSshOutput');
-                if (!cmd) {
-                    if (out) out.textContent = 'Enter a command.';
-                    return;
-                }
-                if (out) out.textContent = `Running: ${cmd}`;
-                const res = await window.ahmadIDE.hostExec(cmd);
-                if (out) {
-                    if (res.ok) out.textContent = res.stdout || '(no output)';
-                    else out.textContent = res.error || res.stderr || 'SSH command failed';
-                }
-            });
+            // Services tool window is lazy-mounted and wired via src/features/services/panel-bindings.js
 
             const getBpLines = () =>
                 Array.from(dbgState.breakpoints || [])
@@ -2753,8 +2764,7 @@
                     .map(parseBpKey)
                     .filter(bp => !isNaN(bp.line));
 
-            const relayout = () => editor.layout();
-            window.addEventListener('resize', relayout);
+            // Monaco uses automaticLayout; extra layout() calls cause layout storms.
 
             // --- Validation wiring ---
             // Run lint on idle to keep typing responsive; same rules, less contention
@@ -3181,7 +3191,7 @@
                 );
                 if (onSelect) onSelect();
                 if (collapseEl) collapseEl.classList.add('collapsed');
-                setTimeout(() => editor.layout(), 120);
+                if (window.MIDE?.scheduleEditorLayout) window.MIDE.scheduleEditorLayout('docker-select');
             };
             host.appendChild(div);
         });

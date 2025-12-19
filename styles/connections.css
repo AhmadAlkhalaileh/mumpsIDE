@@ -329,3 +329,37 @@
     max-height: 280px;
 }
 
+/* Settings: Performance Mode toggle row (injected dynamically) */
+.perf-mode-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 10px;
+    user-select: none;
+    cursor: pointer;
+}
+
+.perf-mode-toggle-row input {
+    cursor: pointer;
+}
+
+/* ============================================
+   PERFORMANCE MODE (reduce expensive effects)
+   ============================================ */
+.perf-mode .statusbar {
+    backdrop-filter: none !important;
+}
+
+.perf-mode .connections-overlay,
+.perf-mode .connections-panel {
+    backdrop-filter: none !important;
+}
+
+.perf-mode .connections-panel {
+    box-shadow: none !important;
+}
+
+.perf-mode .saved-env-pill:hover {
+    box-shadow: none !important;
+}
+
