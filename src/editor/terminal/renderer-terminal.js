@@ -283,8 +283,8 @@
 
         function buildTerminalOptions() {
             const styles = getComputedStyle(document.documentElement);
-            const font = (styles.getPropertyValue('--font-code') || '').trim() || 'monospace';
-            const fontSize = parseInt((styles.getPropertyValue('--font-size-code') || '').trim(), 10) || 13;
+            const font = (styles.getPropertyValue('--font-terminal') || styles.getPropertyValue('--font-code') || '').trim() || 'monospace';
+            const fontSize = parseInt((styles.getPropertyValue('--font-size-terminal') || styles.getPropertyValue('--font-size-code') || '').trim(), 10) || 13;
             const background = (styles.getPropertyValue('--terminal-input-bg') || styles.getPropertyValue('--editor-bg') || '#1e1e1e').trim();
             const foreground = (styles.getPropertyValue('--text') || '#ffffff').trim();
             const selection = (styles.getPropertyValue('--selection-bg') || 'rgba(53,116,240,0.25)').trim();
@@ -303,6 +303,13 @@
                     selection
                 }
             };
+        }
+
+        function applyFontSettings({ fontFamily, fontSize } = {}) {
+            const state = getGlobalTerminalState(); if (!state?.tabs?.length) return;
+            const fam = String(fontFamily || '').trim(); const size = Number(fontSize);
+            state.tabs.forEach((t) => { try { if (t?.term?.setOption) { if (fam) t.term.setOption('fontFamily', fam); if (Number.isFinite(size)) t.term.setOption('fontSize', size); } } catch (_) { } });
+            refreshTerminalLayout(state, { resizeSession: true });
         }
 
         function flushBufferedOutput(tab) {
@@ -471,23 +478,7 @@
             refreshTerminalLayout(state);
         }
 
-        return {
-            getTerminalCwd,
-            focusTerminal,
-            isTerminalFocused,
-            createTerminalState,
-            getActiveTerminalTab,
-            updateTerminalStatusPill,
-            ensureTerminalListeners,
-            renderTerminalTabs,
-            activateTerminalTab,
-            refreshTerminalLayout,
-            addTerminalTab,
-            closeTerminalTab,
-            appendOutput,
-            clearOutput,
-            sendCtrlC
-        };
+        return { getTerminalCwd, focusTerminal, isTerminalFocused, createTerminalState, getActiveTerminalTab, updateTerminalStatusPill, ensureTerminalListeners, renderTerminalTabs, activateTerminalTab, refreshTerminalLayout, addTerminalTab, closeTerminalTab, appendOutput, clearOutput, sendCtrlC, applyFontSettings };
     }
 
     if (typeof window !== 'undefined') {

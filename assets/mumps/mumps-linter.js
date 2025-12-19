@@ -277,7 +277,7 @@ class MUMPSLinter {
 
     analyzeLine(line, lineNum, allLines, newedVariables, variables, issues, cfg) {
         const trimmed = line.trim();
-        const codePart = trimmed.split(';')[0];
+        const codePart = this.extractCodeBeforeComment(trimmed);
 
         // Unknown / ambiguous command
         {
@@ -686,6 +686,19 @@ class MUMPSLinter {
                 }
             }
         }
+    }
+
+    extractCodeBeforeComment(line) {
+        // Extract code before comment, respecting strings
+        let inString = false;
+        for (let i = 0; i < line.length; i++) {
+            if (line[i] === '"') {
+                inString = !inString;
+            } else if (line[i] === ';' && !inString) {
+                return line.substring(0, i);
+            }
+        }
+        return line;
     }
 
     findLabelLine(lines, label) {

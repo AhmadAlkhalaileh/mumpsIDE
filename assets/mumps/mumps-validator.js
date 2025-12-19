@@ -130,8 +130,11 @@ class MUMPSValidator {
             // Skip empty lines and comments
             if (line.trim() === '' || line.trim().startsWith(';') || line.trim().startsWith(' ')) continue;
 
+            // Extract code part before comment (respecting strings)
+            const codePart = this.extractCodeBeforeComment(line);
+
             // Check for unclosed quotes
-            const quotes = (line.match(/"/g) || []).length;
+            const quotes = (codePart.match(/"/g) || []).length;
             if (quotes % 2 !== 0) {
                 errors.push({
                     line: lineNum,
@@ -143,8 +146,8 @@ class MUMPSValidator {
             }
 
             // Check for mismatched parentheses
-            const openParen = (line.match(/\(/g) || []).length;
-            const closeParen = (line.match(/\)/g) || []).length;
+            const openParen = (codePart.match(/\(/g) || []).length;
+            const closeParen = (codePart.match(/\)/g) || []).length;
             if (openParen !== closeParen) {
                 errors.push({
                     line: lineNum,
@@ -173,6 +176,21 @@ class MUMPSValidator {
             errors: errors,
             warnings: warnings
         };
+    }
+
+    /**
+     * Extract code before comment, respecting strings
+     */
+    extractCodeBeforeComment(line) {
+        let inString = false;
+        for (let i = 0; i < line.length; i++) {
+            if (line[i] === '"') {
+                inString = !inString;
+            } else if (line[i] === ';' && !inString) {
+                return line.substring(0, i);
+            }
+        }
+        return line;
     }
 
     /**

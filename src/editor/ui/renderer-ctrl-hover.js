@@ -2,6 +2,7 @@
     function createCtrlHoverManager({ deps } = {}) {
         const getMonaco = deps?.getMonaco || (() => (typeof monaco !== 'undefined' ? monaco : null));
         const parseRoutineReferenceAtPosition = deps?.parseRoutineReferenceAtPosition;
+        const resolveLocalTagLine = deps?.resolveLocalTagLine || null;
         const goToDeclaration = deps?.goToDeclaration || (async () => false);
         const toggleBreakpoint = deps?.toggleBreakpoint || (() => { });
 
@@ -21,10 +22,39 @@
             let lastHoverKey = '';
             let lastHoverActive = false;
             let lastCursor = '';
+            let tooltipEl = null;
+            let lastTooltipKey = '';
 
             const supportsCollection = typeof editor.createDecorationsCollection === 'function';
             const hoverCollection = supportsCollection ? editor.createDecorationsCollection() : null;
             let hoverDeltaIds = [];
+
+            const ensureTooltip = () => {
+                if (tooltipEl) return tooltipEl;
+                tooltipEl = document.createElement('div');
+                tooltipEl.className = 'ui-hover-tooltip hidden';
+                document.body.appendChild(tooltipEl);
+                return tooltipEl;
+            };
+
+            const showTooltip = (key, text, browserEvent) => {
+                if (!text) return hideTooltip();
+                if (key === lastTooltipKey && tooltipEl && !tooltipEl.classList.contains('hidden')) return;
+                lastTooltipKey = key;
+                const el = ensureTooltip();
+                el.textContent = text;
+                const x = browserEvent?.clientX ?? 0;
+                const y = browserEvent?.clientY ?? 0;
+                el.style.left = `${Math.min(window.innerWidth - 20, x + 12)}px`;
+                el.style.top = `${Math.min(window.innerHeight - 20, y + 12)}px`;
+                el.classList.remove('hidden');
+            };
+
+            const hideTooltip = () => {
+                lastTooltipKey = '';
+                if (!tooltipEl) return;
+                tooltipEl.classList.add('hidden');
+            };
 
             const setCursor = (cursor) => {
                 const next = cursor || '';
@@ -37,11 +67,13 @@
             const clearHover = () => {
                 if (!lastHoverKey && !lastHoverActive && !hoverDeltaIds.length) {
                     setCursor('');
+                    hideTooltip();
                     return;
                 }
                 lastHoverKey = '';
                 lastHoverActive = false;
                 setCursor('');
+                hideTooltip();
                 if (hoverCollection) {
                     hoverCollection.clear();
                 } else if (hoverDeltaIds.length) {
@@ -99,8 +131,8 @@
                 const column = pos.column;
                 let startCol = column;
                 let endCol = column;
-                while (startCol > 1 && /[A-Z0-9%^]/.test(lineContent[startCol - 2])) startCol--;
-                while (endCol <= lineContent.length && /[A-Z0-9%^]/.test(lineContent[endCol - 1])) endCol++;
+                while (startCol > 1 && /[A-Z0-9%^$]/i.test(lineContent[startCol - 2])) startCol--;
+                while (endCol <= lineContent.length && /[A-Z0-9%^$]/i.test(lineContent[endCol - 1])) endCol++;
 
                 // Nothing meaningful under the cursor
                 if (startCol === endCol) {
@@ -120,11 +152,32 @@
                     lastHoverActive = false;
                     setCursor('');
                     clearHoverDecorationOnly();
+                    hideTooltip();
+                    return;
+                }
+
+                let navigable = true;
+                let tooltip = 'Go to declaration';
+                if (ref.type === 'local') {
+                    const line = resolveLocalTagLine ? resolveLocalTagLine(model, ref.tag) : null;
+                    navigable = !!line;
+                    tooltip = navigable ? `Go to ${ref.tag} (local)` : '';
+                } else if (ref.type === 'external') {
+                    const target = ref.tag ? `${ref.tag}^${ref.routine}` : `^${ref.routine}`;
+                    tooltip = `Go to ${target}`;
+                }
+
+                if (!navigable) {
+                    lastHoverActive = false;
+                    setCursor('');
+                    clearHoverDecorationOnly();
+                    hideTooltip();
                     return;
                 }
 
                 lastHoverActive = true;
                 setCursor('pointer');
+                showTooltip(key, tooltip, evt.event?.browserEvent);
 
                 const decoration = {
                     range: new monaco.Range(pos.lineNumber, startCol, pos.lineNumber, endCol),

@@ -13,6 +13,8 @@
 
     <script src="./monaco-loader-init.js"></script>
     <script src="./src/app/perf-mode-early.js"></script>
+    <script src="./src/app/applySettingsEarly.js"></script>
+    <link rel="stylesheet" href="./styles/fonts.css?v=20251219-phase3b">
     <link rel="stylesheet" href="./styles/base.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/context-menu.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/layout.css?v=20251209-performance">
@@ -25,10 +27,11 @@
     <link rel="stylesheet" href="./styles/connections.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/git.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/extensions.css?v=20251209-performance">
+    <link rel="stylesheet" href="./styles/dialogs.css?v=20251219">
     <link rel="stylesheet" href="./styles/splash.css?v=20251213">
 
-	    <link rel="stylesheet" href="./node_modules/xterm/css/xterm.css">
-	</head>
+    <link rel="stylesheet" href="./node_modules/xterm/css/xterm.css">
+</head>
 
 <body>
     <div id="splashScreen" class="splash-screen">
@@ -98,13 +101,6 @@
                                 <path d="M4 6l4 4 4-4H4z" />
                             </svg>
                         </button>
-                        <div class="run-config-menu hidden" id="runConfigMenu">
-                            <div class="run-config-header">Run Configurations</div>
-                            <button class="run-config-item" data-config="run-current">Current file (Run)</button>
-                            <button class="run-config-item" data-config="debug-current">Current file (Debug)</button>
-                            <div class="run-config-separator"></div>
-                            <div class="run-config-item disabled">NOT IMPLEMENTED YET: custom configurations</div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -122,20 +118,12 @@
                             <path d="M4 6l4 4 4-4" />
                         </svg>
                     </button>
-                    <div class="vcs-menu hidden" id="vcsWidgetMenu">
-                        <button class="vcs-menu-item" data-action="commit">Commit…</button>
-                        <button class="vcs-menu-item" data-action="history">Show History</button>
-                        <button class="vcs-menu-item" data-action="push">Push</button>
-                        <button class="vcs-menu-item" data-action="pull">Pull / Fetch</button>
-                        <div class="vcs-menu-separator"></div>
-                        <button class="vcs-menu-item" data-action="open-git">Open Git Tool Window</button>
-                    </div>
                 </div>
             </div>
         </div>
 
-	        <div class="ide-body">
-	            <div class="tool-window-bar tool-window-bar-left">
+        <div class="ide-body">
+            <div class="tool-window-bar tool-window-bar-left">
                 <button class="tool-window-stripe-btn active" data-panel="projectPanel" data-position="left"
                     title="Project (Alt+1)">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -153,8 +141,8 @@
                 <div class="stripe-spacer"></div>
             </div>
 
-	            <aside class="tool-window-content tool-window-left" id="leftToolWindow">
-	                <div class="tool-window-panel" id="projectPanel">
+            <aside class="tool-window-content tool-window-left" id="leftToolWindow">
+                <div class="tool-window-panel" id="projectPanel">
                     <div class="tool-window-header">
                         <span class="tool-window-title">Project</span>
                         <div class="tool-window-actions">
@@ -173,7 +161,7 @@
                     <input class="filter-input" id="routineFilterInput" placeholder="Filter...">
                     <div class="project-tree" id="projectTree"></div>
                 </div>
-	                <div class="tool-window-panel hidden" id="structurePanel">
+                <div class="tool-window-panel hidden" id="structurePanel">
                     <div class="tool-window-header">
                         <span class="tool-window-title">Structure</span>
                         <div class="tool-window-actions">
@@ -190,8 +178,8 @@
                 </div>
             </aside>
 
-	            <div class="ide-center">
-	                <main class="editor-area">
+            <div class="ide-center">
+                <main class="editor-area">
                     <div class="tabbar">
                         <div id="tabBar" class="tab-container"></div>
                     </div>
@@ -208,7 +196,7 @@
             </div>
         </div>
 
-	        <div class="bottom-bar-wrapper" id="bottomBarWrapper">
+        <div class="bottom-bar-wrapper" id="bottomBarWrapper">
             <div class="tool-window-bar tool-window-bar-bottom">
                 <button class="tool-window-stripe-btn horizontal active" data-panel="terminalPanel"
                     data-position="bottom" title="Terminal (Alt+F12)">
@@ -265,8 +253,8 @@
                     <section class="panel debug-panel hidden" id="extensionsPanel"></section>
                     <section class="panel debug-panel hidden" id="servicesPanel"></section>
                 </div>
-	            </div>
-	        </div>
+            </div>
+        </div>
 
         <footer class="statusbar">
             <div class="status-left">
@@ -290,78 +278,20 @@
         </footer>
     </div>
 
-	    <div id="connectionsOverlay" class="connections-overlay hidden"></div>
-	    <div id="connectionsPanel" class="connections-panel hidden"></div>
+    <!-- Connections Panel Overlay -->
+    <div id="connectionsOverlay" class="connections-overlay hidden"></div>
+    <div id="connectionsPanel" class="connections-panel hidden"></div>
 
-	    <div id="shortcutsOverlay" class="connections-overlay hidden"></div>
-	    <div id="shortcutsPanel" class="connections-panel hidden">
-        <div class="connections-header">
-            <div>
-                <div class="pane-title">Keyboard Shortcuts</div>
-                <div class="pane-subtitle">Current bindings (owner configurable)</div>
-            </div>
-            <button class="btn ghost icon-btn" id="closeShortcutsBtn" title="Close">✕</button>
-        </div>
-        <div class="connections-grid">
-            <div class="connection-card">
-                <div class="panel-title">Registered Commands</div>
-                <div class="pane-subtitle">Click to copy summary</div>
-                <ul class="problems-list" id="shortcutsList"></ul>
-                <div class="pane-title" style="margin-top:8px;">Update Binding</div>
-                <div class="ssh-form">
-                    <select class="ssh-input" id="shortcutSelect">
-                        <option value="duplicate-line">Duplicate Line</option>
-                        <option value="run-code">Run</option>
-                        <option value="lint-code">Lint</option>
-                        <option value="toggle-sidebar">Toggle Sidebar</option>
-                        <option value="toggle-terminal">Toggle Terminal</option>
-                        <option value="new-terminal">New Terminal</option>
-                    </select>
-                    <input class="ssh-input" id="shortcutInput" placeholder="e.g., Ctrl+D">
-                    <button class="btn primary" id="saveShortcutBtn">Save Binding</button>
-                </div>
-                <div class="pane-subtitle">Valid: Ctrl/Cmd/Shift/Alt + Letter/Enter/F-keys (e.g., Ctrl+Shift+L)</div>
-            </div>
-        </div>
-    </div>
+    <!-- Search Dialogs (Phase 3) -->
+    <div id="findOverlay" class="ui-dialog-overlay hidden"></div>
+    <div id="findDialog" class="search-dialog hidden"></div>
 
-	    <div id="findOverlay" class="overlay hidden"></div>
-	    <div id="findDialog" class="search-dialog hidden" data-mode="find"></div>
-
-	    <div id="searchEverywhereOverlay" class="overlay hidden"></div>
-	    <div id="searchEverywhereDialog" class="search-everywhere hidden"></div>
-
-	    <div id="editorContextMenu" class="context-menu">
-        <div class="ctx-item" data-action="ctx-cut">Cut</div>
-        <div class="ctx-item" data-action="ctx-copy">Copy</div>
-        <div class="ctx-item" data-action="ctx-paste">Paste</div>
-        <div class="ctx-separator"></div>
-        <div class="ctx-item" data-action="ctx-format">Format Code</div>
-        <div class="ctx-item" data-action="ctx-declare">Go to Declaration</div>
-        <div class="ctx-item" data-action="ctx-usages">Find Usages</div>
-        <div class="ctx-separator"></div>
-        <div class="ctx-item" data-action="ctx-comment">Toggle Comment</div>
-        <div class="ctx-separator"></div>
-        <div class="ctx-item git-parent" data-action="ctx-git-parent">Git ▸
-            <div class="context-menu git-submenu">
-                <div class="ctx-item" data-action="ctx-git-add">Add</div>
-                <div class="ctx-item" data-action="ctx-git-commit-file">Commit…</div>
-                <div class="ctx-item" data-action="ctx-git-history">Show History</div>
-                <div class="ctx-item" data-action="ctx-git-compare">Compare with Latest Version</div>
-                <div class="ctx-item" data-action="ctx-git-rollback">Revert / Rollback</div>
-            </div>
-        </div>
-    </div>
+    <div id="searchEverywhereOverlay" class="ui-dialog-overlay hidden"></div>
+    <div id="searchEverywhereDialog" class="search-everywhere hidden"></div>
 
     <div class="toast-container" id="toastContainer"></div>
 
-	    <div id="settingsOverlay" class="connections-overlay hidden"></div>
-	    <div id="settingsPanel" class="connections-panel hidden"></div>
-
-	    <div id="newProjectOverlay" class="connections-overlay hidden"></div>
-	    <div id="newProjectPanel" class="connections-panel hidden"></div>
-
-	    <div id="debugBar" class="debug-float hidden">
+    <div id="debugBar" class="debug-float hidden">
         <button data-cmd="continue" id="dbgContinueBtn" title="Resume Program (F9)">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="#6a9955">
                 <path d="M4 3l9 5-9 5V3z" />
@@ -406,8 +336,41 @@
     <script src="./assets/mumps/mumps-validator.js"></script>
     <script src="./assets/mumps/mumps-linter.js"></script>
     <script src="./assets/mumps/mumps-lexer.js"></script>
-	    <script src="./utils/debug-log.js"></script>
+    <script src="./utils/debug-log.js"></script>
     <script src="./utils/logger.js"></script>
+    <script src="./src/services/settingsService.js"></script>
+    <script src="./src/services/fontService.js"></script>
+    <script src="./src/services/extensionsService.js"></script>
+    <script src="./src/app/registries/dialogRegistry.js"></script>
+    <script src="./src/ui/theme/tokens.js"></script>
+    <script src="./src/ui/primitives/Button.js"></script>
+    <script src="./src/ui/primitives/Input.js"></script>
+    <script src="./src/ui/primitives/Select.js"></script>
+    <script src="./src/ui/primitives/Checkbox.js"></script>
+    <script src="./src/ui/primitives/Toggle.js"></script>
+    <script src="./src/ui/primitives/List.js"></script>
+    <script src="./src/ui/Dialog.js"></script>
+    <script src="./src/ui/DialogLayout.js"></script>
+    <script src="./src/ui/primitives/Dialog.prompt.js"></script>
+    <script src="./src/features/settings/sections/appearance.js"></script>
+    <script src="./src/features/settings/sections/fonts.shared.js"></script>
+    <script src="./src/features/settings/sections/fonts.ui.js"></script>
+    <script src="./src/features/settings/sections/fonts.editor.js"></script>
+    <script src="./src/features/settings/sections/fonts.terminal.js"></script>
+    <script src="./src/features/settings/sections/fonts.js"></script>
+    <script src="./src/features/settings/sections/advanced.js"></script>
+    <script src="./src/features/settings/settingsDialog.js"></script>
+    <script src="./src/features/connections/connectionsDialog.js"></script>
+    <script src="./src/features/about/aboutDialog.js"></script>
+    <script src="./src/features/shortcuts/shortcutsDialog.js"></script>
+    <script src="./src/features/projects/newProjectDialog.js"></script>
+    <script src="./src/features/projects/openProjectDialog.js"></script>
+    <script src="./src/features/search/findReplaceDialog.js"></script>
+    <script src="./src/features/search/searchEverywhereDialog.js"></script>
+    <script src="./src/features/extensions/extensionsToolWindow.js"></script>
+    <script src="./src/extensions/bundled/git.js"></script>
+    <script src="./src/extensions/bundled/mumps-tools.js"></script>
+    <script src="./src/editor/mumps/mumps-local-tags.js"></script>
     <script src="./src/editor/tabs/renderer-tabs.js"></script>
     <script src="./src/editor/terminal/renderer-terminal.js"></script>
     <script src="./src/features/terminal/engine-loader.js"></script>
@@ -430,17 +393,26 @@
     <script src="./src/editor/ui/renderer-ctrl-hover.js"></script>
     <script src="./src/editor/mumps/renderer-mumps-monaco.js"></script>
     <script src="./src/ui/virtual-list.js"></script>
-	    <script src="./src/features/git/perf-ui.js"></script>
-	    <script src="./src/app/monaco-layout-scheduler.js"></script>
-	    <script src="./src/app/feature-registry.js"></script>
-	    <script src="./src/app/lazy-panels.templates.js"></script>
-	    <script src="./src/app/lazy-panels.bootstrap.js"></script>
-	    <script src="./src/features/services/panel-bindings.js"></script>
-	    <script src="./src/app/perf-mode.js"></script>
-	    <script src="./renderer.js"></script>
+    <script src="./src/features/git/perf-ui.js"></script>
+    <script src="./src/app/monaco-layout-scheduler.js"></script>
+    <script src="./src/app/feature-registry.js"></script>
+    <script src="./src/app/lazy-panels.templates.js"></script>
+    <script src="./src/app/lazy-panels.bootstrap.js"></script>
+    <script src="./src/features/services/panel-bindings.js"></script>
+    <script src="./src/app/perf-mode.js"></script>
+    <script src="./src/app/registries/menuRegistry.js?v=fix1"></script>
+    <script src="./src/ui/icons/iconRegistry.js"></script>
+    <script src="./src/ui/menu/menuUtils.js"></script>
+    <script src="./src/ui/menu/submenuIntent.js"></script>
+    <script src="./src/ui/menu/menuController.js"></script>
+    <script src="./src/ui/menu/menuBar.js"></script>
+    <script src="./src/features/menus/menuActions.js"></script>
+    <script src="./src/features/menus/phase3a-menus.js"></script>
+    <script src="./src/app/wireDialogs.js"></script>
+    <script src="./renderer.js"></script>
 
-	    <script>
-	        (function () {
+    <script>
+        (function () {
             const splashScreen = document.getElementById('splashScreen');
             if (!splashScreen) return;
 

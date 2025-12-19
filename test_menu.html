@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Test Menu</title>
+    <link rel="stylesheet" href="./styles/base.css">
+    <link rel="stylesheet" href="./styles/context-menu.css">
+    <style>
+        body {
+            background: #333;
+            color: #fff;
+            padding: 20px;
+        }
+
+        #menuHost {
+            background: #444;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="menuHost"></div>
+    <div id="log"></div>
+
+    <script src="./src/ui/icons/iconRegistry.js"></script>
+    <script src="./src/ui/menu/menuUtils.js"></script>
+    <script src="./src/ui/menu/submenuIntent.js"></script>
+    <script src="./src/ui/menu/menuController.js"></script>
+    <script src="./src/app/registries/menuRegistry.js"></script>
+    <script src="./src/ui/menu/menuBar.js"></script>
+
+    <script>
+        // Mock createSubmenuIntent if needed (it wasn't in the list I read, I should check if it exists)
+        // I saw src/ui/menu/submenuIntent.js in the file listing earlier? 
+        // Let's assume it exists. If not, I'll mock it.
+
+        window.onload = function () {
+            const host = document.getElementById('menuHost');
+            const menuRegistry = window.AhmadIDEModules.app.menuRegistry;
+
+            // Log the tools menu items directly from registry
+            const menus = menuRegistry.get('menubar');
+            const toolsMenu = menus.find(m => m.id === 'tools');
+            console.log('Tools Menu Items from Registry:', toolsMenu ? toolsMenu.items : 'Not found');
+
+            const logDiv = document.getElementById('log');
+            if (toolsMenu) {
+                logDiv.innerHTML += '<h3>Registry Items:</h3><ul>';
+                toolsMenu.items.forEach(it => {
+                    logDiv.innerHTML += `<li>${it.label} (ID: ${it.id}, Action: ${it.action}, Icon: ${it.icon})</li>`;
+                });
+                logDiv.innerHTML += '</ul>';
+            } else {
+                logDiv.innerHTML += '<p>Tools menu not found in registry!</p>';
+            }
+
+            // Try to render
+            const createMenuController = window.AhmadIDEModules.ui.menu.createMenuController;
+            const createMenuBar = window.AhmadIDEModules.ui.menu.createMenuBar;
+
+            const controller = createMenuController({});
+            const menuBar = createMenuBar({
+                host,
+                menus,
+                controller,
+                onAction: (action) => console.log('Action:', action)
+            });
+            menuBar.mount();
+        };
+    </script>
+</body>
+
+</html>

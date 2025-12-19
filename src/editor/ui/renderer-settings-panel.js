@@ -1,48 +1,38 @@
 (() => {
     function createSettingsPanelManager({ deps } = {}) {
-        const toggleDevTools = deps?.toggleDevTools || (async () => {
-            if (window.ahmadIDE && window.ahmadIDE.toggleDevTools) {
-                await window.ahmadIDE.toggleDevTools();
-            }
+        const createSettingsDialog = deps?.createSettingsDialog || window.AhmadIDEModules?.features?.settings?.createSettingsDialog;
+        const settingsService = deps?.settingsService || window.AhmadIDEModules?.services?.settingsService;
+        const fontService = deps?.fontService || window.AhmadIDEModules?.services?.fontService;
+        const extensionsService = deps?.extensionsService || window.AhmadIDEModules?.services?.extensionsService;
+        const dialogRegistry = deps?.dialogRegistry || window.AhmadIDEModules?.app?.dialogRegistry;
+
+        if (!createSettingsDialog) {
+            throw new Error('Settings dialog module missing: src/features/settings/settingsDialog.js');
+        }
+
+        const dialog = createSettingsDialog({
+            deps: { settingsService, fontService, extensionsService }
         });
 
+        try {
+            dialogRegistry?.register?.({
+                id: 'settings',
+                title: 'Settings',
+                open: () => dialog.open()
+            });
+        } catch (_) { }
+
         function openSettingsPanel() {
-            try {
-                window.AhmadIDEModules?.app?.featureRegistry?.ensureById?.('settingsPanel');
-            } catch (_) { }
-            const panel = document.getElementById('settingsPanel');
-            const overlay = document.getElementById('settingsOverlay');
-            panel?.classList.remove('hidden');
-            overlay?.classList.remove('hidden');
-            wireSettingsPanel();
+            if (dialogRegistry?.open?.('settings')) return;
+            dialog.open();
         }
 
         function closeSettingsPanel() {
-            document.getElementById('settingsPanel')?.classList.add('hidden');
-            document.getElementById('settingsOverlay')?.classList.add('hidden');
+            // No-op: dialog owns close UX (Cancel/OK/Esc).
         }
 
         function wireSettingsPanel() {
-            // Settings panel content may be lazy-mounted.
-            if (!document.getElementById('closeSettingsBtn')) {
-                if (!wireSettingsPanel.__lazyHooked) {
-                    const fr = window.AhmadIDEModules?.app?.featureRegistry;
-                    fr?.onMounted?.('settingsPanel', () => wireSettingsPanel());
-                    wireSettingsPanel.__lazyHooked = true;
-                }
-                return;
-            }
-            const panel = document.getElementById('settingsPanel');
-            if (panel?.dataset?.wired === '1') return;
-            if (panel) panel.dataset.wired = '1';
-
-            document.getElementById('closeSettingsBtn')?.addEventListener('click', closeSettingsPanel);
-            document.getElementById('settingsOverlay')?.addEventListener('click', closeSettingsPanel);
-
-            // DevTools toggle
-            document.getElementById('toggleDevTools')?.addEventListener('click', async () => {
-                await toggleDevTools();
-            });
+            // Legacy stub. Settings is now a modal dialog.
         }
 
         return {

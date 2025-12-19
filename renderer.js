@@ -60,7 +60,7 @@
                 '--glow-1': 'rgba(53, 116, 240, 0.08)',
                 '--glow-2': 'rgba(91, 141, 239, 0.06)',
                 '--font-ui': 'Inter, \"Segoe UI\", \"SF Pro Display\", system-ui, sans-serif',
-                '--font-code': '\"JetBrains Mono\", \"SFMono-Regular\", \"Menlo\", \"Consolas\", \"Liberation Mono\", monospace',
+                '--font-code': 'ui-monospace, \"SFMono-Regular\", \"Menlo\", \"Monaco\", \"Consolas\", \"Liberation Mono\", \"Courier New\", monospace',
                 '--font-size-ui': '13px',
                 '--font-size-code': '13px'
             }
@@ -98,7 +98,7 @@
                 '--glow-1': 'rgba(214,127,60,0.08)',
                 '--glow-2': 'rgba(240,194,123,0.06)',
                 '--font-ui': 'Inter, \"Segoe UI\", \"SF Pro Display\", system-ui, sans-serif',
-                '--font-code': '\"JetBrains Mono\", \"SFMono-Regular\", \"Menlo\", \"Consolas\", \"Liberation Mono\", monospace',
+                '--font-code': 'ui-monospace, \"SFMono-Regular\", \"Menlo\", \"Monaco\", \"Consolas\", \"Liberation Mono\", \"Courier New\", monospace',
                 '--font-size-ui': '13px',
                 '--font-size-code': '13px'
             }
@@ -136,7 +136,7 @@
                 '--glow-1': 'rgba(240,163,92,0.10)',
                 '--glow-2': 'rgba(255,213,154,0.06)',
                 '--font-ui': 'Inter, \"Segoe UI\", \"SF Pro Display\", system-ui, sans-serif',
-                '--font-code': '\"JetBrains Mono\", \"SFMono-Regular\", \"Menlo\", \"Consolas\", \"Liberation Mono\", monospace',
+                '--font-code': 'ui-monospace, \"SFMono-Regular\", \"Menlo\", \"Monaco\", \"Consolas\", \"Liberation Mono\", \"Courier New\", monospace',
                 '--font-size-ui': '13px',
                 '--font-size-code': '13px'
             }
@@ -190,6 +190,14 @@
     let settingsPanelManager = null; // settings panel UI module instance (src/editor/ui/renderer-settings-panel.js)
     let ctrlHoverManager = null; // ctrl+hover and gutter module instance (src/editor/ui/renderer-ctrl-hover.js)
     let routinesManager = null; // routines module instance (src/editor/routines/renderer-routines.js)
+    const mumpsLocalTagResolver = (() => {
+        try {
+            const create = window.AhmadIDEModules?.mumps?.createMumpsLocalTagResolver;
+            return typeof create === 'function' ? create() : null;
+        } catch (_) {
+            return null;
+        }
+    })();
 
     // ========== MUMPS Reference Parser (shared utility) ==========
     // Parse routine/tag reference at cursor position (supports TAG^RTN, ^RTN, DO TAG)
@@ -200,37 +208,50 @@
         const column = position.column;
 
         try {
-            // Pattern 1: TAG^ROUTINE (e.g., MAIN^ROUTINE, $$FUNC^ROUTINE)
-            const tagRoutineMatch = lineContent.match(/([A-Z%][A-Z0-9]*)\^([A-Z%][A-Z0-9]+)/gi);
-            if (tagRoutineMatch) {
-                for (const match of tagRoutineMatch) {
-                    const idx = lineContent.indexOf(match);
-                    const endIdx = idx + match.length;
-                    if (column >= idx + 1 && column <= endIdx + 1) {
-                        const [tag, routine] = match.split('^');
-                        return { type: 'external', routine, tag };
-                    }
+            // Pattern 1: TAG^ROUTINE or $$TAG^ROUTINE
+            const tagRoutineRx = /(\$\$)?([A-Z%][A-Z0-9]*)\^([A-Z%][A-Z0-9]+)/gi;
+            let m = null;
+            while ((m = tagRoutineRx.exec(lineContent))) {
+                const full = m[0];
+                const idx = m.index;
+                const endIdx = idx + full.length;
+                if (column >= idx + 1 && column <= endIdx + 1) {
+                    const tag = m[2] || '';
+                    const routine = m[3] || '';
+                    return { type: 'external', routine, tag };
                 }
             }
 
             // Pattern 2: ^ROUTINE (standalone)
-            const routineMatch = lineContent.match(/\^([A-Z%][A-Z0-9]+)/gi);
-            if (routineMatch) {
-                for (const match of routineMatch) {
-                    const idx = lineContent.indexOf(match);
-                    const endIdx = idx + match.length;
-                    if (column >= idx + 1 && column <= endIdx + 1) {
-                        const routine = match.substring(1); // Remove ^
-                        return { type: 'external', routine, tag: '' };
-                    }
+            const routineRx = /\^([A-Z%][A-Z0-9]+)/gi;
+            while ((m = routineRx.exec(lineContent))) {
+                const full = m[0];
+                const idx = m.index;
+                const endIdx = idx + full.length;
+                if (column >= idx + 1 && column <= endIdx + 1) {
+                    const routine = m[1] || '';
+                    return { type: 'external', routine, tag: '' };
                 }
             }
 
-            // Pattern 3: D TAG, DO TAG (local tag call)
-            const localTagMatch = lineContent.match(/(?:^|\s)(?:D(?:O)?)\s+([A-Z%][A-Z0-9]+)(?:\s|$|,|\()/i);
-            if (localTagMatch) {
-                const tagName = localTagMatch[1];
-                const idx = lineContent.indexOf(tagName);
+            // Pattern 3: $$TAG (local extrinsic) without ^ROUTINE
+            const localExtrinsicRx = /\$\$([A-Z%][A-Z0-9]*)(?!\^)/gi;
+            while ((m = localExtrinsicRx.exec(lineContent))) {
+                const full = m[0];
+                const idx = m.index;
+                const endIdx = idx + full.length;
+                if (column >= idx + 1 && column <= endIdx + 1) {
+                    return { type: 'local', tag: m[1] || '' };
+                }
+            }
+
+            // Pattern 4: D TAG, DO TAG (local tag call)
+            const localDoRx = /(?:^|\s)(?:D(?:O)?)\s+([A-Z%][A-Z0-9]*)(?=$|\s|,|\()/gi;
+            while ((m = localDoRx.exec(lineContent))) {
+                const full = m[0];
+                const tagName = m[1] || '';
+                const rel = full.lastIndexOf(tagName);
+                const idx = m.index + Math.max(0, rel);
                 const endIdx = idx + tagName.length;
                 if (column >= idx + 1 && column <= endIdx + 1) {
                     return { type: 'local', tag: tagName };
@@ -243,121 +264,204 @@
 
         return null;
     }
-    const menuConfig = [
-        {
-            id: 'file',
-            label: 'File',
-            items: [
-                { label: 'New', action: 'new-file' },
-                { label: 'Open...', action: 'open-project' },
-                { label: 'Close Project', action: 'close-project' },
-                { separator: true },
-                { label: 'Save All', action: 'save-all' },
-                { separator: true },
-                { label: 'Settings', action: 'settings' },
-                { label: 'Exit', action: 'exit-app' }
-            ]
-        },
-        {
-            id: 'edit',
-            label: 'Edit',
-            items: [
-                { label: 'Undo', action: 'undo' },
-                { label: 'Redo', action: 'redo' },
-                { separator: true },
-                { label: 'Cut', action: 'cut' },
-                { label: 'Copy', action: 'copy' },
-                { label: 'Paste', action: 'paste' },
-                { separator: true },
-                { label: 'Find', action: 'find' },
-                { label: 'Replace', action: 'replace' },
-                { label: 'Duplicate Line', action: 'duplicate-line' },
-                { label: 'Toggle Comment', action: 'comment' }
-            ]
-        },
-        {
-            id: 'view',
-            label: 'View',
-            items: [
-                { label: 'Toggle Sidebar', action: 'toggle-sidebar' },
-                { label: 'Terminal (Tool Window)', action: 'toggle-terminal' },
-                { label: 'Appearance', action: 'appearance', implemented: false }
-            ]
-        },
-        {
-            id: 'navigate',
-            label: 'Navigate',
-            items: [
-                { label: 'Go to File...', action: 'goto-file' },
-                { label: 'Go to Line...', action: 'goto-line' },
-                { label: 'Recent Files', action: 'recent-files', implemented: false }
-            ]
-        },
-        {
-            id: 'code',
-            label: 'Code',
-            items: [
-                { label: 'Format Code', action: 'reformat' },
-                { label: 'Comment/Uncomment', action: 'comment' },
-                { label: 'Rename', action: 'rename' }
-            ]
-        },
-        {
-            id: 'refactor',
-            label: 'Refactor',
-            items: [
-                { label: 'Rename', action: 'rename' },
-                { label: 'Extract Method', action: 'refactor-extract', implemented: false }
-            ]
-        },
-        {
-            id: 'run',
-            label: 'Run',
-            items: [
-                { label: 'Run', action: 'run' },
-                { label: 'Debug', action: 'debug' },
-                { label: 'Stop', action: 'stop-debug' }
-            ]
-        },
-        {
-            id: 'tools',
-            label: 'Tools',
-            items: [
-                { label: 'Terminal', action: 'terminal' },
-                { label: 'Connections', action: 'connections' },
-                { label: 'Lint', action: 'lint' },
-                { label: 'Shortcuts', action: 'shortcuts' },
-                { label: 'Extensions', action: 'extensions' }
-            ]
-        },
-        {
-            id: 'vcs',
-            label: 'Git',
-            items: [
-                { label: 'Git', action: 'git' },
-                { label: 'Git Status', action: 'git-status' },
-                { label: 'Git Diff', action: 'git-diff' },
-                { label: 'Git History', action: 'git-history' }
-            ]
-        },
-        {
-            id: 'window',
-            label: 'Window',
-            items: [
-                { label: 'Toggle Sidebar', action: 'toggle-sidebar' },
-                { label: 'Toggle Terminal', action: 'toggle-terminal' },
-                { label: 'Store Layout', action: 'window-store', implemented: false }
-            ]
-        },
-        {
-            id: 'help',
-            label: 'Help',
-            items: [
-                { label: 'Docs', action: 'docs', implemented: false },
-                { label: 'About', action: 'about', implemented: false }
-            ]
+    // Phase 3A: menus are now rendered by the unified ui.menu controller + MenuBar,
+    // with menu definitions sourced from src/app/registries/menuRegistry.js.
+    const clickEl = (id) => {
+        const elId = String(id || '').trim();
+        if (!elId) return;
+        try {
+            if ($) {
+                const $el = $('#' + elId);
+                if ($el && $el.length) $el.trigger('click');
+                return;
+            }
+        } catch (_) { }
+        document.getElementById(elId)?.click?.();
+    };
+
+    const notImplemented = (label) => {
+        const msg = `${label || 'This action'} is not implemented yet.`;
+        try {
+            if (typeof showToast === 'function') {
+                showToast('info', 'Not implemented', msg);
+                return;
+            }
+        } catch (_) { }
+        console.info('[Not implemented]', msg);
+    };
+
+    async function runMenuAction(action, ctx = {}) {
+        const editor = ctx?.editor || activeEditor || null;
+        const terminalState = ctx?.terminalState || globalTerminalState || null;
+
+        logger.info('MENU_ACTION', { action });
+        switch (action) {
+            case 'save':
+            case 'save-all':
+                clickEl('saveRoutineBtn');
+                return;
+            case 'undo':
+                editor?.trigger('keyboard', 'undo', null);
+                return;
+            case 'redo':
+                editor?.trigger('keyboard', 'redo', null);
+                return;
+            case 'cut':
+                document.execCommand('cut');
+                return;
+            case 'copy':
+                document.execCommand('copy');
+                return;
+            case 'paste':
+                document.execCommand('paste');
+                return;
+            case 'find':
+                editor?.trigger('keyboard', 'actions.find', null);
+                return;
+            case 'replace':
+                editor?.trigger('keyboard', 'editor.action.startFindReplaceAction', null);
+                return;
+            case 'find-in-folder':
+                openFindReplaceDialog('find', getSelectedText());
+                return;
+            case 'replace-in-folder':
+                openFindReplaceDialog('replace', getSelectedText());
+                return;
+            case 'search-everywhere':
+                openSearchEverywhere('');
+                return;
+            case 'comment':
+                editor?.trigger('keyboard', 'editor.action.commentLine', null);
+                return;
+            case 'duplicate-line':
+                duplicateLine(editor);
+                return;
+            case 'goto-line':
+                editor?.trigger('keyboard', 'editor.action.gotoLine', null);
+                return;
+            case 'goto-file':
+                openSearchEverywhere('');
+                return;
+            case 'expand-selection':
+                editor?.trigger('keyboard', 'editor.action.smartSelect.expand', null);
+                return;
+            case 'shrink-selection':
+                editor?.trigger('keyboard', 'editor.action.smartSelect.shrink', null);
+                return;
+            case 'tab-next':
+                cycleTab(1);
+                return;
+            case 'reformat':
+                editor?.trigger('keyboard', 'editor.action.formatDocument', null);
+                return;
+            case 'rename':
+                editor?.trigger('keyboard', 'editor.action.rename', null);
+                return;
+            case 'lint':
+                clickEl('lintBtn');
+                return;
+            case 'toggle-sidebar':
+                toggleSidebar();
+                return;
+            case 'toggle-terminal':
+                toggleTerminal();
+                return;
+            case 'terminal':
+                if (terminalState && !terminalState.tabs.length) {
+                    await addTerminalTab(terminalState, true);
+                }
+                toggleToolWindowPanel('terminalPanel', 'bottom');
+                setTimeout(() => {
+                    if (terminalState) refreshTerminalLayout(terminalState);
+                    focusTerminal();
+                }, 50);
+                return;
+            case 'connections':
+                if (window.AhmadIDEModules?.app?.dialogRegistry?.open('connections')) {
+                    return;
+                }
+                clickEl('toggleConnections');
+                return;
+            case 'extensions':
+                toggleToolWindowPanel('extensionsPanel', 'bottom');
+                return;
+            case 'run':
+                clickEl('runBtn');
+                return;
+            case 'debug':
+                clickEl('debugStartBtn');
+                return;
+            case 'stop-debug':
+                clickEl('dbgStopBtn');
+                return;
+            case 'shortcuts':
+                window.AhmadIDEModules?.app?.dialogRegistry?.open('shortcuts');
+                return;
+            case 'settings':
+                window.AhmadIDEModules?.app?.dialogRegistry?.open('settings') || openSettingsPanel();
+                return;
+            case 'new-project':
+                window.AhmadIDEModules?.app?.dialogRegistry?.open('new-project') || openNewProjectPanel();
+                return;
+            case 'open-project':
+                window.AhmadIDEModules?.app?.dialogRegistry?.open('open-project') || await openProjectDialog();
+                return;
+            case 'close-project':
+                closeCurrentProject();
+                return;
+            case 'new-file':
+                await createNewFile();
+                return;
+            case 'git':
+                openGitToolWindow();
+                return;
+            case 'git-status':
+                openGitToolWindow();
+                clickEl('gitStatusBtn');
+                return;
+            case 'git-diff':
+                openGitToolWindow();
+                clickEl('gitDiffBtn');
+                return;
+            case 'git-history':
+                openGitToolWindow();
+                clickEl('gitLogBtn');
+                return;
+            case 'about':
+                window.AhmadIDEModules?.app?.dialogRegistry?.open('about') || notImplemented(action);
+                return;
+            case 'find':
+                window.AhmadIDEModules?.app?.dialogRegistry?.open('find') || notImplemented(action);
+                return;
+            case 'replace':
+                window.AhmadIDEModules?.app?.dialogRegistry?.open('replace') || notImplemented(action);
+                return;
+            case 'goto-file':
+                window.AhmadIDEModules?.app?.dialogRegistry?.open('goto-file') || notImplemented(action);
+                return;
+
+            case 'appearance':
+            case 'recent-files':
+            case 'refactor-extract':
+            case 'window-store':
+            case 'docs':
+                notImplemented(action);
+                return;
+            case 'exit-app':
+                try {
+                    if (window.ahmadIDE?.exitApp) {
+                        await window.ahmadIDE.exitApp();
+                    } else {
+                        window.close();
+                    }
+                } catch (err) {
+                    showToast('error', 'Exit', err?.message || 'Exit failed');
+                }
+                return;
+            default:
+                notImplemented(action);
         }
-    ];
+    }
     const coreShortcutMap = {
         'ctrl+n': { label: 'Go to File', action: 'goto-file' },
         'ctrl+shift+n': { label: 'Go to File (Alt)', action: 'goto-file' },
@@ -407,6 +511,10 @@
         const selected = ideThemes[key] ? key : defaultIdeTheme;
         const payload = ideThemes[selected];
         Object.entries(payload.vars || {}).forEach(([cssVar, val]) => {
+            // Fonts are controlled by Settings (Phase 3).
+            if (cssVar.startsWith('--font-') || cssVar.startsWith('--font-size-') || cssVar === '--line-height-code' || cssVar === '--font-weight-code' || cssVar === '--font-ligatures-code') {
+                return;
+            }
             document.documentElement.style.setProperty(cssVar, val);
         });
         document.body.dataset.ideTheme = selected;
@@ -509,10 +617,11 @@
         if (settingsPanelManager && typeof settingsPanelManager.openSettingsPanel === 'function') {
             return settingsPanelManager.openSettingsPanel();
         }
-        const panel = document.getElementById('settingsPanel');
-        const overlay = document.getElementById('settingsOverlay');
-        panel?.classList.remove('hidden');
-        overlay?.classList.remove('hidden');
+        // Legacy fallback removed - use dialog registry
+        const dialogRegistry = window.AhmadIDEModules?.app?.dialogRegistry;
+        if (dialogRegistry) {
+            dialogRegistry.show('settings');
+        }
     }
 
     let currentProject = null;
@@ -661,8 +770,56 @@
         closeTerminalTab,
         appendOutput,
         clearOutput,
-        sendCtrlC
+        sendCtrlC,
+        applyFontSettings
     } = terminalManager;
+
+    let __lastFontSettingsKey = '';
+    function applyFontSettingsToRuntime(settings) {
+        if (!settings) return;
+        const editorFont = settings?.fonts?.editor || {};
+        const terminalFont = settings?.fonts?.terminal || {};
+
+        const editorFamily = String(editorFont.family || '').trim();
+        const editorSize = Number(editorFont.sizePx ?? 13) || 13;
+        const editorLineHeight = Number(editorFont.lineHeight ?? 1.55) || 1.55;
+        const editorWeight = String(editorFont.weight ?? '400');
+        const editorLigatures = !!editorFont.ligatures;
+
+        const terminalFamily = String(terminalFont.family || editorFamily || '').trim();
+        const terminalSize = Number(terminalFont.sizePx ?? editorSize) || editorSize;
+
+        const key = `${editorFamily}|${editorSize}|${editorLineHeight}|${editorWeight}|${editorLigatures ? '1' : '0'}|${terminalFamily}|${terminalSize}`;
+        if (key === __lastFontSettingsKey) return;
+        __lastFontSettingsKey = key;
+
+        try {
+            if (activeEditor && typeof activeEditor.updateOptions === 'function') {
+                activeEditor.updateOptions({
+                    fontFamily: editorFamily || undefined,
+                    fontSize: editorSize,
+                    lineHeight: Math.max(12, Math.round(editorSize * editorLineHeight)),
+                    fontLigatures: editorLigatures,
+                    fontWeight: editorWeight
+                });
+                try {
+                    if (typeof monaco !== 'undefined' && monaco?.editor?.remeasureFonts) {
+                        monaco.editor.remeasureFonts();
+                    }
+                } catch (_) { }
+            }
+        } catch (_) { }
+
+        try {
+            applyFontSettings({ fontFamily: terminalFamily, fontSize: terminalSize });
+        } catch (_) { }
+    }
+
+    // Apply runtime font updates on Settings → Apply/OK.
+    window.addEventListener('ahmadIDE:settings-changed', (e) => {
+        const settings = e?.detail;
+        applyFontSettingsToRuntime(settings);
+    });
 
     const mumpsFileIconSvg = `<svg width="16" height="16" viewBox="0 0 16 16"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f0a35c"/><stop offset="100%" stop-color="#d67f3c"/></linearGradient></defs><rect width="16" height="16" rx="3" fill="url(#mg)"/><text x="4" y="12" font-size="10" font-weight="bold" fill="#19100c" font-family="monospace">M</text></svg>`;
 
@@ -921,6 +1078,33 @@
         }
     });
 
+    // Add scanFontsDir to window.AhmadIDE
+    window.AhmadIDE = window.AhmadIDE || {};
+    Object.assign(window.AhmadIDE, {
+        scanFontsDir: async () => {
+            try {
+                const fs = require('fs');
+                const path = require('path');
+                const fontsDir = path.join(__dirname, 'assets', 'fonts');
+                if (!fs.existsSync(fontsDir)) return [];
+
+                const files = await fs.promises.readdir(fontsDir);
+                // Filter likely font extensions
+                const fontFiles = files.filter(f => /\.(ttf|otf|woff|woff2)$/i.test(f));
+
+                // Return objects with name and full path or relative URL
+                return fontFiles.map(f => ({
+                    fileName: f,
+                    // Create a file:// URL for the frontend to use
+                    url: `file://${path.join(fontsDir, f)}`
+                }));
+            } catch (e) {
+                console.error('Failed to scan fonts dir:', e);
+                return [];
+            }
+        }
+    });
+
     // Project tree context menu moved to src/editor/project/renderer-project-context-menu.js
     const createProjectContextMenuManager = window.AhmadIDEModules?.projectContextMenu?.createProjectContextMenuManager;
     if (!createProjectContextMenuManager) {
@@ -978,6 +1162,7 @@
         deps: {
             getMonaco: () => (typeof monaco !== 'undefined' ? monaco : null),
             parseRoutineReferenceAtPosition,
+            resolveLocalTagLine: (model, tag) => mumpsLocalTagResolver?.getTagLine?.(model, tag) || null,
             goToDeclaration: (...args) => goToDeclaration(...args),
             toggleBreakpoint: (...args) => toggleBreakpoint(...args)
         }
@@ -1040,66 +1225,26 @@
         }
     });
 
-    function showConfirmDialog(title, message, onConfirm) {
-        const overlay = $('<div class="prompt-overlay"></div>');
-        const dialog = $('<div class="prompt-dialog"></div>');
-        dialog.html(`
-            <div class="prompt-title">${title}</div>
-            <div class="prompt-message">${message}</div>
-            <div class="prompt-buttons">
-                <button class="btn primary prompt-ok">Discard</button>
-                <button class="btn ghost prompt-cancel">Cancel</button>
-            </div>
-        `);
-
-        overlay.append(dialog);
-        $('body').append(overlay);
-
-        dialog.find('.prompt-ok').on('click', () => {
-            overlay.remove();
-            onConfirm();
-        });
-
-        dialog.find('.prompt-cancel').on('click', () => {
-            overlay.remove();
-        });
+    async function showConfirmDialog(title, message, onConfirm) {
+        const showConfirm = window.AhmadIDEModules?.ui?.showConfirm;
+        if (showConfirm) {
+            const confirmed = await showConfirm({ title, message, confirmLabel: 'Discard', cancelLabel: 'Cancel' });
+            if (confirmed && onConfirm) onConfirm();
+        }
     }
 
-    function showCustomPrompt(title, placeholder, callback) {
-        const overlay = $('<div class="prompt-overlay"></div>');
-        const dialog = $('<div class="prompt-dialog"></div>');
-        dialog.html(`
-            <div class="prompt-title">${title}</div>
-            <input type="text" class="prompt-input" placeholder="${placeholder}" autofocus>
-            <div class="prompt-buttons">
-                <button class="btn primary prompt-ok">OK</button>
-                <button class="btn ghost prompt-cancel">Cancel</button>
-            </div>
-        `);
-
-        overlay.append(dialog);
-        $('body').append(overlay);
-
-        const input = dialog.find('.prompt-input');
-        input.focus();
-
-        const handleOk = () => {
-            const value = input.val().trim();
-            overlay.remove();
-            if (value) callback(value);
-        };
-
-        const handleCancel = () => {
-            overlay.remove();
-        };
-
-        dialog.find('.prompt-ok').on('click', handleOk);
-        dialog.find('.prompt-cancel').on('click', handleCancel);
-        input.on('keydown', (e) => {
-            if (e.key === 'Enter') handleOk();
-            if (e.key === 'Escape') handleCancel();
-        });
+    async function showCustomPrompt(title, placeholder, callback) {
+        const showPrompt = window.AhmadIDEModules?.ui?.showPrompt;
+        if (showPrompt) {
+            const value = await showPrompt({ title, placeholder });
+            if (value && callback) callback(value);
+        } else {
+            // Fallback to built-in prompt
+            const value = prompt(title, '');
+            if (value && callback) callback(value);
+        }
     }
+
 
     // ============================================
     // PhpStorm-style Project Tree Context Menu
@@ -1266,6 +1411,14 @@
             if (!targetEditor || !tag) return false;
             const targetModel = targetEditor.getModel();
             if (!targetModel) return false;
+            const viaCache = mumpsLocalTagResolver?.getTagLine?.(targetModel, tag);
+            const line = viaCache || null;
+            if (line) {
+                targetEditor.revealLineInCenter(line);
+                targetEditor.setPosition({ lineNumber: line, column: 1 });
+                return true;
+            }
+            // Fallback scan (should be rare)
             const lineCount = targetModel.getLineCount();
             for (let i = 1; i <= lineCount; i++) {
                 const lineContent = targetModel.getLineContent(i).trim();
@@ -1485,24 +1638,15 @@
     }
 
     function openShortcutsPanel() {
-        renderShortcutsPanel();
-        const panel = document.getElementById('shortcutsPanel');
-        const overlay = document.getElementById('shortcutsOverlay');
-        const select = document.getElementById('shortcutSelect');
-        const input = document.getElementById('shortcutInput');
-        if (select) {
-            select.value = 'duplicate-line';
+        // Legacy implementation replaced by dialog registry
+        const dialogRegistry = window.AhmadIDEModules?.app?.dialogRegistry;
+        if (dialogRegistry) {
+            dialogRegistry.show('shortcuts');
         }
-        if (input) {
-            input.value = describeBinding((loadShortcutPrefs() || {})['duplicate-line'] || defaultShortcut('duplicate-line'));
-        }
-        panel?.classList.remove('hidden');
-        overlay?.classList.remove('hidden');
     }
 
     function closeShortcutsPanel() {
-        document.getElementById('shortcutsPanel')?.classList.add('hidden');
-        document.getElementById('shortcutsOverlay')?.classList.add('hidden');
+        // No-op - handled by dialog close
     }
 
     function openNewProjectPanel() {
@@ -1522,85 +1666,12 @@
     }
 
     async function openProjectDialog() {
-        // Create a simple dialog using jQuery
-        const dialogHtml = `
-            <div class="connections-overlay" id="openProjectOverlay" style="display:block;"></div>
-            <div class="connections-panel" id="openProjectDialog" style="display:block;">
-                <div class="connections-header">
-                    <div>
-                        <div class="pane-title">Open Project</div>
-                        <div class="pane-subtitle">Enter project path</div>
-                    </div>
-                    <button class="btn ghost icon-btn" id="closeOpenProjectDialog">✕</button>
-                </div>
-                <div class="connections-grid">
-                    <div class="connection-card">
-                        <label class="pane-subtitle">Project Path</label>
-                        <div style="display:flex;gap:8px;margin-bottom:12px;">
-                            <input class="ssh-input" id="openProjectPath" placeholder="/home/ahmad/projects/my-project" style="flex:1;">
-                            <button class="btn ghost" id="browseOpenProjectPath">Browse...</button>
-                        </div>
-                        <div style="display:flex;gap:8px;">
-                            <button class="btn primary" id="confirmOpenProject">Open</button>
-                            <button class="btn ghost" id="cancelOpenProject">Cancel</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
+        // Legacy implementation replaced by dialog registry
         logger.info('PROJECT_OPEN_DIALOG', {});
-        $('body').append(dialogHtml);
-
-        const closeDialog = () => {
-            $('#openProjectOverlay, #openProjectDialog').remove();
-        };
-
-        document.getElementById('closeOpenProjectDialog').addEventListener('click', closeDialog);
-        document.getElementById('cancelOpenProject').addEventListener('click', closeDialog);
-        document.getElementById('openProjectOverlay').addEventListener('click', closeDialog);
-
-        // Browse button handler
-        document.getElementById('browseOpenProjectPath').addEventListener('click', async () => {
-            if (window.ahmadIDE && window.ahmadIDE.openFolderDialog) {
-                const result = await window.ahmadIDE.openFolderDialog();
-                if (result.ok && result.path) {
-                    document.getElementById('openProjectPath').value = result.path;
-                }
-            }
-        });
-
-        document.getElementById('confirmOpenProject').addEventListener('click', async () => {
-            const projectPath = document.getElementById('openProjectPath').value.trim();
-            logger.info('PROJECT_OPEN_REQUEST', { projectPath });
-            if (!projectPath) {
-                showToast('error', 'Error', 'Please enter a path');
-                return;
-            }
-
-            closeDialog();
-
-            try {
-                const result = await window.ahmadIDE.openProject(projectPath);
-                if (result.ok) {
-                    showToast('success', 'Project Opened', result.message || `Loaded: ${result.projectPath}`);
-                    logger.info('PROJECT_OPEN_SUCCESS', { projectPath: result.projectPath, message: result.message });
-                    loadProjectIntoTree(result);
-                } else {
-                    showToast('error', 'Open Failed', result.error);
-                    logger.error('PROJECT_OPEN_FAIL', { projectPath, error: result.error });
-                }
-            } catch (err) {
-                showToast('error', 'Error', err.message);
-                logger.error('PROJECT_OPEN_ERROR', { projectPath, message: err.message, stack: err.stack });
-            }
-        });
-
-        // Focus the input
-        setTimeout(() => {
-            const input = document.getElementById('openProjectPath');
-            if (input) input.focus();
-        }, 100);
+        const dialogRegistry = window.AhmadIDEModules?.app?.dialogRegistry;
+        if (dialogRegistry) {
+            dialogRegistry.show('open-project');
+        }
     }
 
     const normalizeGitError = (text, fallback = 'Git command failed') => {
@@ -1856,6 +1927,9 @@
                     }, 50);
                     return;
                 case 'connections':
+                    if (window.AhmadIDEModules?.app?.dialogRegistry?.open('connections')) {
+                        return;
+                    }
                     clickEl('toggleConnections');
                     return;
                 case 'extensions':
@@ -1871,16 +1945,16 @@
                     clickEl('dbgStopBtn');
                     return;
                 case 'shortcuts':
-                    openShortcutsPanel();
+                    window.AhmadIDEModules?.app?.dialogRegistry?.open('shortcuts');
                     return;
                 case 'settings':
-                    openSettingsPanel();
+                    window.AhmadIDEModules?.app?.dialogRegistry?.open('settings') || openSettingsPanel();
                     return;
                 case 'new-project':
-                    openNewProjectPanel();
+                    window.AhmadIDEModules?.app?.dialogRegistry?.open('new-project');
                     return;
                 case 'open-project':
-                    await openProjectDialog();
+                    window.AhmadIDEModules?.app?.dialogRegistry?.open('open-project');
                     return;
                 case 'close-project':
                     closeCurrentProject();
@@ -1903,12 +1977,25 @@
                     openGitToolWindow();
                     $('#gitLogBtn').trigger('click');
                     return;
+                case 'about':
+                    window.AhmadIDEModules?.app?.dialogRegistry?.open('about') || notImplemented('About');
+                    return;
+                case 'find':
+                    window.AhmadIDEModules?.app?.dialogRegistry?.open('find') || notImplemented('Find');
+                    return;
+                case 'replace':
+                    window.AhmadIDEModules?.app?.dialogRegistry?.open('replace') || notImplemented('Replace');
+                    return;
+                case 'goto-file':
+                    window.AhmadIDEModules?.app?.dialogRegistry?.open('goto-file') || notImplemented('Go to File');
+                    return;
                 case 'appearance':
                 case 'recent-files':
                 case 'refactor-extract':
                 case 'window-store':
                 case 'docs':
-                case 'about':
+                    notImplemented(action);
+                    return;
                 case 'exit-app':
                     try {
                         if (window.ahmadIDE?.exitApp) {
@@ -1927,64 +2014,51 @@
 
         const buildMenuBar = () => {
             const host = document.getElementById('mainMenu');
-            if (!host) return;
-            host.innerHTML = '';
+            if (!host) {
+                console.error('Menu host element #mainMenu not found');
+                return;
+            }
 
-            menuConfig.forEach(menu => {
-                const item = document.createElement('div');
-                item.className = 'menu-item';
-                item.dataset.menu = menu.id;
-                item.textContent = menu.label;
+            const menuRegistry = window.AhmadIDEModules?.app?.menuRegistry;
+            const createMenuController = window.AhmadIDEModules?.ui?.menu?.createMenuController;
+            const createMenuBar = window.AhmadIDEModules?.ui?.menu?.createMenuBar;
 
-                const dropdown = document.createElement('div');
-                dropdown.className = 'menu-dropdown';
-
-                menu.items.forEach(entry => {
-                    if (entry.separator) {
-                        const sep = document.createElement('div');
-                        sep.className = 'menu-separator';
-                        dropdown.appendChild(sep);
-                        return;
-                    }
-                    const btn = document.createElement('button');
-                    btn.className = 'menu-action';
-                    btn.dataset.action = entry.action;
-                    btn.textContent = entry.label + (entry.implemented === false ? ' (Not implemented)' : '');
-                    dropdown.appendChild(btn);
+            if (!menuRegistry || !createMenuController || !createMenuBar) {
+                console.error('Menu system not loaded. Missing:', {
+                    menuRegistry: !!menuRegistry,
+                    createMenuController: !!createMenuController,
+                    createMenuBar: !!createMenuBar
                 });
+                return;
+            }
 
-                item.appendChild(dropdown);
-                host.appendChild(item);
+            const menus = menuRegistry.get('menubar');
+            if (!menus || menus.length === 0) {
+                console.error('No menubar menus found in registry');
+                return;
+            }
+
+            const controller = createMenuController({});
+            const menuBar = createMenuBar({
+                host,
+                menus,
+                controller,
+                onAction: async (action) => {
+                    await runMenuAction(action);
+                },
+                getContext: () => ({
+                    toolWindows: {
+                        leftVisible: !document.getElementById('leftToolWindow')?.classList?.contains('hidden'),
+                        bottomVisible: !document.getElementById('bottomToolWindow')?.classList?.contains('hidden')
+                    }
+                })
             });
+
+            menuBar.mount();
+            console.log('[MenuBar] Mounted with', menus.length, 'menus');
         };
 
         buildMenuBar();
-
-        const wireMenuClicks = () => {
-            const menuItems = document.querySelectorAll('.menu-item');
-            menuItems.forEach(item => {
-                item.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const open = item.classList.contains('open');
-                    document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('open'));
-                    if (!open) item.classList.add('open');
-                });
-            });
-            document.addEventListener('click', () => {
-                document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('open'));
-            });
-
-            document.querySelectorAll('.menu-action').forEach((btn) => {
-                btn.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    const action = btn.getAttribute('data-action');
-                    await runMenuAction(action);
-                    document.querySelectorAll('.menu-item').forEach(el => el.classList.remove('open'));
-                });
-            });
-        };
-
-        wireMenuClicks();
     }
 
     function bindGlobalShortcuts() {
@@ -2308,10 +2382,26 @@
             registerMumpsCompletion(mumpsAutoData);
             registerMumpsHover();
 
+            // Ensure settings + custom fonts are applied before Monaco measures text.
+            try {
+                const settingsService = window.AhmadIDEModules?.services?.settingsService;
+                const fontService = window.AhmadIDEModules?.services?.fontService;
+                const settings = settingsService?.get?.();
+                if (settings && fontService) {
+                    await fontService.ensureCustomFontsLoaded(settings);
+                    fontService.applyFontsToDocument(settings);
+                }
+            } catch (_) { }
+
             const rootStyles = getComputedStyle(document.documentElement);
-            const codeFont = (rootStyles.getPropertyValue('--font-code') || '').trim() || 'JetBrains Mono';
+            const codeFont = (rootStyles.getPropertyValue('--font-code') || '').trim()
+                || 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
             const codeFontSizeValue = (rootStyles.getPropertyValue('--font-size-code') || '').trim();
             const codeFontSize = parseInt(codeFontSizeValue, 10) || 13;
+            const codeLineHeight = parseFloat((rootStyles.getPropertyValue('--line-height-code') || '').trim()) || 1.55;
+            const codeWeight = (rootStyles.getPropertyValue('--font-weight-code') || '').trim() || '400';
+            const ligatures = (rootStyles.getPropertyValue('--font-ligatures-code') || '').trim();
+            const codeLigatures = ligatures === '0' ? false : true;
 
             const editor = monaco.editor.create(editorHost, {
                 value: sampleMumps(),
@@ -2319,7 +2409,9 @@
                 theme: currentCodeTheme || defaultCodeTheme,
                 fontSize: codeFontSize,
                 fontFamily: codeFont,
-                fontLigatures: true,
+                fontLigatures: codeLigatures,
+                fontWeight: codeWeight,
+                lineHeight: Math.max(12, Math.round(codeFontSize * codeLineHeight)),
                 tabSize: 2,
                 insertSpaces: true,
                 detectIndentation: false,
@@ -2633,6 +2725,9 @@
                     }
                 }, 100); // Debounce 100ms
             });
+            try {
+                window.AhmadIDEModules?.services?.extensionsService?.start?.();
+            } catch (_) { }
             initExtensionsView();
 
             // PhpStorm-style search bindings
@@ -2643,7 +2738,7 @@
                 executeFindReplacePreview(false);
             });
             document.getElementById('closeFindDialog')?.addEventListener('click', closeFindReplaceDialog);
-            document.getElementById('findOverlay')?.addEventListener('click', closeFindReplaceDialog);
+            // Legacy overlay removed - dialog handles backdrop clicks
             document.getElementById('replaceAllBtn')?.addEventListener('click', confirmAndReplaceAll);
             document.getElementById('findQueryInput')?.addEventListener('input', () => searchDebounce(() => executeFindReplacePreview(false), 200));
             document.getElementById('findQueryInput')?.addEventListener('keydown', (e) => {
@@ -2673,7 +2768,7 @@
                 if (e.key === 'Escape') closeFindReplaceDialog();
             });
 
-            document.getElementById('searchEverywhereOverlay')?.addEventListener('click', closeSearchEverywhere);
+            // Legacy overlay removed - dialog handles backdrop clicks
             const searchEverywhereInput = document.getElementById('searchEverywhereInput');
             searchEverywhereInput?.addEventListener('input', () => renderSearchEverywhereResults(searchEverywhereInput.value));
             searchEverywhereInput?.addEventListener('keydown', async (e) => {
@@ -3051,7 +3146,7 @@
             connectionsManager.wireConnectionsPanel({ editor, routineState, terminalState });
 
             document.getElementById('closeShortcutsBtn')?.addEventListener('click', closeShortcutsPanel);
-            document.getElementById('shortcutsOverlay')?.addEventListener('click', closeShortcutsPanel);
+            // Legacy overlay removed - dialog handles backdrop clicks
             document.getElementById('saveShortcutBtn')?.addEventListener('click', () => {
                 const input = document.getElementById('shortcutInput');
                 const select = document.getElementById('shortcutSelect');

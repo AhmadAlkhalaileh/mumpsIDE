@@ -41,9 +41,39 @@
 
     /* Typography */
     --font-ui: 'Inter', 'Segoe UI', 'SF Pro Display', system-ui, sans-serif;
-    --font-code: 'JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Consolas', 'Liberation Mono', monospace;
+    --font-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
     --font-size-ui: 13px;
     --font-size-code: 13px;
+    --font-terminal: var(--font-code);
+    --font-size-terminal: var(--font-size-code);
+    --line-height-code: 1.55;
+    --font-weight-code: 400;
+    --font-ligatures-code: 1;
+
+    /* ============================================
+       Menu System Metrics (Phase 3A)
+       All menus/context menus use these tokens.
+       ============================================ */
+    --ui-menubar-h: 32px;
+
+    --ui-menu-min-w: 220px;
+    --ui-menu-row-h: 28px;
+    --ui-menu-pad-x: 10px;
+    --ui-menu-icon-col-w: 24px;
+    --ui-menu-shortcut-col-w: 112px;
+    --ui-menu-arrow-col-w: 16px;
+
+    /* Submenu intention (ms, px) */
+    --ui-submenu-open-delay: 120;
+    --ui-submenu-close-delay: 320;
+    --ui-submenu-grace-px: 16;
+
+    /* Menu surfaces */
+    --ui-menu-bg: rgba(60, 63, 65, 0.98);
+    --ui-menu-border: rgba(255, 255, 255, 0.12);
+    --ui-menu-hover: rgba(255, 255, 255, 0.06);
+    --ui-menu-active: rgba(74, 158, 255, 0.16);
+    --ui-menu-active-border: rgba(74, 158, 255, 0.22);
 }
 
 /* ============================================
@@ -259,6 +289,39 @@ body.perf-mode .btn:hover {
     display: flex;
     align-items: center;
     gap: 8px;
+}
+
+.ui-menubar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.ui-menubar-item {
+    height: var(--ui-menubar-h);
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.ui-menubar-item:hover {
+    background: var(--hover-bg);
+}
+
+.ui-menubar-item:focus-visible {
+    outline: 2px solid var(--ui-focus-outline, rgba(74, 158, 255, 0.55));
+    outline-offset: 2px;
+}
+
+.ui-menubar--focused .ui-menubar-item.focused {
+    background: rgba(74, 158, 255, 0.14);
+    border-color: rgba(74, 158, 255, 0.22);
+    color: var(--text-bright);
 }
 
 .menu-item {
