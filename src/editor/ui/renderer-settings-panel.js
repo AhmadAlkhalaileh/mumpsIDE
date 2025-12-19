@@ -18,7 +18,7 @@
             dialogRegistry?.register?.({
                 id: 'settings',
                 title: 'Settings',
-                open: () => dialog.open()
+                open: (payload) => dialog.open(payload)
             });
         } catch (_) { }
 

@@ -156,7 +156,6 @@
                     console.log('[MenuRegistry] Defining Tools menu items...');
                     const items = [
                         { id: 'tools.terminal', label: 'Terminal', action: 'terminal', icon: 'terminal', shortcut: 'Alt+F12' },
-                        { id: 'tools.connections', label: 'Connections', action: 'connections', icon: 'link' },
                         { id: 'tools.lint', label: 'Lint', action: 'lint' },
                         { id: 'tools.shortcuts', label: 'Shortcuts', action: 'shortcuts' },
                         { id: 'tools.extensions', label: 'Extensions', action: 'extensions' }
@@ -191,7 +190,9 @@
                 label: 'Help',
                 items: withSeparatorCleanup([
                     { id: 'help.docs', label: 'Docs', action: 'docs', disabled: true },
-                    { id: 'help.about', label: 'About', action: 'about' }
+                    { id: 'help.about', label: 'About', action: 'about' },
+                    { type: 'separator' },
+                    { id: 'help.menuSelfTest', label: 'Menu System Self-Test', action: 'menu-self-test' }
                 ])
             }
         ]));

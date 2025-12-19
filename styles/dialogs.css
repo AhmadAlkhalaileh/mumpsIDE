@@ -1,27 +1,3 @@
-:root {
-    --ui-space-0: 0px;
-    --ui-space-1: 4px;
-    --ui-space-2: 8px;
-    --ui-space-3: 12px;
-    --ui-space-4: 16px;
-    --ui-space-5: 20px;
-    --ui-space-6: 24px;
-    --ui-space-7: 32px;
-
-    --ui-radius-1: 6px;
-    --ui-radius-2: 8px;
-    --ui-radius-3: 10px;
-
-    --ui-border-width: 1px;
-    --ui-border-subtle: rgba(255, 255, 255, 0.08);
-    --ui-border-strong: rgba(255, 255, 255, 0.14);
-
-    --ui-surface-overlay: rgba(0, 0, 0, 0.55);
-    --ui-surface-elevated: rgba(60, 63, 65, 0.96);
-
-    --ui-focus-outline: rgba(74, 158, 255, 0.55);
-}
-
 .ui-btn {
     display: inline-flex;
     align-items: center;
@@ -31,8 +7,8 @@
     border: 1px solid var(--ui-border-subtle);
     padding: 0 12px;
     height: 30px;
-    font-family: var(--font-ui);
-    font-size: var(--font-size-ui);
+    font-family: var(--ui-font-ui);
+    font-size: var(--ui-font-ui-size);
     color: var(--text);
     background: rgba(255, 255, 255, 0.05);
     cursor: pointer;
@@ -95,8 +71,8 @@
     border: 1px solid var(--ui-border-subtle);
     background: rgba(0, 0, 0, 0.22);
     color: var(--text);
-    font-family: var(--font-ui);
-    font-size: var(--font-size-ui);
+    font-family: var(--ui-font-ui);
+    font-size: var(--ui-font-ui-size);
     outline: none;
     min-width: 0;
 }
@@ -181,16 +157,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 10000;
+    z-index: var(--ui-z-dialog);
 }
 
 .ui-dialog {
-    width: min(980px, calc(100vw - 56px));
-    height: min(720px, calc(100vh - 56px));
+    width: min(var(--ui-dialog-max-w), calc(100vw - var(--ui-dialog-inset)));
+    height: min(var(--ui-dialog-max-h), calc(100vh - var(--ui-dialog-inset)));
     background: var(--ui-surface-elevated);
     border: 1px solid var(--ui-border-strong);
     border-radius: var(--ui-radius-3);
-    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+    box-shadow: var(--ui-shadow-lg);
     overflow: hidden;
     display: flex;
     outline: none;
@@ -204,7 +180,7 @@
 }
 
 .ui-dialog-header {
-    height: 44px;
+    height: var(--ui-dialog-header-h);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -236,7 +212,7 @@
 .ui-dialog-body {
     flex: 1;
     display: grid;
-    grid-template-columns: 260px 1fr;
+    grid-template-columns: var(--ui-dialog-sidebar-w) 1fr;
     min-height: 0;
 }
 
@@ -504,7 +480,7 @@
     border-radius: 4px;
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid var(--ui-border-subtle);
-    font-family: var(--font-ui);
+    font-family: var(--ui-font-ui);
     font-size: 11px;
     font-weight: 600;
     color: rgba(255, 255, 255, 0.85);
@@ -524,4 +500,3 @@
     text-align: center;
     color: rgba(255, 255, 255, 0.5);
 }
-

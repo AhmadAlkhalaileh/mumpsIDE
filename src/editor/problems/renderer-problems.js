@@ -13,6 +13,10 @@
             if (lower.startsWith('warn')) return 'warning';
             return 'info';
         });
+        const createIcon = deps?.createIcon
+            || window.AhmadIDEModules?.ui?.icons?.createIcon
+            || window.AhmadIDEModules?.ui?.components?.Icon?.createIcon
+            || null;
         const setActiveDebugTab = deps?.setActiveDebugTab || (() => { });
         const getActiveDebugTab = deps?.getActiveDebugTab || (() => null);
 
@@ -28,7 +32,17 @@
                 return acc;
             }, 'info');
 
-            pill.textContent = `Problems: ${total}`;
+            pill.innerHTML = '';
+            const iconName = highest === 'error' ? 'error' : (highest === 'warning' ? 'warning' : 'info');
+            const iconWrap = document.createElement('span');
+            iconWrap.className = 'icon';
+            if (createIcon) {
+                iconWrap.appendChild(createIcon(iconName, { size: 12 }));
+            } else {
+                iconWrap.textContent = highest === 'error' ? '⛔' : (highest === 'warning' ? '⚠' : 'ℹ');
+            }
+            pill.appendChild(iconWrap);
+            pill.appendChild(document.createTextNode(` Problems: ${total}`));
             if (highest === 'error') {
                 pill.style.background = 'rgba(248,113,113,0.18)';
                 pill.style.color = '#fecdd3';
@@ -66,9 +80,9 @@
 
             const iconFor = (sev) => {
                 const s = (sev || 'info').toLowerCase();
-                if (s.startsWith('err')) return '⛔';
-                if (s.startsWith('warn')) return '⚠';
-                return 'ℹ';
+                if (s.startsWith('err')) return { name: 'error', fallback: '⛔' };
+                if (s.startsWith('warn')) return { name: 'warning', fallback: '⚠' };
+                return { name: 'info', fallback: 'ℹ' };
             };
 
             limited.forEach(item => {
@@ -79,7 +93,12 @@
 
                 const icon = document.createElement('span');
                 icon.className = 'problem-icon';
-                icon.textContent = iconFor(sev);
+                const iconMeta = iconFor(sev);
+                if (createIcon) {
+                    icon.appendChild(createIcon(iconMeta.name, { size: 16 }));
+                } else {
+                    icon.textContent = iconMeta.fallback;
+                }
 
                 const text = document.createElement('span');
                 text.className = 'problem-text';
@@ -124,4 +143,3 @@
         window.AhmadIDEModules.problems.createProblemsManager = createProblemsManager;
     }
 })();
-

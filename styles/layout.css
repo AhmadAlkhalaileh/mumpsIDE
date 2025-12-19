@@ -9,7 +9,7 @@
     grid-template-columns: auto auto 1fr;
     grid-template-rows: 1fr;
     overflow: hidden;
-    z-index: 1;
+    z-index: var(--ui-z-base);
     min-height: 0;
     margin: 0;
     padding: 0;
@@ -21,26 +21,26 @@
 .tool-window-bar {
     background: var(--rail-bg);
     display: flex;
-    z-index: 10;
+    z-index: var(--ui-z-rail);
 }
 
 .tool-window-bar-left {
     flex-direction: column;
-    width: 36px;
+    width: var(--ui-stripe-w);
     border-right: 1px solid var(--border);
     grid-column: 1;
 }
 
 .tool-window-bar-right {
     flex-direction: column;
-    width: 36px;
+    width: var(--ui-stripe-w);
     border-left: 1px solid var(--border);
     grid-column: 5;
 }
 
 .tool-window-bar-bottom {
     flex-direction: row;
-    height: 28px;
+    height: var(--ui-stripe-bottom-h);
     border-top: 1px solid var(--border);
     align-items: center;
     padding: 0 4px;
@@ -127,7 +127,7 @@
 }
 
 .tool-window-left {
-    width: 280px;
+    width: var(--ui-sidebar-left-w);
     min-width: 200px;
     max-width: 500px;
     border-right: 1px solid var(--border);
@@ -140,7 +140,7 @@
 }
 
 .tool-window-right {
-    width: 300px;
+    width: var(--ui-sidebar-right-w);
     min-width: 200px;
     max-width: 500px;
     border-left: 1px solid var(--border);
@@ -182,7 +182,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 10px;
+    padding: 0 var(--ui-space-3);
+    height: var(--ui-toolwindow-header-h);
     background: #3c3f41 !important;
     border-bottom: 1px solid #323232;
     flex-shrink: 0;
@@ -300,4 +301,3 @@
 .bottom-panel {
     display: none;
 }
-

@@ -345,39 +345,35 @@
         }
 
         function showTabContextMenu(x, y, tabId) {
-            if (!$) return;
             const tab = state.openTabs.find(t => t.id === tabId);
             if (!tab) return;
+            const registry = window.AhmadIDEModules?.app?.menuRegistry;
+            const controller = window.AhmadIDEModules?.ui?.menu?.controller
+                || window.AhmadIDEModules?.ui?.menu?.createMenuController?.({});
+            const openContextMenu = window.AhmadIDEModules?.ui?.menu?.openContextMenu;
+            if (!registry || (!controller && !openContextMenu)) return;
 
-            $('.tab-context-menu').remove();
-            const menu = $('<div class="routines-context-menu tab-context-menu"></div>');
-            menu.css({ position: 'fixed', top: y, left: x, zIndex: 5000 });
-
-            const menuItems = [
-                { label: 'Close', action: () => closeTab(tabId) },
-                { label: 'Close Others', action: () => closeOtherTabs(tabId) },
-                { label: 'Close All', action: () => closeAllTabs() },
-                { separator: true },
-                { label: 'Close Tabs to the Left', action: () => closeTabsToSide(tabId, 'left') },
-                { label: 'Close Tabs to the Right', action: () => closeTabsToSide(tabId, 'right') }
-            ];
-
-            menuItems.forEach(item => {
-                if (item.separator) {
-                    menu.append('<div class="ctx-separator"></div>');
-                } else {
-                    const menuItem = $('<div class="ctx-item"></div>');
-                    menuItem.html(`<span class="ctx-label">${item.label}</span>`);
-                    menuItem.on('click', () => {
-                        menu.remove();
-                        item.action();
-                    });
-                    menu.append(menuItem);
+            const ctx = { tabId };
+            const items = registry.get('context.tabs', ctx);
+            const payload = {
+                controller,
+                x,
+                y,
+                items,
+                ctx,
+                onAction: (action) => {
+                    if (action === 'tab:close') return closeTab(tabId);
+                    if (action === 'tab:close-others') return closeOtherTabs(tabId);
+                    if (action === 'tab:close-all') return closeAllTabs();
+                    if (action === 'tab:close-left') return closeTabsToSide(tabId, 'left');
+                    if (action === 'tab:close-right') return closeTabsToSide(tabId, 'right');
                 }
-            });
-
-            $('body').append(menu);
-            setTimeout(() => $(document).one('click', () => menu.remove()), 100);
+            };
+            if (typeof openContextMenu === 'function') {
+                openContextMenu(payload);
+                return;
+            }
+            controller.openAtPoint(payload);
         }
 
         function closeOtherTabs(keepTabId) {

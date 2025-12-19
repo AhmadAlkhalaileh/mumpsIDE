@@ -377,8 +377,12 @@
                 }, 50);
                 return;
             case 'connections':
-                if (window.AhmadIDEModules?.app?.dialogRegistry?.open('connections')) {
-                    return;
+                {
+                    const btn = document.getElementById('toggleConnections');
+                    if (btn) {
+                        btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: true }));
+                        return;
+                    }
                 }
                 clickEl('toggleConnections');
                 return;
@@ -2431,7 +2435,7 @@
                 folding: false,  // Disable code folding for performance
                 foldingHighlight: false,
                 showFoldingControls: 'never',
-                occurrencesHighlight: 'off',  // Disable occurrence highlighting
+                occurrencesHighlight: 'singleFile',  // Highlight all occurrences of selected word
                 renderWhitespace: 'none',  // Don't render whitespace
                 overviewRulerBorder: false,
                 scrollBeyondLastLine: false,
@@ -2439,7 +2443,7 @@
                 parameterHints: { enabled: false },
                 // Additional performance optimizations
                 matchBrackets: 'never',  // Disable bracket matching
-                selectionHighlight: false,  // Disable selection highlighting
+                selectionHighlight: true,  // Enable selection highlighting
                 links: false,  // Disable link detection
                 colorDecorators: false,  // Disable color decorators
                 codeLens: false,  // Disable code lens
@@ -2945,6 +2949,7 @@
             };
 
             const runConfigMenu = document.getElementById('runConfigMenu');
+            if (runConfigMenu) runConfigMenu.remove();
             const runConfigBtn = document.getElementById('runConfigBtn');
             const runBtnEl = document.getElementById('runBtn');
             const debugStartBtnEl = document.getElementById('debugStartBtn');
@@ -2968,35 +2973,21 @@
                 }
             };
 
-            const closeRunConfigMenu = () => runConfigMenu?.classList.add('hidden');
-            const toggleRunConfigMenu = () => {
-                if (!runConfigMenu) return;
-                const shouldOpen = runConfigMenu.classList.contains('hidden');
-                closeRunConfigMenu();
-                if (shouldOpen) runConfigMenu.classList.remove('hidden');
-            };
-
-            runConfigBtn?.addEventListener('click', (e) => {
-                e.stopPropagation();
-                toggleRunConfigMenu();
-            });
-
-            runConfigMenu?.querySelectorAll('.run-config-item').forEach((btn) => {
-                if (btn.classList.contains('disabled')) return;
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    const cfg = btn.getAttribute('data-config');
-                    setRunConfig(cfg);
-                    closeRunConfigMenu();
-                });
-            });
-
-            document.addEventListener('click', (e) => {
-                if (!runConfigMenu || !runConfigBtn) return;
-                if (!runConfigMenu.contains(e.target) && !runConfigBtn.contains(e.target)) {
-                    closeRunConfigMenu();
+            window.AhmadIDEModules = window.AhmadIDEModules || {};
+            window.AhmadIDEModules.app = window.AhmadIDEModules.app || {};
+            window.AhmadIDEModules.app.runConfig = window.AhmadIDEModules.app.runConfig || {};
+            window.AhmadIDEModules.app.runConfig.getActive = () => runConfigState.active;
+            window.AhmadIDEModules.app.runConfig.setActive = (id) => setRunConfig(id);
+            window.AhmadIDEModules.app.refreshRoutines = async () => {
+                try {
+                    if (!routinesManager || !routineState || !editor) return false;
+                    const search = document.getElementById('routineSearch')?.value || '';
+                    await loadRoutineList(routineState, editor, search);
+                    return true;
+                } catch (_) {
+                    return false;
                 }
-            });
+            };
 
             const shouldDebugForRun = () => {
                 const bps = getBpLines();

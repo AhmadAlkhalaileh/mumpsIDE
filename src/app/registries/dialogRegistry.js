@@ -17,19 +17,36 @@
 
         const open = (id, payload) => {
             const d = dialogs.get(String(id || ''));
-            if (d?.open) return d.open(payload);
-            return false;
+            if (!d?.open) return false;
+            try {
+                const res = d.open(payload);
+                return res === false ? false : true;
+            } catch (_) {
+                return false;
+            }
         };
+
+        // Back-compat helpers (older modules call `show()` / `has()`).
+        const show = (id, payload) => open(id, payload);
 
         const close = (id) => {
             const d = dialogs.get(String(id || ''));
-            if (d?.close) return d.close();
-            return false;
+            if (!d?.close) return false;
+            try {
+                const res = d.close();
+                return res === false ? false : true;
+            } catch (_) {
+                return false;
+            }
         };
+
+        const hide = (id) => close(id);
+
+        const has = (id) => dialogs.has(String(id || ''));
 
         const list = () => Array.from(dialogs.values()).map((d) => ({ id: d.id, title: d.title }));
 
-        return { register, open, close, list };
+        return { register, open, show, close, hide, has, list };
     }
 
     if (typeof window !== 'undefined') {
@@ -40,4 +57,3 @@
         }
     }
 })();
-

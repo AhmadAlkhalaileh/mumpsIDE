@@ -32,12 +32,45 @@
 
             const connectionsBtn = document.getElementById('toggleConnections');
             if (connectionsBtn && !connectionsBtn.dataset.mideConnectionsWired) {
-                connectionsBtn.addEventListener('click', () => {
+                // Left click: open Connections menu (Shift+Click opens the panel).
+                connectionsBtn.addEventListener('click', (e) => {
+                    const createConnectionsMenu = window.AhmadIDEModules?.features?.menus?.createConnectionsMenu;
+                    if (!e.shiftKey && createConnectionsMenu) {
+                        const menu = createConnectionsMenu();
+                        if (menu?.showForAnchor) {
+                            menu.showForAnchor(connectionsBtn);
+                            return;
+                        }
+                        if (menu?.showAtPoint) {
+                            const r = connectionsBtn.getBoundingClientRect();
+                            menu.showAtPoint(Math.round(r.left), Math.round(r.top));
+                            return;
+                        }
+                        if (menu?.show) {
+                            const r = connectionsBtn.getBoundingClientRect();
+                            menu.show(Math.round(r.left), Math.round(r.top));
+                            return;
+                        }
+                    }
                     ensureMounted();
                     const api = wireConnectionsPanel({ editor, routineState, terminalState });
                     api?.openConnectionsPanel?.();
                     api?.refreshDockerList?.();
                 });
+
+                // Right click: Show context menu
+                connectionsBtn.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const createConnectionsMenu = window.AhmadIDEModules?.features?.menus?.createConnectionsMenu;
+                    if (createConnectionsMenu) {
+                        const menu = createConnectionsMenu();
+                        if (menu?.showAtPoint) return menu.showAtPoint(e.clientX, e.clientY);
+                        if (menu?.show) return menu.show(e.clientX, e.clientY);
+                    }
+                });
+
                 connectionsBtn.dataset.mideConnectionsWired = '1';
             }
 
@@ -333,12 +366,15 @@
                 });
 
                 if (res.ok) {
+                    try {
+                        if (res.sessionId) localStorage.setItem('ahmadIDE:sshSessionId', String(res.sessionId));
+                    } catch (_) { }
                     const entry = { host, port, username, envKey };
                     await window.ahmadIDE.setConnection('ssh', {
                         ssh: { ...entry, password }
                     });
-                    setConnStatus('SSH connected', 'success');
-                    markSshStatus('SSH connected', 'success');
+                    setConnStatus(`SSH: ${host}`, 'success');
+                    markSshStatus(`Connected to ${username}@${host}:${port}`, 'success');
                     appendOutput('✓ SSH connected', terminalState);
                     try {
                         localStorage.setItem('ahmadIDE:ssh', JSON.stringify(entry));

@@ -30,6 +30,8 @@ async function runMenuAction(action, ctx = {}) {
         } catch (_) { }
     };
 
+    const getRunConfigApi = () => window.AhmadIDEModules?.app?.runConfig || null;
+
     const ed = safeEditor();
 
     switch (action) {
@@ -96,8 +98,12 @@ async function runMenuAction(action, ctx = {}) {
             try { toggleToolWindowPanel?.('terminalPanel', 'bottom'); } catch (_) { }
             return;
         case 'connections':
-            if (window.AhmadIDEModules?.app?.dialogRegistry?.open('connections')) {
-                return;
+            {
+                const btn = document.getElementById('toggleConnections');
+                if (btn) {
+                    btn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, shiftKey: true }));
+                    return;
+                }
             }
             clickEl('toggleConnections');
             return;
@@ -191,11 +197,81 @@ async function runMenuAction(action, ctx = {}) {
             try { openGitToolWindow?.(); } catch (_) { }
             return;
         case 'run-config:run-current':
+            if (getRunConfigApi()?.setActive) {
+                getRunConfigApi().setActive('run-current');
+                return;
+            }
             document.querySelector('#runConfigMenu .run-config-item[data-config="run-current"]')?.click?.();
             return;
         case 'run-config:debug-current':
+            if (getRunConfigApi()?.setActive) {
+                getRunConfigApi().setActive('debug-current');
+                return;
+            }
             document.querySelector('#runConfigMenu .run-config-item[data-config="debug-current"]')?.click?.();
             return;
+        case 'menu-self-test': {
+            const controller = window.AhmadIDEModules?.ui?.menu?.controller
+                || window.AhmadIDEModules?.ui?.menu?.createMenuController?.({});
+            if (!controller) return;
+
+            window.AhmadIDEModules = window.AhmadIDEModules || {};
+            window.AhmadIDEModules.ui = window.AhmadIDEModules.ui || {};
+            window.AhmadIDEModules.ui.menu = window.AhmadIDEModules.ui.menu || {};
+            const state = window.AhmadIDEModules.ui.menu.__selfTestState || { checked: true };
+            window.AhmadIDEModules.ui.menu.__selfTestState = state;
+
+            const buildItems = () => {
+                const longList = Array.from({ length: 30 }).map((_, i) => ({
+                    id: `self.long.${i}`,
+                    label: `Long Item ${String(i + 1).padStart(2, '0')}`
+                }));
+
+                return [
+                    { id: 'self.disabled', label: 'Disabled Item', disabled: true, shortcut: 'Ctrl+D' },
+                    { id: 'self.checked', label: 'Checked Item', type: 'checkbox', checked: () => !!state.checked, action: 'selftest:toggle' },
+                    { type: 'separator' },
+                    { id: 'self.shortcut', label: 'Item With Shortcut', shortcut: 'Ctrl+Alt+K' },
+                    {
+                        id: 'self.submenu',
+                        label: 'Submenu',
+                        submenu: [
+                            { id: 'self.submenu.one', label: 'Sub Item One', shortcut: 'Alt+1' },
+                            {
+                                id: 'self.submenu.nested',
+                                label: 'Nested Submenu',
+                                submenu: [
+                                    { id: 'self.submenu.nested.a', label: 'Nested A' },
+                                    { id: 'self.submenu.nested.b', label: 'Nested B' }
+                                ]
+                            },
+                            { id: 'self.submenu.two', label: 'Sub Item Two' }
+                        ]
+                    },
+                    { type: 'separator' },
+                    ...longList
+                ];
+            };
+
+            const x = Math.round(window.innerWidth * 0.5 - 120);
+            const y = Math.round(window.innerHeight * 0.2);
+
+            const open = () => controller.openAtPoint({
+                x,
+                y,
+                items: buildItems(),
+                ctx: { selfTest: true },
+                onAction: (action) => {
+                    if (action === 'selftest:toggle') {
+                        state.checked = !state.checked;
+                        setTimeout(open, 0);
+                    }
+                }
+            });
+
+            open();
+            return;
+        }
         case 'prj:open':
         case 'prj:new-routine':
         case 'prj:new-folder':
@@ -217,4 +293,3 @@ async function runMenuAction(action, ctx = {}) {
             notImplemented(action);
     }
 }
-

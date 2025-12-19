@@ -27,6 +27,13 @@
             overlay: 'rgba(0,0,0,0.55)',
             elevated: 'rgba(60, 63, 65, 0.96)'
         },
+        menu: {
+            bg: 'rgba(60, 63, 65, 0.98)',
+            border: 'rgba(255, 255, 255, 0.12)',
+            hover: 'rgba(255, 255, 255, 0.06)',
+            active: 'rgba(74, 158, 255, 0.16)',
+            activeBorder: 'rgba(74, 158, 255, 0.22)'
+        },
         text: {
             primary: 'var(--text)',
             bright: 'var(--text-bright)',
@@ -36,10 +43,53 @@
             ring: '0 0 0 2px rgba(74, 158, 255, 0.35)',
             outline: 'rgba(74, 158, 255, 0.55)'
         },
+        shadow: {
+            xs: '0 1px 3px rgba(0, 0, 0, 0.18)',
+            sm: '0 4px 12px rgba(0, 0, 0, 0.25)',
+            md: '0 10px 28px rgba(0, 0, 0, 0.45)',
+            lg: '0 18px 40px rgba(0, 0, 0, 0.5)'
+        },
+        z: {
+            base: 1,
+            rail: 10,
+            toolbar: 90,
+            menubar: 100,
+            popover: 200,
+            overlay: 6000,
+            menu: 7000,
+            dialog: 10000,
+            toast: 10010,
+            splash: 99999
+        },
         icon: {
-            1: '12px',
-            2: '16px',
-            3: '20px'
+            12: '12px',
+            16: '16px',
+            20: '20px'
+        },
+        metrics: {
+            menubarRowH: '40px',
+            toolbarRowH: '48px',
+            statusbarH: '24px',
+            menubarItemH: '32px',
+            menuMinW: '220px',
+            menuRowH: '28px',
+            menuPadX: '10px',
+            menuIconColW: '24px',
+            menuShortcutColW: '112px',
+            menuArrowColW: '16px',
+            submenuOpenDelay: '120',
+            submenuCloseDelay: '320',
+            submenuGracePx: '16',
+            stripeW: '36px',
+            stripeBottomH: '28px',
+            sidebarLeftW: '280px',
+            sidebarRightW: '300px',
+            toolwindowHeaderH: '32px',
+            dialogMaxW: '980px',
+            dialogMaxH: '720px',
+            dialogInset: '56px',
+            dialogHeaderH: '44px',
+            dialogSidebarW: '260px'
         },
         typography: {
             uiFamily: 'var(--font-ui)',
@@ -73,6 +123,12 @@
         set('--ui-surface-overlay', TOKENS.surface.overlay);
         set('--ui-surface-elevated', TOKENS.surface.elevated);
 
+        set('--ui-menu-bg', TOKENS.menu.bg);
+        set('--ui-menu-border', TOKENS.menu.border);
+        set('--ui-menu-hover', TOKENS.menu.hover);
+        set('--ui-menu-active', TOKENS.menu.active);
+        set('--ui-menu-active-border', TOKENS.menu.activeBorder);
+
         set('--ui-text-primary', TOKENS.text.primary);
         set('--ui-text-bright', TOKENS.text.bright);
         set('--ui-text-muted', TOKENS.text.muted);
@@ -81,6 +137,37 @@
         set('--ui-focus-outline', TOKENS.focus.outline);
 
         Object.entries(TOKENS.icon).forEach(([k, v]) => set(`--ui-icon-${k}`, v));
+
+        set('--ui-shadow-xs', TOKENS.shadow.xs);
+        set('--ui-shadow-sm', TOKENS.shadow.sm);
+        set('--ui-shadow-md', TOKENS.shadow.md);
+        set('--ui-shadow-lg', TOKENS.shadow.lg);
+
+        Object.entries(TOKENS.z).forEach(([k, v]) => set(`--ui-z-${k}`, String(v)));
+
+        set('--ui-menubar-row-h', TOKENS.metrics.menubarRowH);
+        set('--ui-toolbar-row-h', TOKENS.metrics.toolbarRowH);
+        set('--ui-statusbar-h', TOKENS.metrics.statusbarH);
+        set('--ui-menubar-h', TOKENS.metrics.menubarItemH);
+        set('--ui-menu-min-w', TOKENS.metrics.menuMinW);
+        set('--ui-menu-row-h', TOKENS.metrics.menuRowH);
+        set('--ui-menu-pad-x', TOKENS.metrics.menuPadX);
+        set('--ui-menu-icon-col-w', TOKENS.metrics.menuIconColW);
+        set('--ui-menu-shortcut-col-w', TOKENS.metrics.menuShortcutColW);
+        set('--ui-menu-arrow-col-w', TOKENS.metrics.menuArrowColW);
+        set('--ui-submenu-open-delay', TOKENS.metrics.submenuOpenDelay);
+        set('--ui-submenu-close-delay', TOKENS.metrics.submenuCloseDelay);
+        set('--ui-submenu-grace-px', TOKENS.metrics.submenuGracePx);
+        set('--ui-stripe-w', TOKENS.metrics.stripeW);
+        set('--ui-stripe-bottom-h', TOKENS.metrics.stripeBottomH);
+        set('--ui-sidebar-left-w', TOKENS.metrics.sidebarLeftW);
+        set('--ui-sidebar-right-w', TOKENS.metrics.sidebarRightW);
+        set('--ui-toolwindow-header-h', TOKENS.metrics.toolwindowHeaderH);
+        set('--ui-dialog-max-w', TOKENS.metrics.dialogMaxW);
+        set('--ui-dialog-max-h', TOKENS.metrics.dialogMaxH);
+        set('--ui-dialog-inset', TOKENS.metrics.dialogInset);
+        set('--ui-dialog-header-h', TOKENS.metrics.dialogHeaderH);
+        set('--ui-dialog-sidebar-w', TOKENS.metrics.dialogSidebarW);
 
         set('--ui-font-ui', TOKENS.typography.uiFamily);
         set('--ui-font-ui-size', TOKENS.typography.uiSize);
@@ -103,4 +190,3 @@
         try { apply(); } catch (_) { }
     }
 })();
-
