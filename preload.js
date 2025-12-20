@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('ahmadIDE', {
     // Host Terminal / git
     hostExec: (command) => ipcRenderer.invoke('terminal:exec', { command }),
     git: (command) => ipcRenderer.invoke('git:run', { command }),
+    detectGitRepo: (projectRoot, opts) => ipcRenderer.invoke('git:detectRepo', { projectRoot, opts }),
     getGitConfig: (projectPath) => ipcRenderer.invoke('git:getConfig', { projectPath }),
 
     // Project

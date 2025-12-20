@@ -16,6 +16,8 @@
 
         let dialogApi = null;
 
+        let pathInputElement = null;
+
         const buildContent = () => {
             const container = document.createElement('div');
             container.style.cssText = 'padding:var(--ui-space-6);min-width:520px;';
@@ -30,17 +32,18 @@
 
             const pathRow = document.createElement('div');
             pathRow.style.cssText = 'display:flex;gap:var(--ui-space-2);';
-            const pathInput = createInput({ id: 'openProjPath', placeholder: '/path/to/project', value: '' });
+            pathInputElement = createInput({ placeholder: '/path/to/project', value: '' });
+            pathInputElement.id = 'openProjPath';
             const browseBtn = document.createElement('button');
             browseBtn.className = 'ui-btn ui-btn--ghost';
             browseBtn.textContent = 'Browse…';
             browseBtn.addEventListener('click', async () => {
-                if (typeof window.electronAPI?.selectDirectory === 'function') {
-                    const path = await window.electronAPI.selectDirectory();
-                    if (path) pathInput.value = path;
+                if (typeof window.ahmadIDE?.openFolderDialog === 'function') {
+                    const res = await window.ahmadIDE.openFolderDialog();
+                    if (res?.ok && res.path) pathInputElement.value = res.path;
                 }
             });
-            pathRow.appendChild(pathInput);
+            pathRow.appendChild(pathInputElement);
             pathRow.appendChild(browseBtn);
 
             pathGroup.appendChild(pathLabel);
@@ -137,14 +140,28 @@
                 label: 'Open',
                 variant: 'primary',
                 onClick: async () => {
-                    const path = document.getElementById('openProjPath')?.value?.trim();
+                    const path = pathInputElement?.value?.trim();
                     if (!path) {
                         alert('Please select a project path');
                         return;
                     }
-                    // TODO: Implement actual project opening via IPC
-                    if (typeof window.electronAPI?.openProject === 'function') {
-                        await window.electronAPI.openProject(path);
+                    if (typeof window.ahmadIDE?.openProject === 'function') {
+                        const result = await window.ahmadIDE.openProject(path);
+                        if (result?.ok) {
+                            if (typeof window.loadProjectIntoTree === 'function') {
+                                window.loadProjectIntoTree(result);
+                            }
+                            // Ensure Git gets the project path
+                            const gitRepoManager = window.AhmadIDEModules?.git?.repoManager;
+                            console.log("[OpenProjectDialog] Calling gitRepoManager.setProject with:", result.projectPath);
+                            if (gitRepoManager?.setProject) {
+                                gitRepoManager.setProject(result.projectPath)
+                                    .then(() => console.log("[OpenProjectDialog] setProject completed"))
+                                    .catch(err => console.error("[OpenProjectDialog] setProject failed:", err));
+                            } else {
+                                console.error("[OpenProjectDialog] gitRepoManager.setProject not found");
+                            }
+                        }
                     }
                     dialogApi.close('ok');
                 }

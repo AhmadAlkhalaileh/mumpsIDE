@@ -9,6 +9,7 @@
         const getCurrentProject = deps?.getCurrentProject || (() => null);
         const openGitToolWindow = deps?.openGitToolWindow || (() => { });
         const runGitQuickCmd = deps?.runGitQuickCmd || (async () => ({ ok: false }));
+        const toGitPathspec = deps?.toGitPathspec || ((p) => p);
         const menuRegistry = deps?.menuRegistry || window.AhmadIDEModules?.app?.menuRegistry;
         const menuController = deps?.menuController
             || window.AhmadIDEModules?.ui?.menu?.controller
@@ -26,38 +27,40 @@
         };
 
         const runGitAction = async (action, target) => {
-            const path = target || '.';
+            const targetPath = target || '.';
+            const gitPath = toGitPathspec(targetPath) || targetPath;
+            const safe = String(gitPath).replace(/"/g, '\\"');
             openGitToolWindow();
             if (action === 'add') {
-                await runGitQuickCmd(`git add -- "${path}"`, { toastLabel: 'Git Add' });
+                await runGitQuickCmd(`git add -- "${safe}"`, { toastLabel: 'Git Add' });
                 document.getElementById('gitStatusBtn')?.click();
                 return;
             }
             if (action === 'commit') {
                 const msg = document.getElementById('gitCommitMessage');
                 const diffPath = document.getElementById('gitDiffPath');
-                if (diffPath) diffPath.value = path || '';
-                await runGitQuickCmd(`git add -- "${path}"`, { toastLabel: 'Git Commit' });
+                if (diffPath) diffPath.value = gitPath || '';
+                await runGitQuickCmd(`git add -- "${safe}"`, { toastLabel: 'Git Commit' });
                 showToast('info', 'Commit File', 'Staged file. Enter message in Git tool window to commit.');
                 msg?.focus();
                 document.getElementById('gitStatusBtn')?.click();
                 return;
             }
             if (action === 'history') {
-                await runGitQuickCmd(`git log --oneline -- "${path}"`, { toastLabel: 'Git History' });
+                await runGitQuickCmd(`git log --oneline -- "${safe}"`, { toastLabel: 'Git History' });
                 const input = document.getElementById('gitDiffPath');
-                if (input) input.value = path || '';
+                if (input) input.value = gitPath || '';
                 document.getElementById('gitLogBtn')?.click();
                 return;
             }
             if (action === 'compare') {
                 const input = document.getElementById('gitDiffPath');
-                if (input) input.value = path || '';
+                if (input) input.value = gitPath || '';
                 document.getElementById('gitDiffFileBtn')?.click();
                 return;
             }
             if (action === 'rollback') {
-                await runGitQuickCmd(`git checkout -- "${path}"`, { toastLabel: 'Git Rollback' });
+                await runGitQuickCmd(`git checkout -- "${safe}"`, { toastLabel: 'Git Rollback' });
                 document.getElementById('gitStatusBtn')?.click();
             }
         };

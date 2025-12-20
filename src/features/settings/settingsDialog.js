@@ -10,6 +10,7 @@
     };
     if (typeof document !== 'undefined') {
         loadScript('./src/features/settings/sections/connections.js');
+        loadScript('./src/features/settings/sections/versionControl.js');
     }
     const applyFilter = (root, query) => {
         const q = String(query || '').trim().toLowerCase();
@@ -34,6 +35,7 @@
         const renderFontsSection = window.AhmadIDEModules?.features?.settings?.sections?.renderFontsSection;
         const renderAdvancedSection = window.AhmadIDEModules?.features?.settings?.sections?.renderAdvancedSection;
         const renderConnectionsSectionFn = () => window.AhmadIDEModules?.features?.settings?.sections?.renderConnectionsSection;
+        const renderVersionControlSectionFn = () => window.AhmadIDEModules?.features?.settings?.sections?.renderVersionControlSection;
         if (!settingsService || !fontService || !extensionsService) throw new Error('SettingsDialog requires services');
         if (!createDialog || !createDialogLayout || !primitives) throw new Error('SettingsDialog requires ui primitives');
         let dialogApi = null;
@@ -45,6 +47,10 @@
         let fontsSectionApi = null;
         const ensureConnectionsSection = () => {
             const hasRenderer = () => typeof window.AhmadIDEModules?.features?.settings?.sections?.renderConnectionsSection === 'function';
+            return Promise.resolve(hasRenderer());
+        };
+        const ensureVersionControlSection = () => {
+            const hasRenderer = () => typeof window.AhmadIDEModules?.features?.settings?.sections?.renderVersionControlSection === 'function';
             return Promise.resolve(hasRenderer());
         };
         const renderConnectionsSection = (sectionCtx) => {
@@ -109,6 +115,10 @@
                     }
                 } else if (activeSectionId === 'advanced') node = renderAdvancedSection?.(sectionCtx);
                 else if (activeSectionId === 'connections') node = renderConnectionsSection(sectionCtx);
+                else if (activeSectionId === 'version-control') {
+                    const fn = renderVersionControlSectionFn();
+                    node = typeof fn === 'function' ? fn(sectionCtx) : null;
+                }
             } catch (_) {
                 node = null;
             }
@@ -116,7 +126,9 @@
                 node = document.createElement('div');
                 node.textContent = activeSectionId === 'connections'
                     ? 'Connections section unavailable.'
-                    : 'Section unavailable.';
+                    : (activeSectionId === 'version-control'
+                        ? 'Version Control section unavailable.'
+                        : 'Section unavailable.');
             }
             layout.elements.content.appendChild(node);
             applyFilter(layout.elements.content, lastSearch);
@@ -134,6 +146,7 @@
                 { id: 'appearance', label: 'Appearance' },
                 { id: 'fonts', label: 'Fonts' },
                 { id: 'connections', label: 'Connections' },
+                { id: 'version-control', label: 'Version Control' },
                 { id: 'advanced', label: 'Advanced' }
             ]);
             layout.elements.closeBtn.addEventListener('click', () => dialogApi.close('x'));
@@ -142,6 +155,10 @@
                 if (activeSectionId === 'connections') {
                     ensureConnectionsSection().then((ok) => {
                         if (ok && activeSectionId === 'connections') renderSection();
+                    });
+                } else if (activeSectionId === 'version-control') {
+                    ensureVersionControlSection().then((ok) => {
+                        if (ok && activeSectionId === 'version-control') renderSection();
                     });
                 } else {
                     renderSection();
@@ -168,18 +185,33 @@
         const open = (payload) => {
             ensureDialog();
             ensureConnectionsSection();
+            ensureVersionControlSection();
             draft = settingsService.clone(settingsService.get());
             dirty = false;
             updateFooter();
             lastSearch = '';
             if (layout?.elements?.searchInput) layout.elements.searchInput.value = '';
             const requestedSection = String(payload?.sectionId || '').trim();
-            if (requestedSection && ['appearance', 'fonts', 'connections', 'advanced'].includes(requestedSection)) {
+            if (requestedSection && ['appearance', 'fonts', 'connections', 'version-control', 'advanced'].includes(requestedSection)) {
                 activeSectionId = requestedSection;
                 if (requestedSection === 'connections') {
                     dialogApi.open();
                     ensureConnectionsSection().then((ok) => {
                         if (ok && activeSectionId === 'connections') {
+                            if (layout.getActive() !== requestedSection) {
+                                layout.setActive(requestedSection);
+                            } else {
+                                renderSection();
+                            }
+                        }
+                    });
+                    requestAnimationFrame(() => layout.elements.searchInput.focus());
+                    return;
+                }
+                if (requestedSection === 'version-control') {
+                    dialogApi.open();
+                    ensureVersionControlSection().then((ok) => {
+                        if (ok && activeSectionId === 'version-control') {
                             if (layout.getActive() !== requestedSection) {
                                 layout.setActive(requestedSection);
                             } else {

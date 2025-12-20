@@ -23,6 +23,8 @@
         const showCustomPrompt = deps?.showCustomPrompt || (() => { });
         const appendOutput = deps?.appendOutput || (() => { });
         const getGlobalTerminalState = deps?.getGlobalTerminalState || (() => null);
+        const onTabActivated = deps?.onTabActivated || (() => { });
+        const onTabClosed = deps?.onTabClosed || (() => { });
 
         if (!state || !state.openTabs || !state.tabModels) {
             throw new Error('createTabManager requires { state.openTabs, state.tabModels }');
@@ -44,15 +46,20 @@
             return { base: normalizedBase, folder, path };
         }
 
+        const getTabKind = (tab) => String(tab?.kind || 'routine');
+        const isRoutineTab = (tab) => getTabKind(tab) === 'routine';
+
         function findOpenTab(target, { exact = false } = {}) {
             const normTarget = normalizeRoutineTarget(target);
             const exactMatch = state.openTabs.find(t => {
+                if (!isRoutineTab(t)) return false;
                 const normTab = normalizeRoutineTarget(t.path || t.name);
                 return normTab.path === normTarget.path;
             });
             if (exact || exactMatch) return exactMatch || null;
 
             const looseMatches = state.openTabs.filter(t => {
+                if (!isRoutineTab(t)) return false;
                 const normTab = normalizeRoutineTarget(t.path || t.name);
                 return normTab.base && normTab.base === normTarget.base;
             });
@@ -106,14 +113,7 @@
             }
 
             state.activeTabId = tabId;
-            const normalizedTarget = normalizeRoutineTarget(tab.path || tab.name);
-            if (tab.state) {
-                tab.state.current = normalizedTarget.path || tab.state.current;
-            }
-            const routineStateRef = getRoutineStateRef();
-            if (routineStateRef) {
-                routineStateRef.current = normalizedTarget.path || normalizedTarget.base;
-            }
+            const kind = getTabKind(tab);
 
             // Switch Monaco model (instant, no setValue)
             if (activeEditor) {
@@ -124,23 +124,42 @@
                 } else {
                     // Fallback: create model if missing
                     const monacoRef = getMonaco();
-                    const newModel = monacoRef.editor.createModel(tab.content, 'mumps');
+                    const lang = kind === 'routine' ? 'mumps' : (tab.language || 'plaintext');
+                    const newModel = monacoRef.editor.createModel(tab.content || '', lang);
                     state.tabModels.set(tabId, newModel);
                     activeEditor.setModel(newModel);
                 }
+                try {
+                    if (typeof activeEditor.updateOptions === 'function') {
+                        activeEditor.updateOptions({ readOnly: kind === 'routine' ? false : !!tab.readOnly });
+                    }
+                } catch (_) { }
             }
 
-            setCurrentRoutine(normalizedTarget.path || normalizedTarget.base);
-            logger.info('TAB_SWITCH', { tabId, path: normalizedTarget.path || normalizedTarget.base });
-            const dbgStateRef = getDbgStateRef();
-            if (dbgStateRef) {
-                decorateBreakpoints(activeEditor, dbgStateRef);
-                renderBreakpoints(dbgStateRef);
+            if (kind === 'routine') {
+                const normalizedTarget = normalizeRoutineTarget(tab.path || tab.name);
+                if (tab.state) {
+                    tab.state.current = normalizedTarget.path || tab.state.current;
+                }
+                const routineStateRef = getRoutineStateRef();
+                if (routineStateRef) {
+                    routineStateRef.current = normalizedTarget.path || normalizedTarget.base;
+                }
+                setCurrentRoutine(normalizedTarget.path || normalizedTarget.base);
+                logger.info('TAB_SWITCH', { tabId, path: normalizedTarget.path || normalizedTarget.base });
+
+                const dbgStateRef = getDbgStateRef();
+                if (dbgStateRef) {
+                    decorateBreakpoints(activeEditor, dbgStateRef);
+                    renderBreakpoints(dbgStateRef);
+                }
+            } else {
+                logger.info('TAB_SWITCH_CUSTOM', { tabId, key: tab.key || tab.path || tab.name || '' });
             }
+
             renderTabs();
-
-            // Scroll active tab into view
             scrollActiveTabIntoView();
+            try { onTabActivated(tab); } catch (_) { }
         }
 
         function createTab(name, content = '', routineState = null, options = {}) {
@@ -170,6 +189,9 @@
                 isDirty: false,
                 state: tabState,
                 icon: tabMumpsIcon,
+                kind: 'routine',
+                language: 'mumps',
+                readOnly: false,
                 disposables: []  // Store disposables for cleanup
             };
             state.openTabs.push(tab);
@@ -194,6 +216,81 @@
             renderTabs();
             switchTab(id);
             logger.info('TAB_OPEN', { id, path: tabPath, name: normalized.base, folder: normalized.folder });
+            return tab;
+        }
+
+        function createCustomTab(options = {}) {
+            const key = String(options.key || options.path || '').trim();
+            if (!key) return null;
+            const title = String(options.title || options.name || options.label || 'Untitled');
+            const language = String(options.language || 'plaintext');
+            const kind = String(options.kind || 'custom');
+            const readOnly = options.readOnly !== false;
+            const icon = options.icon != null ? String(options.icon) : '';
+            const content = String(options.content ?? '');
+            const meta = options.meta;
+
+            const existing = state.openTabs.find(t => String(t.key || '') === key);
+            if (existing) {
+                existing.name = title;
+                existing.path = String(existing.path || key);
+                existing.key = key;
+                existing.kind = kind;
+                existing.language = language;
+                existing.readOnly = !!readOnly;
+                existing.icon = icon || existing.icon || '';
+                existing.isDirty = false;
+                existing.content = content;
+                if (meta !== undefined) existing.meta = meta;
+
+                const model = state.tabModels.get(existing.id);
+                const monacoRef = getMonaco();
+                if (model && typeof model.setValue === 'function') {
+                    try {
+                        if (model.getValue() !== content) model.setValue(content);
+                    } catch (_) {
+                        model.setValue(content);
+                    }
+                }
+                try {
+                    if (monacoRef?.editor?.setModelLanguage && model) {
+                        monacoRef.editor.setModelLanguage(model, language);
+                    }
+                } catch (_) { }
+                switchTab(existing.id);
+                return existing;
+            }
+
+            state.tabIdCounter = (state.tabIdCounter || 0) + 1;
+            const id = `tab_${state.tabIdCounter}`;
+
+            const tab = {
+                id,
+                name: title,
+                path: key,
+                folder: null,
+                content,
+                isDirty: false,
+                state: null,
+                icon,
+                kind,
+                language,
+                readOnly,
+                key,
+                meta,
+                disposables: []
+            };
+            state.openTabs.push(tab);
+
+            const monacoRef = getMonaco();
+            if (monacoRef) {
+                const model = monacoRef.editor.createModel(content, language);
+                state.tabModels.set(id, model);
+            }
+
+            renderTabs();
+            switchTab(id);
+            logger.info('TAB_OPEN_CUSTOM', { id, key, kind });
             return tab;
         }
 
@@ -235,6 +332,7 @@
                 renderTabs();
             }
             logger.info('TAB_CLOSED', { tabId, path: closing?.path });
+            try { onTabClosed(closing); } catch (_) { }
         }
 
         function closeTab(tabId, force = false) {
@@ -401,6 +499,7 @@
             normalizeRoutineTarget,
             findOpenTab,
             createTab,
+            createCustomTab,
             switchTab,
             closeTab,
             performCloseTab,

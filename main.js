@@ -398,6 +398,10 @@ ipcHandle('git:run', async (_event, payload) => {
     return bridge.git(payload?.command || '');
 });
 
+ipcHandle('git:detectRepo', async (_event, payload) => {
+    return bridge.detectGitRepo(payload?.projectRoot || '', payload?.opts || {});
+});
+
 ipcHandle('git:getConfig', async (_event, payload) => {
     return bridge.getGitConfig(payload?.projectPath || '');
 });

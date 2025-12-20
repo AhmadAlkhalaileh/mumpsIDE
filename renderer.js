@@ -179,6 +179,7 @@
     let problemsManager = null; // problems UI module instance (src/editor/problems/renderer-problems.js)
     let diagnosticsManager = null; // lint/diagnostics module instance (src/editor/diagnostics/renderer-diagnostics.js)
     let mumpsMonacoManager = null; // monaco+mumps bootstrap module instance (src/editor/mumps/renderer-mumps-monaco.js)
+    let gitRepoManager = null; // git repo detection/state module instance (src/editor/git/renderer-git-repo-manager.js)
     let gitToolWindowManager = null; // git tool window module instance (src/editor/git/renderer-git-toolwindow.js)
     let gitSettingsManager = null; // git settings panel module instance (src/editor/git/renderer-git-settings.js)
     let connectionsManager = null; // connections panel module instance (src/editor/connections/renderer-connections.js)
@@ -632,6 +633,13 @@
 
     function loadProjectIntoTree(projectData) {
         currentProject = projectData;
+        window.currentProject = projectData;
+        try {
+            const root = String(projectData?.projectPath || '').trim();
+            if (gitRepoManager && typeof gitRepoManager.setProject === 'function') {
+                gitRepoManager.setProject(root).catch(() => { });
+            }
+        } catch (_) { }
         const host = $('#projectTree');
         if (!host.length) {
             return;
@@ -736,6 +744,189 @@
         // routines folder
         const routinesFolder = createRoutineFolder('routines', projectData.structure.routines || []);
         host.append(routinesFolder);
+    }
+
+    // Expose for dialogs/external modules
+    window.loadProjectIntoTree = loadProjectIntoTree;
+
+    function toGitPathspec(inputPath) {
+        const raw = String(inputPath || '').trim();
+        if (!raw) return '';
+        if (raw === '.') return '.';
+
+        try {
+            const repoState = gitRepoManager?.getState ? gitRepoManager.getState() : null;
+            const repoRoot = String(repoState?.repoRoot || '').trim();
+            const projectRoot = String(currentProject?.projectPath || '').trim();
+            if (!repoRoot || !projectRoot) return raw;
+
+            const path = require('path');
+            const abs = path.isAbsolute(raw) ? raw : path.join(projectRoot, raw);
+            const rel = path.relative(repoRoot, abs);
+            if (!rel || rel.startsWith('..')) return raw;
+            return rel.split(path.sep).join('/');
+        } catch (_) {
+            return raw;
+        }
+    }
+
+    async function openDiffTab(opts = {}) {
+        const tabIcon = (() => {
+            try {
+                const icons = window.AhmadIDEModules?.ui?.icons?.map || {};
+                return icons.git || icons.format || '';
+            } catch (_) {
+                return '';
+            }
+        })();
+
+        const st = gitRepoManager?.getState ? gitRepoManager.getState() : null;
+        if (!st) {
+            showToast('error', 'Diff', 'Git state is not ready');
+            return { ok: false, error: 'Git state not ready' };
+        }
+        if (st.gitDisabled) {
+            showToast('info', 'Diff', 'Git is disabled for this project');
+            return { ok: false, error: 'Git disabled' };
+        }
+        if (!st.gitAvailable) {
+            showToast('error', 'Diff', st.lastError || 'Git is not available');
+            return { ok: false, error: st.lastError || 'Git unavailable' };
+        }
+        if (!st.repoDetected || !st.repoRoot) {
+            showToast('info', 'Diff', st.lastError || 'No Git repository detected');
+            return { ok: false, error: st.lastError || 'No repo detected' };
+        }
+
+        const kind = String(opts.kind || '').trim() || 'worktree';
+        const pathIn = String(opts.path || '').trim();
+        if (!pathIn) {
+            showToast('error', 'Diff', 'No file selected');
+            return { ok: false, error: 'No path provided' };
+        }
+
+        const repoRoot = String(opts.repoRoot || st.repoRoot || '').trim();
+        const staged = !!opts.staged;
+        const status = String(opts.status || '').trim();
+        const oldPath = String(opts.oldPath || '').trim();
+        const commitHash = String(opts.commitHash || '').trim();
+        const parents = Array.isArray(opts.parents) ? opts.parents.filter(Boolean) : [];
+        const parentHash = String(opts.parentHash || parents[0] || '').trim();
+        const ignoreWhitespace = !!opts.ignoreWhitespace;
+
+        const escapeArg = (val) => String(val || '').replace(/"/g, '\\"');
+        const q = (val) => `"${escapeArg(val)}"`;
+        const baseName = (pathIn.split('/').pop() || pathIn).trim() || pathIn;
+
+        const pathspecs = [];
+        if (oldPath && oldPath !== pathIn) pathspecs.push(oldPath);
+        pathspecs.push(pathIn);
+        const pathSpecArgs = pathspecs.map(q).join(' ');
+        const wsFlag = ignoreWhitespace ? ' -w' : '';
+
+        let cmd = '';
+        let key = '';
+        let title = `${baseName} (Diff)`;
+
+        if (kind === 'commit') {
+            if (!commitHash) {
+                showToast('error', 'Diff', 'No commit selected');
+                return { ok: false, error: 'No commit hash provided' };
+            }
+            if (parentHash) {
+                cmd = `git diff --no-color -M${wsFlag} ${parentHash} ${commitHash} -- ${pathSpecArgs}`;
+            } else {
+                // Root commit (no parent): git show produces a diff against the empty tree.
+                cmd = `git show --no-color -M${wsFlag} --format= ${commitHash} -- ${pathSpecArgs}`;
+            }
+            key = `diff:commit:${repoRoot}:${commitHash}:${pathIn}`;
+        } else if (kind === 'worktree') {
+            const stageKey = staged ? 'staged' : 'worktree';
+            key = `diff:${stageKey}:${repoRoot}:${pathIn}`;
+            if (status === '?' && !staged) {
+                // Untracked file: git diff won't show it; use a no-index diff from /dev/null.
+                try {
+                    const pathMod = require('path');
+                    const abs = pathMod.isAbsolute(pathIn) ? pathIn : pathMod.join(repoRoot, pathIn);
+                    const nullDev = (typeof process !== 'undefined' && process.platform === 'win32') ? 'NUL' : '/dev/null';
+                    cmd = `git diff --no-index --no-color${wsFlag} -- ${nullDev} ${q(abs)}`;
+                } catch (_) {
+                    cmd = '';
+                }
+            } else {
+                cmd = staged
+                    ? `git diff --no-color -M${wsFlag} --staged -- ${pathSpecArgs}`
+                    : `git diff --no-color -M${wsFlag} -- ${pathSpecArgs}`;
+            }
+        } else {
+            showToast('error', 'Diff', `Unsupported diff kind: ${kind}`);
+            return { ok: false, error: `Unsupported diff kind: ${kind}` };
+        }
+
+        if (!cmd) {
+            showToast('error', 'Diff', 'Unable to build diff command');
+            return { ok: false, error: 'No diff command' };
+        }
+
+        let res = null;
+        try {
+            res = await (gitRepoManager?.runGit ? gitRepoManager.runGit(cmd, { silent: true }) : window.ahmadIDE.git(cmd));
+        } catch (err) {
+            showToast('error', 'Diff', err?.message || 'Git diff failed');
+            return { ok: false, error: err?.message || 'Git diff failed' };
+        }
+
+        if (!res?.ok) {
+            const message = res?.error || res?.stderr || 'Git diff failed';
+            let normalized = message;
+            try {
+                if (typeof normalizeGitError === 'function') normalized = normalizeGitError(message, 'Git diff failed');
+            } catch (_) { }
+            showToast('error', 'Diff', normalized);
+            return { ok: false, error: message };
+        }
+
+        let diffText = String(res.stdout || '');
+        if (!diffText.trim()) {
+            diffText = 'No changes.\n';
+        }
+
+        if (typeof createCustomTab !== 'function') {
+            showToast('error', 'Diff', 'Tab system unavailable');
+            return { ok: false, error: 'Tab system unavailable' };
+        }
+
+        const meta = {
+            kind,
+            repoRoot,
+            path: pathIn,
+            oldPath,
+            status,
+            staged,
+            commitHash,
+            parents,
+            parentHash,
+            ignoreWhitespace,
+            source: String(opts.source || '').trim()
+        };
+
+        const tab = createCustomTab({
+            key,
+            title,
+            content: diffText,
+            language: 'plaintext',
+            icon: tabIcon,
+            kind: 'diff',
+            readOnly: true,
+            meta
+        });
+
+        if (tab) {
+            tab.diffAnchors = computeDiffAnchors(diffText);
+            return { ok: true, tabId: tab.id };
+        }
+
+        return { ok: false, error: 'Failed to create diff tab' };
     }
 
     let globalTerminalState = null;
@@ -876,18 +1067,166 @@
             showConfirmDialog,
             showCustomPrompt,
             appendOutput,
-            getGlobalTerminalState: () => globalTerminalState
+            getGlobalTerminalState: () => globalTerminalState,
+            onTabActivated: (tab) => handleEditorTabActivated(tab),
+            onTabClosed: (tab) => handleEditorTabClosed(tab)
         }
     });
 
     const normalizeRoutineTarget = tabManager.normalizeRoutineTarget;
     const findOpenTab = tabManager.findOpenTab;
     const createTab = tabManager.createTab;
+    const createCustomTab = tabManager.createCustomTab;
     const switchTab = tabManager.switchTab;
     const markTabDirty = tabManager.markTabDirty;
     const cycleTab = tabManager.cycleTab;
     const bindTabKeyboardShortcuts = tabManager.bindTabKeyboardShortcuts;
     const renderTabs = tabManager.renderTabs;
+
+    function getActiveTab() {
+        try {
+            return openTabs.find(t => t.id === activeTabId) || null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    function isDiffTab(tab) {
+        return String(tab?.kind || '') === 'diff';
+    }
+
+    function canSaveActiveTab() {
+        const tab = getActiveTab();
+        if (!tab) return true;
+        return !isDiffTab(tab);
+    }
+
+    // Diff toolbar in the main editor action bar (shown only for diff tabs).
+    let diffToolbarEl = null;
+    let diffToolbarWired = false;
+
+    function computeDiffAnchors(diffText) {
+        const anchors = [];
+        const lines = String(diffText || '').split('\n');
+        for (let i = 0; i < lines.length; i += 1) {
+            const line = lines[i];
+            if (line.startsWith('@@') || line.startsWith('diff --git')) {
+                anchors.push(i + 1);
+            }
+        }
+        return anchors;
+    }
+
+    function ensureDiffToolbar() {
+        const host = document.querySelector('.action-bar .actions');
+        if (!host) return null;
+        if (!diffToolbarEl) {
+            diffToolbarEl = document.createElement('div');
+            diffToolbarEl.id = 'diffToolbar';
+            diffToolbarEl.className = 'diff-toolbar hidden';
+            diffToolbarEl.innerHTML = `
+                <button class="btn ghost diff-toolbar-btn" type="button" id="diffPrevChangeBtn" title="Previous change">Prev</button>
+                <button class="btn ghost diff-toolbar-btn" type="button" id="diffNextChangeBtn" title="Next change">Next</button>
+                <div class="toolbar-separator" aria-hidden="true"></div>
+                <button class="btn ghost diff-toolbar-btn" type="button" id="diffIgnoreWhitespaceBtn" title="Ignore whitespace">Ignore WS</button>
+                <select class="diff-parent-select hidden" id="diffParentSelect" title="Compare with parent"></select>
+            `;
+            host.prepend(diffToolbarEl);
+        }
+        if (!diffToolbarWired) {
+            diffToolbarWired = true;
+            diffToolbarEl.querySelector('#diffPrevChangeBtn')?.addEventListener('click', () => navigateDiffChange(-1));
+            diffToolbarEl.querySelector('#diffNextChangeBtn')?.addEventListener('click', () => navigateDiffChange(1));
+            diffToolbarEl.querySelector('#diffIgnoreWhitespaceBtn')?.addEventListener('click', () => toggleDiffWhitespace());
+            diffToolbarEl.querySelector('#diffParentSelect')?.addEventListener('change', (e) => {
+                const tab = getActiveTab();
+                if (!isDiffTab(tab)) return;
+                const meta = tab?.meta || {};
+                const parentHash = String(e?.target?.value || '').trim();
+                if (!parentHash) return;
+                openDiffTab({ ...meta, parentHash, source: 'diff-parent-select' }).catch(() => { });
+            });
+        }
+        return diffToolbarEl;
+    }
+
+    function syncDiffToolbar(tab) {
+        const el = ensureDiffToolbar();
+        if (!el) return;
+        if (!isDiffTab(tab)) {
+            el.classList.add('hidden');
+            return;
+        }
+
+        el.classList.remove('hidden');
+        const ignoreBtn = el.querySelector('#diffIgnoreWhitespaceBtn');
+        const parentSelect = el.querySelector('#diffParentSelect');
+        const meta = tab?.meta || {};
+        const ignore = !!meta.ignoreWhitespace;
+        if (ignoreBtn) {
+            ignoreBtn.classList.toggle('active', ignore);
+            ignoreBtn.textContent = ignore ? 'Ignore WS: On' : 'Ignore WS';
+        }
+        if (parentSelect) {
+            const parents = Array.isArray(meta.parents) ? meta.parents.filter(Boolean) : [];
+            if (parents.length > 1) {
+                parentSelect.classList.remove('hidden');
+                parentSelect.innerHTML = '';
+                parents.forEach((hash, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = hash;
+                    opt.textContent = idx === 0 ? `Parent 1 (${hash.slice(0, 7)})` : `Parent ${idx + 1} (${hash.slice(0, 7)})`;
+                    parentSelect.appendChild(opt);
+                });
+                const selected = String(meta.parentHash || parents[0] || '').trim();
+                if (selected) parentSelect.value = selected;
+            } else {
+                parentSelect.classList.add('hidden');
+            }
+        }
+    }
+
+    function navigateDiffChange(direction) {
+        const tab = getActiveTab();
+        if (!isDiffTab(tab)) return;
+        const editor = activeEditor;
+        if (!editor) return;
+        const anchors = Array.isArray(tab.diffAnchors) ? tab.diffAnchors : [];
+        if (!anchors.length) return;
+        const pos = editor.getPosition?.();
+        const curLine = pos?.lineNumber || 1;
+        let target = null;
+        if (direction > 0) {
+            target = anchors.find((n) => n > curLine) || anchors[0];
+        } else {
+            for (let i = anchors.length - 1; i >= 0; i -= 1) {
+                if (anchors[i] < curLine) {
+                    target = anchors[i];
+                    break;
+                }
+            }
+            if (!target) target = anchors[anchors.length - 1];
+        }
+        if (!target) return;
+        editor.setPosition?.({ lineNumber: target, column: 1 });
+        editor.revealLineInCenter?.(target);
+        editor.focus?.();
+    }
+
+    function toggleDiffWhitespace() {
+        const tab = getActiveTab();
+        if (!isDiffTab(tab)) return;
+        const meta = tab?.meta || {};
+        openDiffTab({ ...meta, ignoreWhitespace: !meta.ignoreWhitespace, source: 'diff-ignore-ws' }).catch(() => { });
+    }
+
+    function handleEditorTabActivated(tab) {
+        syncDiffToolbar(tab);
+    }
+
+    function handleEditorTabClosed(_tab) {
+        // No-op for now; the active tab change will hide the toolbar as needed.
+    }
 
     // Breakpoints / Debugger moved to src/editor/debug/renderer-debug.js
     const createDebugManager = window.AhmadIDEModules?.debug?.createDebugManager;
@@ -1003,6 +1342,27 @@
         }
     });
 
+    // Git repo detection/state moved to src/editor/git/renderer-git-repo-manager.js
+    const createGitRepoManager = window.AhmadIDEModules?.git?.createGitRepoManager;
+    if (!createGitRepoManager) {
+        logger.error('GIT_REPO_MANAGER_MODULE_MISSING', { path: './src/editor/git/renderer-git-repo-manager.js' });
+        throw new Error('Git Repo Manager module missing: ./src/editor/git/renderer-git-repo-manager.js');
+    }
+    gitRepoManager = createGitRepoManager({
+        deps: {
+            showToast,
+            logger,
+            getCurrentProject: () => currentProject
+        }
+    });
+    try {
+        window.AhmadIDEModules = window.AhmadIDEModules || {};
+        window.AhmadIDEModules.git = window.AhmadIDEModules.git || {};
+        window.AhmadIDEModules.git.repoManager = gitRepoManager;
+        window.AhmadIDE = window.AhmadIDE || {};
+        window.AhmadIDE.gitRepoManager = gitRepoManager;
+    } catch (_) { }
+
     // Git tool window moved to src/editor/git/renderer-git-toolwindow.js
     const createGitToolWindowManager = window.AhmadIDEModules?.git?.createGitToolWindowManager;
     if (!createGitToolWindowManager) {
@@ -1013,7 +1373,14 @@
         deps: {
             showToast,
             normalizeGitError: (...args) => normalizeGitError(...args),
-            toggleToolWindowPanel
+            toggleToolWindowPanel,
+            runGit: (cmd, opts) => gitRepoManager?.runGit
+                ? gitRepoManager.runGit(cmd, opts)
+                : window.ahmadIDE.git(cmd),
+            gitActions: gitRepoManager?.actions,
+            getGitRepoState: () => (gitRepoManager?.getState ? gitRepoManager.getState() : null),
+            subscribeGitRepoState: (fn) => (gitRepoManager?.subscribe ? gitRepoManager.subscribe(fn) : (() => { })),
+            openDiffTab
         }
     });
 
@@ -1027,7 +1394,11 @@
         deps: {
             $,
             showToast,
-            getCurrentProject: () => currentProject
+            getCurrentProject: () => currentProject,
+            runGit: (cmd, opts) => gitRepoManager?.runGit
+                ? gitRepoManager.runGit(cmd, opts)
+                : window.ahmadIDE.git(cmd),
+            getGitRepoState: () => (gitRepoManager?.getState ? gitRepoManager.getState() : null)
         }
     });
 
@@ -1126,7 +1497,8 @@
             loadRoutineList: (...args) => loadRoutineList(...args),
             getCurrentProject: () => currentProject,
             openGitToolWindow: (...args) => openGitToolWindow(...args),
-            runGitQuickCmd: (...args) => runGitQuickCmd(...args)
+            runGitQuickCmd: (...args) => runGitQuickCmd(...args),
+            toGitPathspec: (...args) => toGitPathspec(...args)
         }
     });
 
@@ -1716,7 +2088,7 @@
     async function runGitQuickCmd(cmd, { toastLabel = 'Git', silent = false } = {}) {
         logger.info('GIT_COMMAND', { cmd, toastLabel });
         if (!silent) gitOutputGlobal(`$ ${cmd}`);
-        const res = await window.ahmadIDE.git(cmd);
+        const res = await (gitRepoManager?.runGit ? gitRepoManager.runGit(cmd) : window.ahmadIDE.git(cmd));
         if (res.ok) {
             if (!silent) {
                 if (res.stdout) gitOutputGlobal(res.stdout);
@@ -1734,7 +2106,8 @@
 
     async function runGitContextAction(action, path) {
         const target = path || '.';
-        const safe = target.replace(/"/g, '\\"');
+        const gitPath = toGitPathspec(target) || target;
+        const safe = String(gitPath).replace(/"/g, '\\"');
         const setPath = (val) => {
             const input = document.getElementById('gitDiffPath');
             if (input) input.value = val;
@@ -1754,7 +2127,7 @@
                 return;
             case 'commit':
                 openCommitToolWindow();
-                setPath(target);
+                setPath(gitPath);
                 await runGitQuickCmd(`git add -- "${safe}"`, { toastLabel: 'Commit File' });
                 showToast('info', 'Commit File', 'File staged. Enter a commit message in Git tool window.');
                 focusCommit();
@@ -1762,13 +2135,13 @@
                 return;
             case 'history':
                 openGitToolWindow();
-                setPath(target);
+                setPath(gitPath);
                 await runGitQuickCmd(`git log --oneline -- "${safe}"`, { toastLabel: 'Git History' });
                 document.getElementById('gitLogBtn')?.click();
                 return;
             case 'compare':
                 openGitToolWindow();
-                setPath(target);
+                setPath(gitPath);
                 document.getElementById('gitDiffFileBtn')?.click();
                 return;
             case 'rollback':
@@ -2097,6 +2470,10 @@
                 e.preventDefault();
                 e.stopPropagation();
                 if (globalRoutineState && globalTerminalState && activeEditor) {
+                    if (!canSaveActiveTab()) {
+                        showToast('info', 'Diff', 'Diff tabs are read-only');
+                        return;
+                    }
                     await saveRoutineFlow(activeEditor, globalRoutineState, globalTerminalState);
                 }
                 return;
@@ -2182,6 +2559,9 @@
                 if (contentArea) contentArea.classList.add('hidden');
             }
             buttons.forEach(b => b.classList.remove('active'));
+            try {
+                window.dispatchEvent(new CustomEvent('ahmadIDE:toolwindow-hidden', { detail: { panelId, position } }));
+            } catch (_) { }
             return;
         }
 
@@ -2233,6 +2613,10 @@
             refreshTerminalLayout(globalTerminalState);
             setTimeout(() => focusTerminal(), 10);
         }
+
+        try {
+            window.dispatchEvent(new CustomEvent('ahmadIDE:toolwindow-activated', { detail: { panelId, position } }));
+        } catch (_) { }
     }
 
     function bindToolWindows() {
@@ -2242,6 +2626,10 @@
             btn.addEventListener('click', () => {
                 const panelId = btn.getAttribute('data-panel');
                 const position = btn.getAttribute('data-position');
+                if (panelId === 'gitToolPanel') {
+                    openGitToolWindow({ source: 'stripe' });
+                    return;
+                }
                 toggleToolWindowPanel(panelId, position);
             });
         });
@@ -2705,7 +3093,7 @@
             registerKeybinding(editor, 'Tool: Problems', 'tool-todo', () => toggleToolWindowPanel('problemsPanel', 'bottom'), shortcutDefaults['tool-todo']);
             registerKeybinding(editor, 'Tool: Structure', 'tool-structure', () => toggleToolWindowPanel('structurePanel', 'left'), shortcutDefaults['tool-structure']);
             registerKeybinding(editor, 'Tool: Services', 'tool-services', () => toggleToolWindowPanel('servicesPanel', 'bottom'), shortcutDefaults['tool-services']);
-            registerKeybinding(editor, 'Tool: Git', 'tool-git', () => toggleToolWindowPanel('gitToolPanel', 'bottom'), shortcutDefaults['tool-git']);
+            registerKeybinding(editor, 'Tool: Git', 'tool-git', () => openGitToolWindow({ source: 'shortcut' }), shortcutDefaults['tool-git']);
             registerKeybinding(editor, 'Tool: Terminal', 'tool-terminal', () => toggleToolWindowPanel('terminalPanel', 'bottom'), shortcutDefaults['tool-terminal']);
 
             renderProjectTree([], routineState, editor);
@@ -2917,16 +3305,39 @@
             };
 
             const fetchCurrentBranch = async () => {
-                if (currentProject && currentProject.projectPath) {
-                    const branchRes = await window.ahmadIDE.git('git branch --show-current');
-                    if (branchRes?.ok && branchRes.stdout) {
-                        const name = branchRes.stdout.trim();
-                        setBranchDisplay(name || 'Git');
-                        return name || 'Git';
+                try {
+                    const repoState = gitRepoManager?.getState ? gitRepoManager.getState() : null;
+                    if (repoState?.gitDisabled) return null;
+                    if (repoState && !repoState.gitAvailable) return null;
+                    if (repoState && !repoState.repoDetected) {
+                        setBranchDisplay('Git');
+                        return null;
                     }
-                }
+
+                    if (currentProject && currentProject.projectPath) {
+                        const branchRes = await (gitRepoManager?.runGit
+                            ? gitRepoManager.runGit('git branch --show-current')
+                            : window.ahmadIDE.git('git branch --show-current'));
+                        if (branchRes?.ok && branchRes.stdout) {
+                            const name = branchRes.stdout.trim();
+                            setBranchDisplay(name || 'Git');
+                            return name || 'Git';
+                        }
+                    }
+                } catch (_) { }
                 return null;
             };
+
+            // Keep branch / tooltip in sync with repo detection changes.
+            try {
+                gitRepoManager?.subscribe?.((s) => {
+                    if (!s || s.gitDisabled || !s.gitAvailable || !s.repoDetected) {
+                        setBranchDisplay('Git');
+                        return;
+                    }
+                    fetchCurrentBranch().catch(() => { });
+                });
+            } catch (_) { }
 
             // Update Git branch if in a git repo
             fetchCurrentBranch();
@@ -3094,6 +3505,10 @@
             hideBtn?.addEventListener('click', () => toggleToolWindowPanel('terminalPanel', 'bottom'));
 
             $('#saveRoutineBtn').on('click', async () => {
+                if (!canSaveActiveTab()) {
+                    showToast('info', 'Diff', 'Diff tabs are read-only');
+                    return;
+                }
                 await saveRoutineFlow(editor, routineState, terminalState);
             });
             $('#undoBtn').on('click', () => {

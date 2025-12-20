@@ -66,65 +66,229 @@
             <ul class="problems-list" id="problemsListStandalone"></ul>
         `,
         gitToolPanel: `
-            <div class="pane-header">
-                <div class="pane-title">Git</div>
-                <div class="pill subtle">Status / Log / Diff</div>
-            </div>
-            <div class="git-grid">
-                <div class="git-left">
-                    <div class="pane-title">Local Changes</div>
-                    <div class="pane-subtitle">Unstaged</div>
-                    <div class="git-changes-list" id="gitChangesUnstaged">Run status to load changes.</div>
-                    <div class="pane-subtitle" style="margin-top:6px;">Staged</div>
-                    <div class="git-changes-list" id="gitChangesStaged">No staged files.</div>
-                    <div class="flex git-actions" style="margin-top:8px;">
-                        <button class="btn ghost" id="gitRefreshBtn">Refresh</button>
-                        <button class="btn ghost" id="gitStageSelectedBtn">Stage</button>
-                        <button class="btn ghost" id="gitUnstageSelectedBtn">Unstage</button>
-                        <button class="btn ghost" id="gitDiffSelectedBtn">Diff Selected</button>
+            <div class="git-toolwindow" id="gitToolWindow">
+                <div class="git-tw-header">
+                    <div class="git-tw-title">Git</div>
+
+                    <div class="git-tw-tabs" role="tablist" aria-label="Git tool window">
+                        <button class="git-tw-tab active" type="button" data-git-tab="log" role="tab"
+                            aria-selected="true">Log</button>
+                        <button class="git-tw-tab" type="button" data-git-tab="changes" role="tab"
+                            aria-selected="false">Commit</button>
                     </div>
-                    <div class="pane-title" style="margin-top:10px;">Commit</div>
-                    <textarea id="gitCommitMessage" class="git-commit-input" placeholder="Commit message"></textarea>
-                    <div class="flex git-actions">
-                        <button class="btn primary" id="gitCommitBtn">Commit</button>
-                        <button class="btn ghost" id="gitPushBtn">Push</button>
-                        <button class="btn ghost" id="gitPullBtn">Pull</button>
-                        <button class="btn ghost" id="gitFetchBtn">Fetch</button>
-                    </div>
-                    <div class="pane-title" style="margin-top:6px;">Branch</div>
-                    <div class="git-branch-row">
-                        <select id="gitBranchSelect" class="git-branch-select"></select>
-                        <input id="gitBranchInput" class="git-branch-input" placeholder="New branch name">
-                        <button class="btn ghost" id="gitCheckoutBtn">Checkout</button>
-                    </div>
+
                 </div>
-                <div class="git-right">
-                    <div class="pane-title">History</div>
-                    <div class="flex" style="margin-bottom:6px; flex-wrap: wrap;">
-                        <button class="btn ghost" id="gitStatusBtn">Status</button>
-                        <button class="btn ghost" id="gitLogBtn">Log</button>
-                        <button class="btn ghost" id="gitDiffBtn">Diff (stat)</button>
-                        <button class="btn ghost" id="gitClearBtn">Clear</button>
+
+                <div class="git-banner hidden" id="gitBanner" role="status" aria-live="polite">
+                    <div class="git-banner-text" id="gitBannerText"></div>
+                    <div class="git-banner-actions" id="gitBannerActions"></div>
+                </div>
+
+                <div class="git-tw-toolbar" role="toolbar" aria-label="Git toolbar">
+                    <div class="git-tw-toolbar-group">
+                        <button class="git-tw-iconbtn" type="button" id="gitFetchBtn" title="Fetch">
+                            <span data-ui-icon="download" data-ui-icon-size="16" aria-hidden="true"></span>
+                        </button>
+                        <button class="git-tw-iconbtn" type="button" id="gitPullBtn" title="Pull">
+                            <span data-ui-icon="download" data-ui-icon-size="16" aria-hidden="true"></span>
+                        </button>
+                        <button class="git-tw-iconbtn" type="button" id="gitPushBtn" title="Push">
+                            <span data-ui-icon="upload" data-ui-icon-size="16" aria-hidden="true"></span>
+                        </button>
+
+                        <div class="git-tw-sep" role="separator"></div>
+
+                        <button class="git-tw-iconbtn" type="button" id="gitRefreshBtn" title="Refresh">
+                            <span data-ui-icon="refresh" data-ui-icon-size="16" aria-hidden="true"></span>
+                        </button>
                     </div>
-                    <div class="git-history-list" id="gitHistoryList">History not loaded.</div>
-                    <div class="pane-title" style="margin-top:8px;">Console</div>
-                    <pre class="debug-output" id="gitOutput">Git ready.</pre>
-                    <div class="pane-title" style="margin-top:8px;">File Diff</div>
-                    <div class="flex" style="gap:6px; margin-bottom:6px;">
-                        <input class="ssh-input" id="gitDiffPath" placeholder="Path (relative)">
-                        <button class="btn ghost" id="gitDiffFileBtn">Show Diff</button>
-                        <button class="btn ghost" id="gitHistoryFileBtn">File History</button>
-                    </div>
-                    <div class="pane-title" style="margin-top:6px;">Compare Two Files</div>
-                    <div class="flex" style="gap:6px; margin-bottom:6px;">
-                        <input class="ssh-input" id="gitComparePathA" placeholder="Path A">
-                        <input class="ssh-input" id="gitComparePathB" placeholder="Path B">
-                        <button class="btn ghost" id="gitCompareBtn">Compare</button>
-                    </div>
-                    <div class="git-diff-grid">
-                        <pre class="debug-output" id="gitDiffLeft">Left</pre>
-                        <pre class="debug-output" id="gitDiffRight">Right</pre>
-                    </div>
+
+                    <div class="git-tw-sep" role="separator"></div>
+
+                    <button class="git-tw-iconbtn" type="button" id="gitFocusSearchBtn" title="Search">
+                        <span data-ui-icon="search" data-ui-icon-size="16" aria-hidden="true"></span>
+                    </button>
+                    <button class="git-tw-iconbtn" type="button" id="gitFilterBtn" title="Filter">
+                        <span data-ui-icon="filter" data-ui-icon-size="16" aria-hidden="true"></span>
+                    </button>
+
+                    <div class="git-spacer"></div>
+
+                    <button class="git-tw-iconbtn" type="button" id="gitSettingsBtn" title="Settings">
+                        <span data-ui-icon="settings" data-ui-icon-size="16" aria-hidden="true"></span>
+                    </button>
+                    <button class="git-tw-iconbtn" type="button" id="gitOverflowBtn" title="More">⋯</button>
+                </div>
+
+                <div class="git-tw-panes">
+                    <section class="git-tw-pane active" data-git-pane="log" role="tabpanel">
+                        <div class="git-log-layout git-log-layout--3pane">
+                            <div class="git-pane git-pane--branches">
+                                <div class="git-pane-header">
+                                    <div class="git-pane-title">Branches</div>
+                                    <div class="git-pane-actions">
+                                        <button class="git-tw-iconbtn" type="button" id="gitBranchesRefreshBtn" title="Refresh">
+                                            <span data-ui-icon="refresh" data-ui-icon-size="16" aria-hidden="true"></span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="git-branches-tree" id="gitBranchesTree">Branches not loaded.</div>
+                            </div>
+
+                            <div class="git-pane git-pane--commits">
+                                <div class="git-log-filter-row" role="toolbar" aria-label="Commit filters">
+                                    <div class="git-log-filter-search" title="Search commits">
+                                        <span data-ui-icon="search" data-ui-icon-size="16" aria-hidden="true"></span>
+                                        <input id="gitLogSearchInput" class="git-input" placeholder="Text or hash">
+                                    </div>
+                                    <div class="git-log-filter-field" title="Branch scope">
+                                        <span class="git-log-filter-label">Branch:</span>
+                                        <select id="gitLogBranchSelect" class="git-select"></select>
+                                    </div>
+
+                                    <select id="gitLogUserSelect" class="git-select" disabled title="Not implemented yet">
+                                        <option>User</option>
+                                    </select>
+                                    <select id="gitLogDateSelect" class="git-select" disabled title="Not implemented yet">
+                                        <option>Date</option>
+                                    </select>
+                                    <select id="gitLogPathsSelect" class="git-select" disabled title="Not implemented yet">
+                                        <option>Paths</option>
+                                    </select>
+
+                                    <button class="btn ghost git-small-btn" type="button" id="gitLogResetBtn">Reset</button>
+                                    <button class="git-tw-iconbtn" type="button" id="gitLogBtn" title="Reload Log">
+                                        <span data-ui-icon="refresh" data-ui-icon-size="16" aria-hidden="true"></span>
+                                    </button>
+                                </div>
+
+                                <div class="git-log-list" id="gitHistoryList">History not loaded.</div>
+                            </div>
+
+                            <div class="git-pane git-pane--details">
+                                <div class="git-pane-header">
+                                    <div>
+                                        <div class="git-pane-title">Commit details</div>
+                                        <div class="git-pane-subtitle" id="gitLogDetailsSubtitle"></div>
+                                    </div>
+                                </div>
+
+                                <div class="git-log-empty" id="gitLogEmptyState">
+                                    Select commit to view changes
+                                </div>
+
+                                <div class="git-log-details-body hidden" id="gitLogDetailsBody">
+                                    <div class="git-commit-header">
+                                        <div class="git-commit-subject" id="gitLogSubject"></div>
+                                        <div class="git-commit-meta">
+                                            <span class="git-commit-hash" id="gitLogHash"></span>
+                                            <span class="git-commit-meta-sep">·</span>
+                                            <span class="git-commit-author" id="gitLogAuthor"></span>
+                                            <span class="git-commit-meta-sep">·</span>
+                                            <span class="git-commit-date" id="gitLogDate"></span>
+                                            <span class="git-spacer"></span>
+                                            <button class="git-tw-iconbtn git-commit-copy" type="button"
+                                                id="gitCopyCommitHashBtn" title="Copy commit hash">
+                                                <span data-ui-icon="copy" data-ui-icon-size="16" aria-hidden="true"></span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div class="git-log-files">
+                                        <div class="git-section-header">
+                                            <div class="git-group-header">Files</div>
+                                            <div class="git-section-actions">
+                                                <span class="git-section-meta" id="gitLogFilesCount"></span>
+                                            </div>
+                                        </div>
+                                        <div class="git-log-files-list" id="gitLogFiles"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="git-tw-pane" data-git-pane="changes" role="tabpanel">
+                        <div class="git-changes-layout git-changes-layout--single">
+                            <div class="git-pane">
+                                <div class="git-commit-view">
+                                    <div class="git-commit-changes">
+                                        <div class="git-section-row">
+                                            <div class="git-section-title">Changes</div>
+                                            <div class="git-section-actions">
+                                                <button class="git-tw-iconbtn" type="button" id="gitStageSelectedBtn"
+                                                    title="Stage Selected">
+                                                    <span data-ui-icon="download" data-ui-icon-size="16" aria-hidden="true"></span>
+                                                </button>
+                                                <button class="git-tw-iconbtn" type="button" id="gitUnstageSelectedBtn"
+                                                    title="Unstage Selected">
+                                                    <span data-ui-icon="upload" data-ui-icon-size="16" aria-hidden="true"></span>
+                                                </button>
+                                                <button class="git-tw-iconbtn" type="button" id="gitDiffSelectedBtn"
+                                                    title="Open Diff in Editor">
+                                                    <span data-ui-icon="format" data-ui-icon-size="16" aria-hidden="true"></span>
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div class="git-changes-groups">
+                                            <div class="git-group">
+                                                <div class="git-group-header">Unstaged</div>
+                                                <div class="git-changes-list" id="gitChangesUnstaged">Run refresh to load
+                                                    changes.</div>
+                                            </div>
+                                            <div class="git-group">
+                                                <div class="git-group-header">Staged</div>
+                                                <div class="git-changes-list" id="gitChangesStaged">No staged files.</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="git-commit-message">
+                                        <div class="git-commit-options">
+                                            <label class="git-checkbox">
+                                                <input type="checkbox" id="gitAmendCheckbox">
+                                                Amend
+                                            </label>
+                                            <div class="git-spacer"></div>
+                                            <button class="btn ghost git-small-btn" type="button" id="gitCommitOptionsBtn"
+                                                title="Commit Options" disabled>⋯</button>
+                                        </div>
+                                        <textarea id="gitCommitMessage" class="git-commit-input"
+                                            placeholder="Commit message"></textarea>
+                                        <div class="git-commit-actions">
+                                            <button class="btn primary git-primary git-small-btn" type="button"
+                                                id="gitCommitBtn">Commit</button>
+                                            <button class="btn ghost git-small-btn" type="button"
+                                                id="gitCommitAndPushBtn">Commit and Push…</button>
+                                        </div>
+                                        <details class="git-branch-details">
+                                            <summary class="git-branch-summary">Branch</summary>
+                                            <div class="git-branch-row">
+                                                <select id="gitBranchSelect" class="git-select"></select>
+                                                <input id="gitBranchInput" class="git-input" placeholder="New branch name">
+                                                <button class="btn ghost git-small-btn" type="button"
+                                                    id="gitCheckoutBtn">Checkout</button>
+                                            </div>
+                                        </details>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="hidden">
+                                <button class="btn ghost git-small-btn" type="button" id="gitStatusBtn">Status</button>
+                                <button class="btn ghost git-small-btn" type="button" id="gitClearBtn">Clear</button>
+                                <input class="git-input" id="gitDiffPath" placeholder="Path (relative)">
+                                <button class="btn ghost git-small-btn" type="button" id="gitDiffFileBtn">Show Diff</button>
+                                <button class="btn ghost git-small-btn" type="button" id="gitHistoryFileBtn">File History</button>
+                                <input class="git-input" id="gitComparePathA" placeholder="Path A">
+                                <input class="git-input" id="gitComparePathB" placeholder="Path B">
+                                <button class="btn ghost git-small-btn" type="button" id="gitCompareBtn">Compare</button>
+                                <button class="btn ghost git-small-btn" type="button" id="gitDiffBtn">Diff (stat)</button>
+                                <pre class="debug-output git-console-output" id="gitOutput">Git ready.</pre>
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </div>
         `,
@@ -142,24 +306,64 @@
             </div>
         `,
         servicesPanel: `
-            <div class="pane-header">
-                <div class="pane-title">Services</div>
-                <div class="pill subtle">Docker / SSH</div>
+            <div class="services-toolwindow" id="servicesToolWindow">
+                <div class="services-split">
+                    <div class="services-left">
+                        <div class="services-titlebar">Services</div>
+                        <div class="services-divider"></div>
+                        <div class="services-toolbar" role="toolbar" aria-label="Services toolbar">
+                            <button class="services-toolbar-btn" id="servicesAddBtn" type="button" title="Add">
+                                <svg viewBox="0 0 16 16" fill="none">
+                                    <path d="M8 3.2v9.6M3.2 8h9.6" stroke="currentColor" stroke-width="1.6"
+                                        stroke-linecap="round" />
+                                    <circle cx="12.3" cy="12.3" r="0.9" fill="currentColor" opacity="0.7" />
+                                </svg>
+                            </button>
+                            <button class="services-toolbar-btn" id="servicesViewBtn" type="button" title="View options">
+                                <svg viewBox="0 0 16 16" fill="none">
+                                    <path d="M1.8 8s2.2-4 6.2-4 6.2 4 6.2 4-2.2 4-6.2 4-6.2-4-6.2-4z"
+                                        stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+                                    <circle cx="8" cy="8" r="1.8" stroke="currentColor" stroke-width="1.3" />
+                                </svg>
+                            </button>
+                            <button class="services-toolbar-btn" id="servicesNewBtn" type="button" title="New service">
+                                <svg viewBox="0 0 16 16" fill="none">
+                                    <rect x="3" y="3" width="10" height="10" rx="1.8" stroke="currentColor"
+                                        stroke-width="1.3" />
+                                    <path d="M8 5.3v5.4M5.3 8h5.4" stroke="currentColor" stroke-width="1.4"
+                                        stroke-linecap="round" />
+                                </svg>
+                            </button>
+                            <div class="services-toolbar-sep" role="separator"></div>
+                            <button class="services-toolbar-btn" id="servicesExpandAllBtn" type="button"
+                                title="Expand all">
+                                <svg viewBox="0 0 16 16" fill="none">
+                                    <path d="M5 6l3 3 3-3" stroke="currentColor" stroke-width="1.4"
+                                        stroke-linecap="round" stroke-linejoin="round" />
+                                    <path d="M5 10l3 3 3-3" stroke="currentColor" stroke-width="1.4"
+                                        stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                            <button class="services-toolbar-btn" id="servicesCollapseAllBtn" type="button"
+                                title="Collapse all">
+                                <svg viewBox="0 0 16 16" fill="none">
+                                    <path d="M5 10l3-3 3 3" stroke="currentColor" stroke-width="1.4"
+                                        stroke-linecap="round" stroke-linejoin="round" />
+                                    <path d="M5 6l3-3 3 3" stroke="currentColor" stroke-width="1.4"
+                                        stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="services-tree" id="servicesTree" role="tree" aria-label="Services tree"></div>
+                    </div>
+                    <div class="services-right">
+                        <div class="services-detail" id="servicesDetail">
+                            <div class="services-empty" id="servicesEmpty">Select service to view details</div>
+                            <div class="services-detail-content hidden" id="servicesDetailContent"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="pane-title">Docker</div>
-            <div class="pane-subtitle">List running containers</div>
-            <div class="flex" style="margin-bottom:6px;">
-                <button class="btn ghost" id="svcDockerListBtn">List Containers</button>
-                <button class="btn ghost" id="svcDockerRefreshBtn">Refresh</button>
-            </div>
-            <div class="git-changes-list" id="svcDockerOutput">Docker services not queried.</div>
-            <div class="pane-title" style="margin-top:10px;">SSH</div>
-            <div class="pane-subtitle">Run simple command</div>
-            <div class="flex" style="gap:6px; margin-bottom:6px;">
-                <input class="ssh-input" id="svcSshCmd" placeholder="Command (requires SSH config)">
-                <button class="btn ghost" id="svcSshRunBtn">Run</button>
-            </div>
-            <div class="git-changes-list" id="svcSshOutput">SSH services not queried.</div>
         `,
         connectionsPanel: `
             <div class="connections-header">

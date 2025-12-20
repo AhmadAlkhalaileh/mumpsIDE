@@ -44,6 +44,53 @@
     margin-left: auto;
 }
 
+/* Diff toolbar (main editor action bar) */
+.diff-toolbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.diff-toolbar.hidden {
+    display: none;
+}
+
+.diff-toolbar-btn.btn {
+    padding: 4px 8px;
+    min-height: 24px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.diff-toolbar-btn.btn:hover {
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+.diff-toolbar-btn.btn.active {
+    background: rgba(74, 158, 255, 0.18) !important;
+    border-color: rgba(74, 158, 255, 0.35);
+    color: rgba(203, 228, 255, 0.92) !important;
+}
+
+.diff-parent-select {
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: #2d2f30;
+    color: var(--text);
+    font-size: 12px;
+    line-height: 24px;
+}
+
+.diff-parent-select.hidden {
+    display: none;
+}
+
 /* PhpStorm-style toolbar buttons */
 .toolbar-btn {
     display: inline-flex;
@@ -241,4 +288,3 @@
 .perf-mode .debug-float {
     box-shadow: none !important;
 }
-
