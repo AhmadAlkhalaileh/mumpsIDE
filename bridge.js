@@ -890,7 +890,8 @@ function wrapDockerCmd(cmd) {
 
 function buildYdbEnv(cfg = {}, opts = {}) {
   const ydbPath = cfg.ydbPath || '';
-  const gldPath = cfg.gldPath || '';
+  // gldPath should be pre-discovered and passed in via opts.discoveredGldPath or cfg.gldPath
+  const gldPath = opts.discoveredGldPath || cfg.gldPath || '';
   const routines = (cfg.rpcRoutinesPath || cfg.routinesPath || '').trim();
   const tmpDebugDir = (opts.tmpDebugDir || '').trim();
   const extra = Array.isArray(opts.extraRoutines) ? opts.extraRoutines.filter(Boolean) : [];
@@ -900,13 +901,61 @@ function buildYdbEnv(cfg = {}, opts = {}) {
   if (routines) routineParts.push(`${routines}(${routines})`);
   routineParts.push(`${ydbPath}/libgtmutil.so ${ydbPath}`);
   const gtmroutines = routineParts.filter(Boolean).join(' ').trim();
-  return [
-    `export gtm_dist=${ydbPath}`,
-    `export gtmgbldir=${gldPath}`,
-    `export gtmroutines='${gtmroutines}'`,
-    `export gtm_etrap=''`,
-    `export gtm_ztrap=''`
-  ].join(' && ');
+
+  const exports = [];
+
+  // Export gtmgbldir - this should be pre-discovered and passed in
+  if (gldPath) {
+    exports.push(`export gtmgbldir=${gldPath}`);
+  }
+
+  // Export gtm_dist if ydbPath is configured
+  if (ydbPath) {
+    exports.push(`export gtm_dist=${ydbPath}`);
+  }
+
+  // Always set gtmroutines to include our debug directory
+  exports.push(`export gtmroutines='${gtmroutines}'`);
+
+  // Disable error traps to prevent interference with debugging
+  exports.push(`export gtm_etrap=''`);
+  exports.push(`export gtm_ztrap=''`);
+
+  return exports.join(' && ');
+}
+
+// Discover gld path from the container/host
+async function discoverGldPath() {
+  const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
+  const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
+
+  // If gldPath is already configured, use it
+  if (cfg.gldPath) {
+    return cfg.gldPath;
+  }
+
+  // Try to discover from common locations
+  const discoveryCmd = "test -f /var/worldvista/prod/hakeem/globals/mumps.gld && echo '/var/worldvista/prod/hakeem/globals/mumps.gld' || (find /var/worldvista -name 'mumps.gld' 2>/dev/null | head -1)";
+
+  return new Promise((resolve) => {
+    if (useDocker) {
+      const escaped = discoveryCmd.replace(/'/g, `'\\''`);
+      const fullCmd = wrapDockerCmd(`docker exec ${cfg.containerId} bash -c '${escaped}'`);
+      exec(fullCmd, { timeout: 10000 }, (err, stdout) => {
+        const gldPath = (stdout || '').trim();
+        dbgLog('[DEBUG] discoverGldPath result:', gldPath || '(empty)');
+        resolve(gldPath || '/var/worldvista/prod/hakeem/globals/mumps.gld'); // Fallback
+      });
+    } else {
+      const sshPass = cfg.password ? `sshpass -p '${cfg.password}'` : '';
+      const fullCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "${discoveryCmd.replace(/"/g, '\\"')}"`;
+      exec(fullCmd, { timeout: 10000 }, (err, stdout) => {
+        const gldPath = (stdout || '').trim();
+        dbgLog('[DEBUG] discoverGldPath result:', gldPath || '(empty)');
+        resolve(gldPath || '/var/worldvista/prod/hakeem/globals/mumps.gld'); // Fallback
+      });
+    }
+  });
 }
 
 function runHostCommand(cmd) {
@@ -1185,11 +1234,12 @@ async function ensureHarness() {
   return writeRemoteFile(dest, content);
 }
 
-function spawnZStepProcess(entryRoutine, entryTag = '') {
+function spawnZStepProcess(entryRoutine, entryTag = '', discoveredGldPath = '') {
   const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
   const tagArg = entryTag ? ` ${entryTag}` : '';
   const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
-  const envExports = buildYdbEnv(cfg, { tmpDebugDir: '/tmp/ahmad_dbg' });
+  // Pass discovered gld path to buildYdbEnv
+  const envExports = buildYdbEnv(cfg, { tmpDebugDir: '/tmp/ahmad_dbg', discoveredGldPath });
   const cdCmd = 'cd /tmp/ahmad_dbg';
   // Run the AHMDBGJSON entry point in the AHMDBG routine (tag^routine)
   const runCmd = `${envExports} && ${cdCmd} && ${cfg.ydbPath}/mumps -run AHMDBGJSON^AHMDBG ${entryRoutine}${tagArg}`;
@@ -1904,7 +1954,11 @@ async function startZStepSession(code, breakpoints = [], startLine = null) {
   }
   dbgLog('[DEBUG] TMPDBG.m compiled successfully');
 
-  const proc = spawnZStepProcess('TMPDBG', entryTag);
+  // Discover gld path before spawning the debugger process
+  const discoveredGldPath = await discoverGldPath();
+  dbgLog('[DEBUG] discovered gld path:', discoveredGldPath);
+
+  const proc = spawnZStepProcess('TMPDBG', entryTag, discoveredGldPath);
   const session = {
     engine: 'zstep',
     proc,
