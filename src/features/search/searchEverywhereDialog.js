@@ -2,7 +2,6 @@
     /**
      * Search Everywhere Dialog
      * Palette-style universal search dialog
-     * Matches PhpStorm 2025.3 New UI Search Everywhere (Shift+Shift)
      *
      * Checklist: SEA-001 to SEA-008
      */
@@ -40,12 +39,12 @@
                 tab.textContent = label;
                 tab.dataset.tab = label.toLowerCase();
                 if (label.toLowerCase() === activeTab) {
-                    tab.style.background = 'rgba(74, 158, 255, 0.16)';
+                    tab.style.background = 'var(--accent-soft)';
                 }
                 tab.addEventListener('click', () => {
                     activeTab = label.toLowerCase();
                     tabsRow.querySelectorAll('button').forEach((b) => {
-                        b.style.background = b.dataset.tab === activeTab ? 'rgba(74, 158, 255, 0.16)' : '';
+                        b.style.background = b.dataset.tab === activeTab ? 'var(--accent-soft)' : '';
                     });
                     renderResults();
                 });
@@ -95,7 +94,7 @@
             container.innerHTML = '';
 
             if (results.length === 0) {
-                container.innerHTML = '<div style="padding:var(--ui-space-6);text-align:center;color:rgba(255,255,255,0.5);">No results</div>';
+                container.innerHTML = '<div style="padding:var(--ui-space-6);text-align:center;color:var(--muted);">No results</div>';
                 return;
             }
 
@@ -128,7 +127,7 @@
                 name.style.cssText = 'font-weight:500;';
                 const path = document.createElement('div');
                 path.textContent = result.path || result.routine || result.action || '';
-                path.style.cssText = 'font-size:11px;color:rgba(255,255,255,0.5);';
+                path.style.cssText = 'font-size:11px;color:var(--muted);';
                 details.appendChild(name);
                 details.appendChild(path);
 
@@ -136,7 +135,7 @@
                 item.appendChild(details);
 
                 item.addEventListener('mouseenter', () => {
-                    item.style.background = 'rgba(74, 158, 255, 0.12)';
+                    item.style.background = 'var(--hover-bg)';
                 });
                 item.addEventListener('mouseleave', () => {
                     item.style.background = '';

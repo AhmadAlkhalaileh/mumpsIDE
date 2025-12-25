@@ -2,22 +2,73 @@
     const panelTemplates = {
         terminalPanel: `
             <div class="pane-header terminal-header">
-                <div class="pane-title">Terminal</div>
-                <div class="pane-actions">
-                    <div class="pill subtle" id="terminalStatusPill" title="Toggle with Alt+F12">Alt+F12</div>
-                    <button class="btn ghost icon-btn" id="terminalNewTabBtn" title="New Terminal Tab (Ctrl+Shift+T)">+</button>
-                    <button class="btn ghost icon-btn" id="terminalHideBtn" title="Hide Terminal">✕</button>
+                <div class="terminal-header-left">
+                    <span class="pane-title">Run</span>
+                    <button class="terminal-icon-btn" id="terminalNewTabBtn" title="New Run Tab (Ctrl+Shift+T)">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </button>
+                    <button class="terminal-icon-btn" id="terminalClearBtn" title="Clear Output" type="button">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                            <path d="M3.5 4.5h9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+                            <path d="M6.5 4.5v-1h3v1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                            <path d="M5.25 6v6.75h5.5V6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
+                    <button class="terminal-icon-btn" id="terminalDropdownBtn" title="Terminal Options">
+                        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
                 </div>
-            </div>
-            <div class="terminal-tabbar">
                 <div id="terminalTabs" class="terminal-tabs"></div>
-                <div class="terminal-tab-actions">
-                    <button class="btn ghost icon-btn" id="terminalClearBtn" title="Clear Active Terminal">Clear</button>
+                <div class="terminal-header-right">
+                    <button class="terminal-icon-btn" id="terminalMenuBtn" title="More">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="3" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="8" cy="13" r="1.2"/></svg>
+                    </button>
+                    <button class="terminal-icon-btn" id="terminalHideBtn" title="Hide">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 8h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </button>
                 </div>
             </div>
             <div class="terminal-surface">
                 <div class="terminal-viewport" id="terminalViewport" aria-label="Terminal"></div>
                 <div class="terminal-error hidden" id="terminalError" role="alert"></div>
+            </div>
+        `,
+        terminalToolPanel: `
+            <div class="pane-header terminal-header">
+                <div class="terminal-header-left">
+                    <span class="pane-title">Terminal</span>
+                    <button class="terminal-icon-btn" id="terminalToolNewTabBtn" title="New Terminal Tab (Ctrl+Shift+T)" type="button">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </button>
+                    <button class="terminal-icon-btn" id="terminalToolSplitBtn" title="Split Right" type="button">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                            <path d="M2.75 3.25h10.5v9.5H2.75z" stroke="currentColor" stroke-width="1.2"/>
+                            <path d="M8 3.25v9.5" stroke="currentColor" stroke-width="1.2"/>
+                        </svg>
+                    </button>
+                    <button class="terminal-icon-btn" id="terminalToolSplitDownBtn" title="Split Down" type="button">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                            <path d="M2.75 3.25h10.5v9.5H2.75z" stroke="currentColor" stroke-width="1.2"/>
+                            <path d="M2.75 8h10.5" stroke="currentColor" stroke-width="1.2"/>
+                        </svg>
+                    </button>
+                    <button class="terminal-icon-btn" id="terminalToolOptionsBtn" title="Terminal Options" type="button">
+                        <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    </button>
+                </div>
+                <div id="terminalToolTabs" class="terminal-tabs"></div>
+                <div class="terminal-header-right">
+                    <button class="terminal-icon-btn" id="terminalToolMenuBtn" title="More" type="button">
+                        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="3" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="8" cy="13" r="1.2"/></svg>
+                    </button>
+                    <button class="terminal-icon-btn" id="terminalToolHideBtn" title="Hide" type="button">
+                        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 8h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="terminal-surface terminal-tool-surface">
+                <div class="terminal-viewport terminal-tool-viewport" id="terminalToolViewport" aria-label="Terminal"></div>
+                <div class="terminal-error hidden" id="terminalToolError" role="alert"></div>
             </div>
         `,
         debugPanel: `
@@ -65,230 +116,104 @@
             </div>
             <ul class="problems-list" id="problemsListStandalone"></ul>
         `,
+        commitPanel: `
+            <div class="ps-commit-window">
+                <div class="ps-commit-header">
+                    <span class="ps-commit-title">Commit</span>
+                    <button class="ps-commit-pill" id="commitHeaderBtn" disabled>Commit</button>
+                    <div class="ps-spacer"></div>
+                    <button class="ps-icon-btn ps-commit-header-btn" id="commitHeaderMenuBtn" title="Menu">
+                        <span data-ui-icon="dots-vertical" data-ui-icon-size="16" aria-hidden="true"></span>
+                    </button>
+                    <button class="ps-icon-btn ps-commit-header-btn" id="commitHeaderMinimizeBtn" title="Minimize">
+                        <span data-ui-icon="minus" data-ui-icon-size="16" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <div class="ps-commit-toolbar" role="toolbar" aria-label="Commit toolbar">
+                    <button class="ps-icon-btn" id="commitRefreshBtn" title="Refresh"><span data-ui-icon="refresh" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                    <button class="ps-icon-btn" id="commitRollbackBtn" title="Undo"><span data-ui-icon="undo" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                    <button class="ps-icon-btn" id="commitDownloadBtn" title="Download Patch"><span data-ui-icon="download" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                    <button class="ps-icon-btn" id="commitDiffBtn" title="Show Diff"><span data-ui-icon="eye" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                    <button class="ps-icon-btn" id="commitExpandBtn" title="Expand"><span data-ui-icon="chevron-up" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                    <button class="ps-icon-btn" id="commitCollapseBtn" title="Collapse"><span data-ui-icon="chevron-down" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                    <button class="ps-icon-btn" id="commitCloseBtn" title="Close"><span data-ui-icon="close" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                </div>
+                <div class="ps-changes-section">
+                    <div class="ps-section-header" id="commitChangesToggle">
+                        <span class="ps-chevron" data-ui-icon="chevron-down" data-ui-icon-size="12" aria-hidden="true"></span>
+                        <span class="ps-section-title">Changes</span>
+                        <span class="ps-count" id="commitChangesCount">0 files</span>
+                    </div>
+                    <div class="ps-file-list" id="commitFileList"></div>
+                </div>
+                <div class="ps-commit-message-section">
+                    <div class="ps-commit-message-toolbar">
+                        <label class="ps-checkbox"><input type="checkbox" id="commitAmend"> Amend</label>
+                        <button class="ps-icon-btn-sm" id="commitAmendOptionsBtn" title="Amend Options">
+                            <span data-ui-icon="square-arrow-right" data-ui-icon-size="14" aria-hidden="true"></span>
+                        </button>
+                        <button class="ps-icon-btn-sm" id="commitTimeBtn" title="Commit Time">
+                            <span data-ui-icon="clock" data-ui-icon-size="14" aria-hidden="true"></span>
+                        </button>
+                        <button class="ps-icon-btn-sm ps-icon-warm" id="commitCleanupBtn" title="Cleanup">
+                            <span data-ui-icon="flame" data-ui-icon-size="14" aria-hidden="true"></span>
+                        </button>
+                    </div>
+                    <textarea id="commitMessageInput" class="ps-textarea"></textarea>
+                    <div class="ps-commit-footer">
+                        <div class="ps-commit-footer-actions">
+                            <button class="ps-btn-commit ps-btn-primary" id="commitBtnMain" disabled>Commit</button>
+                            <button class="ps-btn-commit-push" id="commitAndPushBtn" disabled>Commit and Push...</button>
+                        </div>
+                        <button class="ps-icon-btn" id="commitSettingsBtn" title="Commit Settings">
+                            <span data-ui-icon="settings" data-ui-icon-size="16" aria-hidden="true"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `,
         gitToolPanel: `
-            <div class="git-toolwindow" id="gitToolWindow">
-                <div class="git-tw-header">
-                    <div class="git-tw-title">Git</div>
-
-                    <div class="git-tw-tabs" role="tablist" aria-label="Git tool window">
-                        <button class="git-tw-tab active" type="button" data-git-tab="log" role="tab"
-                            aria-selected="true">Log</button>
-                        <button class="git-tw-tab" type="button" data-git-tab="changes" role="tab"
-                            aria-selected="false">Commit</button>
-                    </div>
-
+            <div class="ps-git-window">
+                <div class="ps-git-toolbar">
+                    <input type="text" class="ps-search" placeholder="Text or hash" id="gitSearchInput">
+                    <button class="ps-icon-btn" id="gitOpenCommitPanelBtn" type="button" title="Commit"><span data-ui-icon="commit" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                    <span class="ps-separator"></span>
+                    <select class="ps-select-sm" id="gitLogBranchSelect"><option value="__ALL__">origin</option></select>
+                    <button class="ps-icon-btn" id="gitFilterAuthorBtn" type="button" title="User"><span data-ui-icon="user" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                    <button class="ps-icon-btn" id="gitFilterDateBtn" type="button" title="Date"><span data-ui-icon="calendar" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                    <button class="ps-icon-btn" id="gitFilterPathBtn" type="button" title="Paths"><span data-ui-icon="folder" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                    <span class="ps-separator"></span>
+                    <button class="ps-icon-btn" id="gitShowGraphBtn" type="button" title="Show Graph"><span data-ui-icon="graph" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                    <button class="ps-icon-btn" id="gitLogRefreshBtn" type="button" title="Refresh"><span data-ui-icon="refresh" data-ui-icon-size="16" aria-hidden="true"></span></button>
+                    <button class="ps-icon-btn" id="gitOpenGitSettingsBtn" type="button" title="Settings"><span data-ui-icon="settings" data-ui-icon-size="16" aria-hidden="true"></span></button>
                 </div>
-
-                <div class="git-banner hidden" id="gitBanner" role="status" aria-live="polite">
-                    <div class="git-banner-text" id="gitBannerText"></div>
-                    <div class="git-banner-actions" id="gitBannerActions"></div>
-                </div>
-
-                <div class="git-tw-toolbar" role="toolbar" aria-label="Git toolbar">
-                    <div class="git-tw-toolbar-group">
-                        <button class="git-tw-iconbtn" type="button" id="gitFetchBtn" title="Fetch">
-                            <span data-ui-icon="download" data-ui-icon-size="16" aria-hidden="true"></span>
-                        </button>
-                        <button class="git-tw-iconbtn" type="button" id="gitPullBtn" title="Pull">
-                            <span data-ui-icon="download" data-ui-icon-size="16" aria-hidden="true"></span>
-                        </button>
-                        <button class="git-tw-iconbtn" type="button" id="gitPushBtn" title="Push">
-                            <span data-ui-icon="upload" data-ui-icon-size="16" aria-hidden="true"></span>
-                        </button>
-
-                        <div class="git-tw-sep" role="separator"></div>
-
-                        <button class="git-tw-iconbtn" type="button" id="gitRefreshBtn" title="Refresh">
-                            <span data-ui-icon="refresh" data-ui-icon-size="16" aria-hidden="true"></span>
-                        </button>
-                    </div>
-
-                    <div class="git-tw-sep" role="separator"></div>
-
-                    <button class="git-tw-iconbtn" type="button" id="gitFocusSearchBtn" title="Search">
-                        <span data-ui-icon="search" data-ui-icon-size="16" aria-hidden="true"></span>
-                    </button>
-                    <button class="git-tw-iconbtn" type="button" id="gitFilterBtn" title="Filter">
-                        <span data-ui-icon="filter" data-ui-icon-size="16" aria-hidden="true"></span>
-                    </button>
-
-                    <div class="git-spacer"></div>
-
-                    <button class="git-tw-iconbtn" type="button" id="gitSettingsBtn" title="Settings">
-                        <span data-ui-icon="settings" data-ui-icon-size="16" aria-hidden="true"></span>
-                    </button>
-                    <button class="git-tw-iconbtn" type="button" id="gitOverflowBtn" title="More">⋯</button>
-                </div>
-
-                <div class="git-tw-panes">
-                    <section class="git-tw-pane active" data-git-pane="log" role="tabpanel">
-                        <div class="git-log-layout git-log-layout--3pane">
-                            <div class="git-pane git-pane--branches">
-                                <div class="git-pane-header">
-                                    <div class="git-pane-title">Branches</div>
-                                    <div class="git-pane-actions">
-                                        <button class="git-tw-iconbtn" type="button" id="gitBranchesRefreshBtn" title="Refresh">
-                                            <span data-ui-icon="refresh" data-ui-icon-size="16" aria-hidden="true"></span>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="git-branches-tree" id="gitBranchesTree">Branches not loaded.</div>
-                            </div>
-
-                            <div class="git-pane git-pane--commits">
-                                <div class="git-log-filter-row" role="toolbar" aria-label="Commit filters">
-                                    <div class="git-log-filter-search" title="Search commits">
-                                        <span data-ui-icon="search" data-ui-icon-size="16" aria-hidden="true"></span>
-                                        <input id="gitLogSearchInput" class="git-input" placeholder="Text or hash">
-                                    </div>
-                                    <div class="git-log-filter-field" title="Branch scope">
-                                        <span class="git-log-filter-label">Branch:</span>
-                                        <select id="gitLogBranchSelect" class="git-select"></select>
-                                    </div>
-
-                                    <select id="gitLogUserSelect" class="git-select" disabled title="Not implemented yet">
-                                        <option>User</option>
-                                    </select>
-                                    <select id="gitLogDateSelect" class="git-select" disabled title="Not implemented yet">
-                                        <option>Date</option>
-                                    </select>
-                                    <select id="gitLogPathsSelect" class="git-select" disabled title="Not implemented yet">
-                                        <option>Paths</option>
-                                    </select>
-
-                                    <button class="btn ghost git-small-btn" type="button" id="gitLogResetBtn">Reset</button>
-                                    <button class="git-tw-iconbtn" type="button" id="gitLogBtn" title="Reload Log">
-                                        <span data-ui-icon="refresh" data-ui-icon-size="16" aria-hidden="true"></span>
-                                    </button>
-                                </div>
-
-                                <div class="git-log-list" id="gitHistoryList">History not loaded.</div>
-                            </div>
-
-                            <div class="git-pane git-pane--details">
-                                <div class="git-pane-header">
-                                    <div>
-                                        <div class="git-pane-title">Commit details</div>
-                                        <div class="git-pane-subtitle" id="gitLogDetailsSubtitle"></div>
-                                    </div>
-                                </div>
-
-                                <div class="git-log-empty" id="gitLogEmptyState">
-                                    Select commit to view changes
-                                </div>
-
-                                <div class="git-log-details-body hidden" id="gitLogDetailsBody">
-                                    <div class="git-commit-header">
-                                        <div class="git-commit-subject" id="gitLogSubject"></div>
-                                        <div class="git-commit-meta">
-                                            <span class="git-commit-hash" id="gitLogHash"></span>
-                                            <span class="git-commit-meta-sep">·</span>
-                                            <span class="git-commit-author" id="gitLogAuthor"></span>
-                                            <span class="git-commit-meta-sep">·</span>
-                                            <span class="git-commit-date" id="gitLogDate"></span>
-                                            <span class="git-spacer"></span>
-                                            <button class="git-tw-iconbtn git-commit-copy" type="button"
-                                                id="gitCopyCommitHashBtn" title="Copy commit hash">
-                                                <span data-ui-icon="copy" data-ui-icon-size="16" aria-hidden="true"></span>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div class="git-log-files">
-                                        <div class="git-section-header">
-                                            <div class="git-group-header">Files</div>
-                                            <div class="git-section-actions">
-                                                <span class="git-section-meta" id="gitLogFilesCount"></span>
-                                            </div>
-                                        </div>
-                                        <div class="git-log-files-list" id="gitLogFiles"></div>
-                                    </div>
-                                </div>
-                            </div>
+                <div class="ps-git-3pane">
+                    <div class="ps-git-branches" id="gitBranchesTree">
+                        <div class="ps-tree-section">
+                            <div class="ps-tree-header"><span data-ui-icon="chevron-right" data-ui-icon-size="12" aria-hidden="true"></span> HEAD (Current Branch)</div>
+                            <div class="ps-tree-empty">Loading...</div>
                         </div>
-                    </section>
-
-                    <section class="git-tw-pane" data-git-pane="changes" role="tabpanel">
-                        <div class="git-changes-layout git-changes-layout--single">
-                            <div class="git-pane">
-                                <div class="git-commit-view">
-                                    <div class="git-commit-changes">
-                                        <div class="git-section-row">
-                                            <div class="git-section-title">Changes</div>
-                                            <div class="git-section-actions">
-                                                <button class="git-tw-iconbtn" type="button" id="gitStageSelectedBtn"
-                                                    title="Stage Selected">
-                                                    <span data-ui-icon="download" data-ui-icon-size="16" aria-hidden="true"></span>
-                                                </button>
-                                                <button class="git-tw-iconbtn" type="button" id="gitUnstageSelectedBtn"
-                                                    title="Unstage Selected">
-                                                    <span data-ui-icon="upload" data-ui-icon-size="16" aria-hidden="true"></span>
-                                                </button>
-                                                <button class="git-tw-iconbtn" type="button" id="gitDiffSelectedBtn"
-                                                    title="Open Diff in Editor">
-                                                    <span data-ui-icon="format" data-ui-icon-size="16" aria-hidden="true"></span>
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <div class="git-changes-groups">
-                                            <div class="git-group">
-                                                <div class="git-group-header">Unstaged</div>
-                                                <div class="git-changes-list" id="gitChangesUnstaged">Run refresh to load
-                                                    changes.</div>
-                                            </div>
-                                            <div class="git-group">
-                                                <div class="git-group-header">Staged</div>
-                                                <div class="git-changes-list" id="gitChangesStaged">No staged files.</div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="git-commit-message">
-                                        <div class="git-commit-options">
-                                            <label class="git-checkbox">
-                                                <input type="checkbox" id="gitAmendCheckbox">
-                                                Amend
-                                            </label>
-                                            <div class="git-spacer"></div>
-                                            <button class="btn ghost git-small-btn" type="button" id="gitCommitOptionsBtn"
-                                                title="Commit Options" disabled>⋯</button>
-                                        </div>
-                                        <textarea id="gitCommitMessage" class="git-commit-input"
-                                            placeholder="Commit message"></textarea>
-                                        <div class="git-commit-actions">
-                                            <button class="btn primary git-primary git-small-btn" type="button"
-                                                id="gitCommitBtn">Commit</button>
-                                            <button class="btn ghost git-small-btn" type="button"
-                                                id="gitCommitAndPushBtn">Commit and Push…</button>
-                                        </div>
-                                        <details class="git-branch-details">
-                                            <summary class="git-branch-summary">Branch</summary>
-                                            <div class="git-branch-row">
-                                                <select id="gitBranchSelect" class="git-select"></select>
-                                                <input id="gitBranchInput" class="git-input" placeholder="New branch name">
-                                                <button class="btn ghost git-small-btn" type="button"
-                                                    id="gitCheckoutBtn">Checkout</button>
-                                            </div>
-                                        </details>
-                                    </div>
+                        <div class="ps-tree-section">
+                            <div class="ps-tree-header"><span data-ui-icon="chevron-right" data-ui-icon-size="12" aria-hidden="true"></span> Local</div>
+                        </div>
+                        <div class="ps-tree-section">
+                            <div class="ps-tree-header"><span data-ui-icon="chevron-right" data-ui-icon-size="12" aria-hidden="true"></span> Remote</div>
+                        </div>
+                    </div>
+                    <div class="ps-git-commits" id="gitHistoryList"></div>
+                    <div class="ps-git-details">
+                        <div class="ps-details-empty" id="gitLogEmptyState">Select commit to view changes</div>
+                        <div class="ps-details-body hidden" id="gitLogDetailsBody">
+                            <div class="ps-commit-info">
+                                <div class="ps-commit-subject" id="gitLogSubject"></div>
+                                <div class="ps-commit-meta">
+                                    <span id="gitLogHash"></span> · <span id="gitLogAuthor"></span> · <span id="gitLogDate"></span>
                                 </div>
                             </div>
-
-                            <div class="hidden">
-                                <button class="btn ghost git-small-btn" type="button" id="gitStatusBtn">Status</button>
-                                <button class="btn ghost git-small-btn" type="button" id="gitClearBtn">Clear</button>
-                                <input class="git-input" id="gitDiffPath" placeholder="Path (relative)">
-                                <button class="btn ghost git-small-btn" type="button" id="gitDiffFileBtn">Show Diff</button>
-                                <button class="btn ghost git-small-btn" type="button" id="gitHistoryFileBtn">File History</button>
-                                <input class="git-input" id="gitComparePathA" placeholder="Path A">
-                                <input class="git-input" id="gitComparePathB" placeholder="Path B">
-                                <button class="btn ghost git-small-btn" type="button" id="gitCompareBtn">Compare</button>
-                                <button class="btn ghost git-small-btn" type="button" id="gitDiffBtn">Diff (stat)</button>
-                                <pre class="debug-output git-console-output" id="gitOutput">Git ready.</pre>
-                            </div>
+                            <div class="ps-changed-files" id="gitLogFiles"></div>
+                            <div class="ps-diff-view" id="gitLogDiffGrid"></div>
                         </div>
-                    </section>
+                    </div>
                 </div>
             </div>
         `,
@@ -302,6 +227,17 @@
                 <div class="extensions-detail" id="extensionDetail">
                     <div class="pane-title">Select an extension</div>
                     <div class="pane-subtitle">Details will appear here.</div>
+                </div>
+            </div>
+        `,
+        comparePanel: `
+            <div class="ps-compare-window" id="releaseComparePanel">
+                <div class="ps-compare-empty">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" opacity="0.3">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" stroke-width="2"/>
+                        <path d="M12 8v8m-4-4h8" stroke-width="2"/>
+                    </svg>
+                    <p>Right-click on a routine file and select "Compare with Release"</p>
                 </div>
             </div>
         `,
@@ -415,28 +351,45 @@
                     </div>
                     <div class="pill subtle" id="dockerConfigStatus">No config saved (universal mode)</div>
                 </div>
-                <div class="connection-card">
-                    <div class="panel-title">SSH</div>
-                    <div class="pane-subtitle">Connect to a remote host</div>
-                    <div class="ssh-form">
-                        <input class="ssh-input" id="sshHostInput" placeholder="Host (e.g., 10.0.0.5)">
-                        <input class="ssh-input" id="sshPortInput" placeholder="Port (default 22)" type="number" min="1" max="65535">
-                        <input class="ssh-input" id="sshEnvInput" placeholder="Environment key (e.g., cc)">
-                        <input class="ssh-input" id="sshUserInput" placeholder="Username">
-                        <input class="ssh-input" id="sshPassInput" placeholder="Password" type="password">
-                        <button class="btn primary" id="sshConnectBtn">Connect SSH</button>
-                    </div>
-                    <div class="pill subtle" id="sshFormStatus">Not connected</div>
-                    <div class="ssh-saved">
-                        <div class="pane-subtitle">Saved environments</div>
-                        <div id="sshSavedList" class="saved-env-list"></div>
-                        <div class="flex">
-                            <button class="btn ghost" id="sshSaveEnvBtn">Save environment</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `,
+	                <div class="connection-card">
+	                    <div class="panel-title">SSH</div>
+	                    <div class="pane-subtitle">Connect to a remote host</div>
+	                    <div class="ssh-form">
+	                        <input class="ssh-input" id="sshHostInput" placeholder="Host (e.g., 10.0.0.5)">
+	                        <input class="ssh-input" id="sshPortInput" placeholder="Port (default 22)" type="number" min="1" max="65535">
+	                        <input class="ssh-input" id="sshEnvInput" placeholder="Environment key (e.g., cc)">
+	                        <input class="ssh-input" id="sshUserInput" placeholder="Username">
+	                        <input class="ssh-input" id="sshPassInput" placeholder="Password" type="password">
+	                        <button class="btn primary" id="sshConnectBtn">Connect SSH</button>
+	                    </div>
+	                    <div class="pill subtle" id="sshFormStatus">Not connected</div>
+	                    <div class="ssh-saved">
+	                        <div class="pane-subtitle">Saved environments</div>
+	                        <div id="sshSavedList" class="saved-env-list"></div>
+	                        <div class="flex">
+	                            <button class="btn ghost" id="sshSaveEnvBtn">Save environment</button>
+	                        </div>
+	                    </div>
+	                </div>
+	                <div class="connection-card hidden" id="releaseConnectionCard">
+	                    <div class="panel-title">Release Connection</div>
+	                    <div class="pane-subtitle">Compare routines via SSH (Compare with Release)</div>
+	                    <div class="ssh-form">
+	                        <input class="ssh-input" id="releaseConnHostInput" placeholder="Host (e.g., 10.0.0.5)">
+	                        <input class="ssh-input" id="releaseConnPortInput" placeholder="Port (default 22)" type="number" min="1" max="65535">
+	                        <input class="ssh-input" id="releaseConnUserInput" placeholder="Username">
+	                        <input class="ssh-input" id="releaseConnPassInput" placeholder="Password (stored securely)" type="password" autocomplete="new-password">
+	                        <div class="flex">
+	                            <button class="btn ghost" id="releaseConnTestBtn" type="button">Test</button>
+	                            <button class="btn ghost" id="releaseConnSaveBtn" type="button">Save</button>
+	                            <button class="btn ghost" id="releaseConnDeleteBtn" type="button">Delete</button>
+	                            <button class="btn primary" id="releaseConnFocusCompareBtn" type="button">Compare…</button>
+	                        </div>
+	                    </div>
+	                    <div class="pill subtle" id="releaseConnStatus">Not configured</div>
+	                </div>
+	            </div>
+	        `,
         settingsPanel: `
             <div class="connections-header">
                 <div>
@@ -565,6 +518,96 @@
         searchEverywhereDialog: `
             <input class="search-everywhere-input" id="searchEverywhereInput" placeholder="Search Everywhere (files)">
             <div class="search-everywhere-results" id="searchEverywhereResults">Press Shift twice to search…</div>
+        `,
+        patchTrackingPanel: `
+            <div style="padding: 20px; background: var(--ps-bg-main, #1e1e1e); color: var(--ps-text-main, #d4d4d4); height: 100%; overflow-y: auto;">
+                <!-- Header -->
+                <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid rgba(139, 233, 253, 0.3);">
+                    <h2 style="margin: 0; font-size: 24px; color: #8be9fd;">
+                        📦 Vista Patch Tracking
+                    </h2>
+                    <p style="margin: 8px 0 0 0; color: #6272a4; font-size: 13px;">
+                        Intelligent patch detection and Git integration
+                    </p>
+                </div>
+
+                <!-- Git Repository Settings -->
+                <div style="background: rgba(40, 42, 54, 0.3); border: 1px solid rgba(139, 233, 253, 0.2); border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <div style="flex: 1;">
+                            <label style="display: block; font-size: 12px; color: #6272a4; margin-bottom: 6px;">Git Repository Path</label>
+                            <input type="text" id="gitRepoPathInput" placeholder="~/Desktop/vista-routines"
+                                   style="width: 100%; padding: 8px 12px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(139, 233, 253, 0.3); border-radius: 4px; color: #f8f8f2; font-size: 13px;">
+                        </div>
+                        <div>
+                            <button id="setRepoPathBtn" style="margin-top: 18px; padding: 8px 16px; background: rgba(139, 233, 253, 0.2); border: 1px solid #8be9fd; border-radius: 4px; color: #8be9fd; cursor: pointer; font-size: 12px; font-weight: 600;">
+                                Set Path
+                            </button>
+                        </div>
+                        <div>
+                            <button id="browseRepoBtn" style="margin-top: 18px; padding: 8px 16px; background: rgba(139, 233, 253, 0.1); border: 1px solid rgba(139, 233, 253, 0.3); border-radius: 4px; color: #8be9fd; cursor: pointer; font-size: 12px;">
+                                📁 Browse
+                            </button>
+                        </div>
+                    </div>
+                    <div id="repoPathStatus" style="font-size: 11px; color: #6272a4; margin-top: 8px;"></div>
+                </div>
+
+                <!-- Workflow Steps -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
+                    <div class="workflow-step" data-step="1" style="background: rgba(139, 233, 253, 0.1); border: 1px solid rgba(139, 233, 253, 0.3); border-radius: 8px; padding: 16px; cursor: pointer;">
+                        <div style="font-size: 24px; margin-bottom: 8px;">📦</div>
+                        <div style="font-weight: 600; margin-bottom: 4px;">1. Upload Patch</div>
+                        <div style="font-size: 11px; color: #6272a4;">Upload KIDS file</div>
+                    </div>
+                    <div class="workflow-step" data-step="2" style="background: rgba(139, 233, 253, 0.1); border: 1px solid rgba(139, 233, 253, 0.3); border-radius: 8px; padding: 16px; cursor: pointer;">
+                        <div style="font-size: 24px; margin-bottom: 8px;">🔍</div>
+                        <div style="font-weight: 600; margin-bottom: 4px;">2. Scan Docker</div>
+                        <div style="font-size: 11px; color: #6272a4;">Detect changes</div>
+                    </div>
+                    <div class="workflow-step" data-step="3" style="background: rgba(139, 233, 253, 0.1); border: 1px solid rgba(139, 233, 253, 0.3); border-radius: 8px; padding: 16px; cursor: pointer;">
+                        <div style="font-size: 24px; margin-bottom: 8px;">🔗</div>
+                        <div style="font-weight: 600; margin-bottom: 4px;">3. Correlate</div>
+                        <div style="font-size: 11px; color: #6272a4;">Match patch to changes</div>
+                    </div>
+                    <div class="workflow-step" data-step="4" style="background: rgba(139, 233, 253, 0.1); border: 1px solid rgba(139, 233, 253, 0.3); border-radius: 8px; padding: 16px; cursor: pointer;">
+                        <div style="font-size: 24px; margin-bottom: 8px;">✅</div>
+                        <div style="font-weight: 600; margin-bottom: 4px;">4. Approve & Commit</div>
+                        <div style="font-size: 11px; color: #6272a4;">Review and push to Git</div>
+                    </div>
+                </div>
+
+                <!-- Statistics -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
+                    <div style="background: rgba(139, 233, 253, 0.05); border: 1px solid rgba(139, 233, 253, 0.2); border-radius: 6px; padding: 16px; text-align: center;">
+                        <div style="font-size: 28px; font-weight: 700; color: #8be9fd;" id="statPatches">0</div>
+                        <div style="font-size: 12px; color: #6272a4; margin-top: 4px;">Patches</div>
+                    </div>
+                    <div style="background: rgba(139, 233, 253, 0.05); border: 1px solid rgba(139, 233, 253, 0.2); border-radius: 6px; padding: 16px; text-align: center;">
+                        <div style="font-size: 28px; font-weight: 700; color: #8be9fd;" id="statChanges">0</div>
+                        <div style="font-size: 12px; color: #6272a4; margin-top: 4px;">Changes</div>
+                    </div>
+                    <div style="background: rgba(139, 233, 253, 0.05); border: 1px solid rgba(139, 233, 253, 0.2); border-radius: 6px; padding: 16px; text-align: center;">
+                        <div style="font-size: 28px; font-weight: 700; color: #ffb86c;" id="statPending">0</div>
+                        <div style="font-size: 12px; color: #6272a4; margin-top: 4px;">Pending</div>
+                    </div>
+                    <div style="background: rgba(139, 233, 253, 0.05); border: 1px solid rgba(139, 233, 253, 0.2); border-radius: 6px; padding: 16px; text-align: center;">
+                        <div style="font-size: 28px; font-weight: 700; color: #50fa7b;" id="statCommitted">0</div>
+                        <div style="font-size: 12px; color: #6272a4; margin-top: 4px;">Committed</div>
+                    </div>
+                </div>
+
+                <!-- Content Area -->
+                <div id="patchTrackingContent" style="background: rgba(40, 42, 54, 0.5); border: 1px solid rgba(139, 233, 253, 0.2); border-radius: 8px; padding: 40px; min-height: 300px;">
+                    <div style="text-align: center; color: #6272a4;">
+                        <svg width="80" height="80" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity: 0.3; margin-bottom: 20px;">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="2"/>
+                            <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                        <p style="font-size: 16px; margin: 0;">Click on "1. Upload Patch" above to begin tracking a Vista KIDS patch</p>
+                    </div>
+                </div>
+            </div>
         `
     };
 

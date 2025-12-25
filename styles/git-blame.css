@@ -1,0 +1,58 @@
+/* Git Blame Annotations */
+
+.git-blame-annotation {
+    color: var(--text-muted, #888) !important;
+    font-size: 0.85em !important;
+    font-style: italic !important;
+    opacity: 0.6 !important;
+    margin-left: 2em !important;
+    pointer-events: none !important;
+}
+
+.git-blame-current-line {
+    color: #00ff00 !important;
+    background: rgba(255, 0, 0, 0.3) !important;
+    font-size: 1.2em !important;
+    opacity: 1 !important;
+    margin-left: 5em !important;
+    padding: 2px 8px !important;
+    pointer-events: none !important;
+    white-space: nowrap !important;
+    font-style: italic !important;
+    font-weight: bold !important;
+}
+
+.git-blame-gutter-icon {
+    background: rgba(0, 255, 0, 0.5) !important;
+    width: 100% !important;
+}
+
+/* Git blame hover tooltip styling */
+.monaco-hover-content .hover-row {
+    padding: 4px 8px !important;
+}
+
+.monaco-hover-content code {
+    font-family: var(--font-mono, monospace) !important;
+    font-size: 0.9em !important;
+}
+
+/* Git blame panel toggle button */
+.git-blame-toggle {
+    padding: 4px 8px;
+    font-size: 12px;
+    background: var(--bg-secondary, #2a2a2a);
+    border: 1px solid var(--border, #444);
+    color: var(--text-primary, #fff);
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+.git-blame-toggle:hover {
+    background: var(--bg-hover, #333);
+}
+
+.git-blame-toggle.active {
+    background: var(--accent, #007acc);
+    border-color: var(--accent, #007acc);
+}

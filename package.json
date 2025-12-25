@@ -5,8 +5,10 @@
   "main": "main.js",
   "scripts": {
     "check:no-cdn": "node scripts/check-no-cdn.js",
+    "rebuild:pty": "node scripts/rebuild-node-pty-electron.js",
+    "postinstall": "npm run rebuild:pty || true",
     "start": "AHMAD_IDE_USE_SG=1 electron .",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test tests/*.test.js"
   },
   "keywords": [],
   "author": "",
@@ -15,6 +17,7 @@
     "electron": "^27.1.0"
   },
   "dependencies": {
+    "keytar": "^7.9.0",
     "monaco-editor": "^0.55.1",
     "node-pty": "0.10.1",
     "ssh2": "^1.17.0",

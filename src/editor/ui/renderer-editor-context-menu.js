@@ -55,6 +55,16 @@
                     if (target) runGitContextAction(map[action], target);
                     return;
                 }
+                case 'compare-with-release': {
+                    // Trigger Compare with Release extension
+                    const handler = window.AhmadIDEModules?.extensions?.compareWithRelease?.handleCompareWithRelease;
+                    if (handler) {
+                        await handler(ctx);
+                    } else {
+                        showToast('error', 'Compare with Release', 'Extension not available');
+                    }
+                    return;
+                }
                 default:
                     return;
             }

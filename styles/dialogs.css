@@ -26,8 +26,8 @@
 }
 
 .ui-btn--primary {
-    background: rgba(74, 158, 255, 0.22);
-    border-color: rgba(74, 158, 255, 0.35);
+    background: var(--accent-soft);
+    border-color: var(--accent-soft-border);
     color: var(--text-bright);
 }
 
@@ -68,8 +68,8 @@
     height: 30px;
     padding: 0 10px;
     border-radius: var(--ui-radius-1);
-    border: 1px solid var(--ui-border-subtle);
-    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--border);
+    background: var(--bg);
     color: var(--text);
     font-family: var(--ui-font-ui);
     font-size: var(--ui-font-ui-size);
@@ -83,8 +83,8 @@
 
 .ui-input:focus,
 .ui-select:focus {
-    border-color: rgba(74, 158, 255, 0.45);
-    outline: 2px solid rgba(74, 158, 255, 0.20);
+    border-color: var(--accent);
+    outline: 2px solid var(--accent-soft-border);
     outline-offset: 0;
 }
 
@@ -140,14 +140,14 @@
     transform: translateX(0);
 }
 
-.ui-toggle__input:checked + .ui-toggle__track {
-    background: rgba(74, 158, 255, 0.22);
-    border-color: rgba(74, 158, 255, 0.35);
+.ui-toggle__input:checked+.ui-toggle__track {
+    background: #bd93f9;
+    border-color: rgba(189, 147, 249, 0.45);
 }
 
-.ui-toggle__input:checked + .ui-toggle__track .ui-toggle__thumb {
+.ui-toggle__input:checked+.ui-toggle__track .ui-toggle__thumb {
     transform: translateX(16px);
-    background: rgba(255, 255, 255, 0.9);
+    background: #ffffff;
 }
 
 .ui-dialog-overlay {
@@ -163,8 +163,8 @@
 .ui-dialog {
     width: min(var(--ui-dialog-max-w), calc(100vw - var(--ui-dialog-inset)));
     height: min(var(--ui-dialog-max-h), calc(100vh - var(--ui-dialog-inset)));
-    background: var(--ui-surface-elevated);
-    border: 1px solid var(--ui-border-strong);
+    background: #363948;
+    border: 1px solid #44475a;
     border-radius: var(--ui-radius-3);
     box-shadow: var(--ui-shadow-lg);
     overflow: hidden;
@@ -185,8 +185,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 0 var(--ui-space-4);
-    border-bottom: 1px solid var(--ui-border-subtle);
-    background: rgba(0, 0, 0, 0.12);
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-strong);
 }
 
 .ui-dialog-title {
@@ -217,8 +217,8 @@
 }
 
 .ui-dialog-sidebar {
-    border-right: 1px solid var(--ui-border-subtle);
-    background: rgba(0, 0, 0, 0.10);
+    border-right: 1px solid var(--border);
+    background: var(--panel-2);
     padding: var(--ui-space-3);
     display: flex;
     flex-direction: column;
@@ -258,8 +258,8 @@
 }
 
 .ui-dialog-nav__item.active {
-    background: rgba(74, 158, 255, 0.16);
-    border-color: rgba(74, 158, 255, 0.25);
+    background: #44475a;
+    border-color: #6272a4;
     color: var(--text-bright);
 }
 
@@ -286,15 +286,15 @@
     justify-content: flex-end;
     gap: var(--ui-space-2);
     padding: 0 var(--ui-space-4);
-    border-top: 1px solid var(--ui-border-subtle);
-    background: rgba(0, 0, 0, 0.08);
+    border-top: 1px solid var(--border);
+    background: #282a36;
 }
 
 .ui-settings-group {
     padding: var(--ui-space-4);
-    border: 1px solid var(--ui-border-subtle);
+    border: 1px solid #44475a;
     border-radius: var(--ui-radius-2);
-    background: rgba(0, 0, 0, 0.12);
+    background: #2e313d;
     margin-bottom: var(--ui-space-4);
 }
 
@@ -330,11 +330,28 @@
     min-width: 0;
 }
 
+.ui-settings-subsection {
+    margin-top: var(--ui-space-3);
+    margin-bottom: var(--ui-space-2);
+}
+
+.ui-settings-subsection__title {
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.86);
+    margin-bottom: 2px;
+}
+
+.ui-settings-subsection__hint {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
 .ui-settings-preview {
-    border: 1px solid var(--ui-border-subtle);
+    border: 1px solid #44475a;
     border-radius: var(--ui-radius-2);
     padding: var(--ui-space-3);
-    background: rgba(0, 0, 0, 0.22);
+    background: #282a36;
 }
 
 .ui-settings-preview pre {
@@ -393,8 +410,8 @@
 }
 
 .connections-profile-item.active {
-    background: rgba(74, 158, 255, 0.16);
-    border-color: rgba(74, 158, 255, 0.35);
+    background: var(--accent-soft);
+    border-color: var(--accent-soft-border);
 }
 
 .connections-profile-item.connected {

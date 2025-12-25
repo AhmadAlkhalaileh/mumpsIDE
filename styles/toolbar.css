@@ -1,4 +1,4 @@
-/* PhpStorm-style breadcrumbs */
+/* -style breadcrumbs */
 .crumbs {
     font-size: 13px;
     color: var(--muted);
@@ -71,9 +71,9 @@
 }
 
 .diff-toolbar-btn.btn.active {
-    background: rgba(74, 158, 255, 0.18) !important;
-    border-color: rgba(74, 158, 255, 0.35);
-    color: rgba(203, 228, 255, 0.92) !important;
+    background: var(--accent-soft) !important;
+    border-color: var(--accent-soft-border);
+    color: var(--text-bright) !important;
 }
 
 .diff-parent-select {
@@ -81,7 +81,7 @@
     padding: 0 8px;
     border-radius: 6px;
     border: 1px solid var(--border);
-    background: #2d2f30;
+    background: var(--panel-soft);
     color: var(--text);
     font-size: 12px;
     line-height: 24px;
@@ -91,7 +91,7 @@
     display: none;
 }
 
-/* PhpStorm-style toolbar buttons */
+/* -style toolbar buttons */
 .toolbar-btn {
     display: inline-flex;
     align-items: center;
@@ -101,15 +101,15 @@
     min-height: 32px;
     border-radius: 6px;
     background: transparent !important;
-    color: #808080 !important;
+    color: var(--muted) !important;
     border: 1px solid transparent;
     transition: all 0.15s ease;
 }
 
 .toolbar-btn:hover {
-    background: #2d2f30 !important;
-    color: #bbbbbb !important;
-    border-color: #323232;
+    background: var(--hover-bg) !important;
+    color: var(--text) !important;
+    border-color: var(--border);
 }
 
 .toolbar-btn svg {
@@ -123,13 +123,13 @@
 }
 
 .toolbar-btn.primary {
-    background: linear-gradient(135deg, var(--accent-green), #4a9d50);
+    background: linear-gradient(135deg, var(--accent-green), #2bdc6f);
     border-color: var(--accent-green);
 }
 
 .toolbar-btn.primary:hover {
-    background: linear-gradient(135deg, #6bc56f, #5fb865);
-    box-shadow: 0 4px 12px rgba(95, 184, 101, 0.3);
+    background: linear-gradient(135deg, #71fb9a, var(--accent-green));
+    box-shadow: 0 4px 12px rgba(80, 250, 123, 0.22);
 }
 
 .toolbar-btn.primary svg {
@@ -182,9 +182,9 @@
 }
 
 .debug-float button {
-    background: #313335 !important;
-    color: #bbbbbb !important;
-    border: 1px solid #323232;
+    background: var(--panel) !important;
+    color: var(--text) !important;
+    border: 1px solid var(--border);
     border-radius: 4px;
     padding: 4px 6px;
     cursor: pointer;
@@ -192,11 +192,12 @@
 
 .editor-frame {
     flex: 1;
-    background: #2b2b2b;
+    background: var(--editor-bg);
     border: none;
     border-radius: 0;
     min-height: 0;
     overflow: hidden;
+    position: relative;
     margin: 0;
     padding: 0;
 }
@@ -206,6 +207,24 @@
     width: 100%;
     min-height: 200px;
     background: var(--editor-bg);
+}
+
+/* Split diff viewer (used by Git diff tabs) */
+.diff-tab-viewer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--editor-bg);
+}
+
+.diff-tab-viewer .git-diff-grid {
+    flex: 1;
+    min-height: 0;
+}
+
+.diff-tab-viewer .git-diff-pane {
+    min-height: 0;
 }
 
 #debugStartBtn {
@@ -226,17 +245,20 @@
 }
 
 #debugStartBtn.armed::after {
-    background: #5fb865; /* green indicator when armed */
+    background: var(--accent-green);
+    /* green indicator when armed */
 }
 
 #debugStartBtn.live::after {
-    background: #d67f3c; /* orange indicator when a session is live */
+    background: var(--accent-orange);
+    /* orange indicator when a session is live */
 }
+
 
 .monaco-editor,
 .monaco-editor .margin {
-    background: #2b2b2b !important;
-    color: #bbbbbb !important;
+    background: var(--editor-bg) !important;
+    color: var(--text) !important;
 }
 
 /* SCROLL PERFORMANCE - CSS containment for better scrolling */
@@ -261,21 +283,26 @@
     overflow: visible !important;
 }
 
+
 .monaco-editor .margin {
-    background: #313335 !important;
+    background: var(--gutter-bg) !important;
 }
 
+
 .monaco-editor .margin-view-overlays {
-    background: #313335 !important;
+    background: var(--gutter-bg) !important;
 }
 
 .monaco-editor .line-numbers,
 .monaco-editor .glyph-margin {
-    color: #808080 !important;
+    color: var(--muted) !important;
 }
 
+
 .monaco-editor .current-line {
-    background-color: #214283 !important;
+    background-color: var(--glow-1) !important;
+    /* Use softer glow or selection variable */
+    box-shadow: inset 0 0 0 1px var(--selection-bg) !important;
 }
 
 /* ============================================

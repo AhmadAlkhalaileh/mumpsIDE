@@ -15,6 +15,8 @@
         const getGlobalTerminalState = deps?.getGlobalTerminalState || (() => null);
         const getActiveEditor = deps?.getActiveEditor || (() => null);
         const showToast = deps?.showToast || (() => { });
+        const mode = String(deps?.mode || 'terminal').trim(); // 'terminal' | 'run-output'
+        const isRunOutput = mode === 'run-output';
         // PERF/SECURITY: local-only terminal engine. No CDN dependency.
         const terminalEngineSources = deps?.terminalEngineSources || [
             './node_modules/xterm/lib/xterm.js'
@@ -196,20 +198,29 @@
             const { tabsHost: host } = getTerminalElements();
             if (!host) return;
             host.innerHTML = '';
+
             state.tabs.forEach(t => {
                 const tab = document.createElement('div');
                 tab.className = 'terminal-tab' + (t.id === state.active ? ' active' : '') + (t.exited !== undefined ? ' exited' : '');
-                tab.textContent = t.name;
-                tab.onclick = () => activateTerminalTab(state, t.id);
-                const close = document.createElement('span');
-                close.className = 'tab-close';
-                close.textContent = '✕';
-                close.title = 'Close tab';
-                close.onclick = (e) => {
+
+                // Tab name span
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'tab-name';
+                nameSpan.textContent = t.name;
+                tab.appendChild(nameSpan);
+
+                // Close button (X)
+                const closeBtn = document.createElement('span');
+                closeBtn.className = 'tab-close';
+                closeBtn.innerHTML = '×';
+                closeBtn.title = 'Close';
+                closeBtn.onclick = (e) => {
                     e.stopPropagation();
                     closeTerminalTab(state, t.id);
                 };
-                tab.appendChild(close);
+                tab.appendChild(closeBtn);
+
+                tab.onclick = () => activateTerminalTab(state, t.id);
                 host.appendChild(tab);
             });
         }
@@ -294,8 +305,8 @@
                 fontFamily: font,
                 fontSize,
                 lineHeight: 1.2,
-                disableStdin: false,
-                cursorBlink: true,
+                disableStdin: isRunOutput,
+                cursorBlink: !isRunOutput,
                 theme: {
                     background,
                     foreground,
@@ -393,7 +404,9 @@
                 ensureTerminalResizeObserver(state);
                 state.counter += 1;
                 const id = `term${state.counter}`;
-                const tabName = isDefault ? 'Local' : `Local ${state.counter}`;
+                const tabName = isRunOutput
+                    ? (isDefault ? 'Run' : `Run ${state.counter}`)
+                    : (isDefault ? 'Local' : `Local ${state.counter}`);
                 const container = createTerminalContainer(id);
                 if (!container) {
                     showToast('error', 'Terminal', 'Missing terminal container');
@@ -444,7 +457,9 @@
                 refreshTerminalLayout(state, { resizeSession: false });
                 setTimeout(() => refreshTerminalLayout(state), 50);
                 flushBufferedOutput(tab);
-                await startTerminalSession(tab, state);
+                if (!isRunOutput) {
+                    await startTerminalSession(tab, state);
+                }
                 logger.info('TERMINAL_TAB_READY', { id, sessionId: tab.sessionId });
             } catch (err) {
                 console.error('Failed to create terminal tab', err);

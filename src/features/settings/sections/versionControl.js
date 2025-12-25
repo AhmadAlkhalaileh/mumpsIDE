@@ -20,6 +20,31 @@
             if (typeof opts.onChange === 'function') input.addEventListener('change', (e) => opts.onChange(e));
             return input;
         });
+        const createToggle = primitives.createToggle || ((opts = {}) => {
+            const label = String(opts.label || '');
+            const row = document.createElement('label');
+            row.className = 'ui-toggle';
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.checked = !!opts.checked;
+            input.disabled = !!opts.disabled;
+            input.className = 'ui-toggle__input';
+            const track = document.createElement('span');
+            track.className = 'ui-toggle__track';
+            const thumb = document.createElement('span');
+            thumb.className = 'ui-toggle__thumb';
+            track.appendChild(thumb);
+            const text = document.createElement('span');
+            text.className = 'ui-toggle__label';
+            text.textContent = label;
+            row.appendChild(input);
+            row.appendChild(track);
+            row.appendChild(text);
+            if (typeof opts.onChange === 'function') {
+                input.addEventListener('change', (e) => opts.onChange(e, input.checked));
+            }
+            return { root: row, input };
+        });
 
         const repoManager = window.AhmadIDEModules?.git?.repoManager || window.AhmadIDE?.gitRepoManager || null;
         const getState = () => {
@@ -81,7 +106,7 @@
         };
 
         const root = document.createElement('div');
-        root.dataset.filterText = 'version control vcs git repository remote origin user email name';
+        root.dataset.filterText = 'version control vcs git repository repo root project root remote origin user email name identity author config enable disable refresh reconnect choose init clone apply status';
 
         const makeGroup = (title, hint, filterText) => {
             const group = document.createElement('div');
@@ -113,10 +138,27 @@
             return row;
         };
 
-        const stateGroup = makeGroup(
-            'Git',
-            'Configure repository connection, author identity, and origin remote.',
-            'git version control vcs repository remote origin repo root'
+        const makeSubsection = (title, hint, filterText) => {
+            const wrap = document.createElement('div');
+            wrap.className = 'ui-settings-subsection';
+            wrap.dataset.filterText = String(filterText || '').trim();
+            const t = document.createElement('div');
+            t.className = 'ui-settings-subsection__title';
+            t.textContent = String(title || '');
+            wrap.appendChild(t);
+            if (hint) {
+                const h = document.createElement('div');
+                h.className = 'ui-settings-subsection__hint';
+                h.textContent = String(hint || '');
+                wrap.appendChild(h);
+            }
+            return wrap;
+        };
+
+        const repoGroup = makeGroup(
+            'Repository',
+            'Choose the Git repository used by this project.',
+            'git repository repo root project root vcs enable disable integration refresh reconnect choose root'
         );
 
         const repoRootInput = createInput({ value: '', placeholder: 'Not detected', disabled: true });
@@ -124,124 +166,119 @@
         const projectRootInput = createInput({ value: '', placeholder: 'No project', disabled: true });
         projectRootInput.style.flex = '1';
 
-        const btnReconnect = createButton({
-            label: 'Reconnect',
-            variant: 'ghost',
-            onClick: async () => {
-                try {
-                    await repoManager?.actions?.reconnect?.();
-                    hydrateFromState();
-                    notify('success', 'Git', 'Reconnected.');
-                } catch (err) {
-                    notify('error', 'Git', err?.message || 'Reconnect failed');
-                }
+        const doReconnect = async () => {
+            try {
+                await repoManager?.actions?.reconnect?.();
+                hydrateFromState();
+                notify('success', 'Git', 'Refreshed.');
+            } catch (err) {
+                notify('error', 'Git', err?.message || 'Refresh failed');
             }
-        });
+        };
 
-        const btnChooseRoot = createButton({
-            label: 'Choose Repo Root…',
-            variant: 'ghost',
-            onClick: async () => {
-                try {
-                    const res = await repoManager?.actions?.chooseRepoRoot?.();
-                    hydrateFromState();
-                    if (res?.ok) notify('success', 'Git', 'Repository root updated.');
-                } catch (err) {
-                    notify('error', 'Git', err?.message || 'Choose root failed');
-                }
+        const doChooseRoot = async () => {
+            try {
+                const res = await repoManager?.actions?.chooseRepoRoot?.();
+                hydrateFromState();
+                if (res?.ok) notify('success', 'Git', 'Repository root updated.');
+            } catch (err) {
+                notify('error', 'Git', err?.message || 'Choose root failed');
             }
-        });
+        };
 
-        const btnToggleGit = createButton({
-            label: 'Disable Git',
-            variant: 'danger',
-            onClick: async () => {
+        const doToggleGit = async ({ disable } = {}) => {
+            const st = getState();
+            const shouldDisable = typeof disable === 'boolean' ? disable : !st.gitDisabled;
+            const ok = await showConfirm({
+                title: shouldDisable ? 'Disable Git' : 'Enable Git',
+                message: shouldDisable
+                    ? 'Disable Git integration for this project?'
+                    : 'Enable Git integration for this project?',
+                variant: shouldDisable ? 'danger' : 'default',
+                confirmLabel: shouldDisable ? 'Disable' : 'Enable',
+                cancelLabel: 'Cancel'
+            });
+            if (!ok) return false;
+            try {
+                if (shouldDisable) await repoManager?.actions?.disableGit?.();
+                else await repoManager?.actions?.enableGit?.();
+                hydrateFromState();
+                return true;
+            } catch (err) {
+                notify('error', 'Git', err?.message || 'Toggle failed');
+                return false;
+            }
+        };
+
+        const doInitRepo = async () => {
+            try {
                 const st = getState();
-                const disable = !st.gitDisabled;
-                const ok = await showConfirm({
-                    title: disable ? 'Disable Git' : 'Enable Git',
-                    message: disable
-                        ? 'Disable Git integration for this project?'
-                        : 'Enable Git integration for this project?',
-                    variant: disable ? 'danger' : 'default',
-                    confirmLabel: disable ? 'Disable' : 'Enable',
-                    cancelLabel: 'Cancel'
-                });
-                if (!ok) return;
-                try {
-                    if (disable) await repoManager?.actions?.disableGit?.();
-                    else await repoManager?.actions?.enableGit?.();
-                    hydrateFromState();
-                } catch (err) {
-                    notify('error', 'Git', err?.message || 'Toggle failed');
-                }
+                const root = st.projectRoot || st.repoRoot || '';
+                const res = await repoManager?.actions?.initializeRepo?.({ root });
+                hydrateFromState();
+                if (res?.ok) notify('success', 'Git', 'Repository initialized.');
+                else notify('error', 'Git', res?.error || 'git init failed');
+            } catch (err) {
+                notify('error', 'Git', err?.message || 'git init failed');
             }
-        });
+        };
 
-        const btnInit = createButton({
-            label: 'Init Repo',
-            variant: 'ghost',
-            onClick: async () => {
-                try {
-                    const st = getState();
-                    const root = st.projectRoot || st.repoRoot || '';
-                    const res = await repoManager?.actions?.initializeRepo?.({ root });
-                    hydrateFromState();
-                    if (res?.ok) notify('success', 'Git', 'Repository initialized.');
-                    else notify('error', 'Git', res?.error || 'git init failed');
-                } catch (err) {
-                    notify('error', 'Git', err?.message || 'git init failed');
-                }
+        const doCloneRepo = async () => {
+            const url = await showPrompt({
+                title: 'Clone Repository',
+                message: 'Enter repository URL',
+                placeholder: 'git@github.com:user/repo.git',
+                defaultValue: ''
+            });
+            if (!url) return;
+            const directory = await showPrompt({
+                title: 'Clone Repository',
+                message: 'Enter target directory (will be created if needed)',
+                placeholder: '/path/to/clone/repo',
+                defaultValue: ''
+            });
+            if (!directory) return;
+            try {
+                const res = await repoManager?.actions?.cloneRepo?.({ url, directory });
+                hydrateFromState();
+                if (res?.ok) notify('success', 'Git', 'Clone completed.');
+                else notify('error', 'Git', res?.error || 'Clone failed');
+            } catch (err) {
+                notify('error', 'Git', err?.message || 'Clone failed');
             }
-        });
+        };
 
-        const btnClone = createButton({
-            label: 'Clone…',
-            variant: 'ghost',
-            onClick: async () => {
-                const url = await showPrompt({
-                    title: 'Clone Repository',
-                    message: 'Enter repository URL',
-                    placeholder: 'https://github.com/user/repo.git',
-                    defaultValue: ''
-                });
-                if (!url) return;
-                const directory = await showPrompt({
-                    title: 'Clone Repository',
-                    message: 'Enter target directory (will be created if needed)',
-                    placeholder: '/path/to/clone/repo',
-                    defaultValue: ''
-                });
-                if (!directory) return;
-                try {
-                    const res = await repoManager?.actions?.cloneRepo?.({ url, directory });
-                    hydrateFromState();
-                    if (res?.ok) notify('success', 'Git', 'Clone completed.');
-                    else notify('error', 'Git', res?.error || 'Clone failed');
-                } catch (err) {
-                    notify('error', 'Git', err?.message || 'Clone failed');
-                }
-            }
-        });
+        const btnRefresh = createButton({ label: 'Refresh', variant: 'ghost', onClick: doReconnect });
+        const btnChooseRoot = createButton({ label: 'Choose Repo Root…', variant: 'ghost', onClick: doChooseRoot });
 
-        const stateActions = document.createElement('div');
-        stateActions.style.display = 'flex';
-        stateActions.style.flexWrap = 'wrap';
-        stateActions.style.gap = '6px';
-        stateActions.appendChild(btnReconnect);
-        stateActions.appendChild(btnChooseRoot);
-        stateActions.appendChild(btnInit);
-        stateActions.appendChild(btnClone);
-        stateActions.appendChild(btnToggleGit);
+        const repoActions = document.createElement('div');
+        repoActions.style.display = 'flex';
+        repoActions.style.flexWrap = 'wrap';
+        repoActions.style.gap = '6px';
+        repoActions.appendChild(btnChooseRoot);
+        repoActions.appendChild(btnRefresh);
 
         const statusText = document.createElement('div');
         statusText.className = 'ui-settings-group__hint';
         statusText.style.marginTop = '8px';
 
-        stateGroup.appendChild(makeRow('Project root', projectRootInput, 'project root'));
-        stateGroup.appendChild(makeRow('Repo root', repoRootInput, 'repository root'));
-        stateGroup.appendChild(makeRow('Actions', stateActions, 'reconnect choose root init clone disable'));
-        stateGroup.appendChild(statusText);
+        const gitToggle = createToggle({
+            label: 'Enable Git integration',
+            checked: true,
+            disabled: false,
+            onChange: async (_e, checked) => {
+                const ok = await doToggleGit({ disable: !checked });
+                if (!ok) {
+                    try { gitToggle.input.checked = !checked; } catch (_) { }
+                }
+            }
+        });
+
+        repoGroup.appendChild(makeRow('Git', gitToggle.root, 'enable disable git integration'));
+        repoGroup.appendChild(makeRow('Project root', projectRootInput, 'project root'));
+        repoGroup.appendChild(makeRow('Repo root', repoRootInput, 'repository root'));
+        repoGroup.appendChild(makeRow('Actions', repoActions, 'refresh reconnect choose root'));
+        repoGroup.appendChild(statusText);
 
         const cfgGroup = makeGroup('Git Config', 'Applies to the current repository (not global).', 'git config user name email remote origin');
 
@@ -258,7 +295,7 @@
         cfgActions.style.flexWrap = 'wrap';
 
         const btnSave = createButton({
-            label: 'Save',
+            label: 'Apply',
             variant: 'primary',
             onClick: async () => {
                 const st = getState();
@@ -300,7 +337,7 @@
         });
 
         const btnTest = createButton({
-            label: 'Test',
+            label: 'Check Status',
             variant: 'ghost',
             onClick: async () => {
                 const st = getState();
@@ -321,10 +358,29 @@
         cfgActions.appendChild(btnSave);
         cfgActions.appendChild(btnTest);
 
+        cfgGroup.appendChild(makeSubsection('Identity', 'Used for commits in this repository.', 'identity author user name email'));
         cfgGroup.appendChild(makeRow('User name', nameInput, 'user name git config'));
         cfgGroup.appendChild(makeRow('User email', emailInput, 'user email git config'));
-        cfgGroup.appendChild(makeRow('Remote (origin)', remoteInput, 'remote origin url'));
+        cfgGroup.appendChild(makeSubsection('Remote', 'Origin URL used for push/pull.', 'remote origin url'));
+        cfgGroup.appendChild(makeRow('Origin URL', remoteInput, 'remote origin url'));
         cfgGroup.appendChild(makeRow('Actions', cfgActions, 'save test'));
+
+        const advancedGroup = makeGroup(
+            'Advanced',
+            'Repository setup actions (optional).',
+            'advanced init clone repository setup'
+        );
+
+        const advancedActions = document.createElement('div');
+        advancedActions.style.display = 'flex';
+        advancedActions.style.flexWrap = 'wrap';
+        advancedActions.style.gap = '6px';
+
+        const btnInit = createButton({ label: 'Init Repo', variant: 'ghost', onClick: doInitRepo });
+        const btnClone = createButton({ label: 'Clone…', variant: 'ghost', onClick: doCloneRepo });
+        advancedActions.appendChild(btnInit);
+        advancedActions.appendChild(btnClone);
+        advancedGroup.appendChild(makeRow('Actions', advancedActions, 'init clone'));
 
         const hydrateFromState = async () => {
             const st = getState();
@@ -336,16 +392,25 @@
             repoRootInput.value = repoRoot || '';
 
             try {
-                const label = btnToggleGit.querySelector('.ui-btn__label') || null;
-                if (label) label.textContent = st.gitDisabled ? 'Enable Git' : 'Disable Git';
-                else btnToggleGit.textContent = st.gitDisabled ? 'Enable Git' : 'Disable Git';
+                gitToggle.input.checked = !st.gitDisabled;
+                gitToggle.input.disabled = !st.gitAvailable;
             } catch (_) { }
-            btnToggleGit.className = `ui-btn ui-btn--${st.gitDisabled ? 'ghost' : 'danger'} ui-btn--md`;
+
+            const disableOps = !st.gitAvailable || st.gitDisabled;
+            try { btnRefresh.disabled = disableOps; } catch (_) { }
+            try { btnChooseRoot.disabled = !st.gitAvailable; } catch (_) { }
+            try { btnInit.disabled = disableOps; } catch (_) { }
+            try { btnClone.disabled = disableOps; } catch (_) { }
+            try { btnSave.disabled = disableOps || !repoRoot; } catch (_) { }
+            try { btnTest.disabled = disableOps || !repoRoot; } catch (_) { }
+            try { nameInput.disabled = disableOps; } catch (_) { }
+            try { emailInput.disabled = disableOps; } catch (_) { }
+            try { remoteInput.disabled = disableOps; } catch (_) { }
 
             const flags = [
-                st.gitDisabled ? 'disabled' : null,
-                st.gitAvailable ? 'gitAvailable' : 'gitMissing',
-                st.repoDetected ? 'repoDetected' : 'noRepo'
+                st.gitDisabled ? 'Git disabled' : 'Git enabled',
+                st.gitAvailable ? 'Git available' : 'Git not available',
+                st.repoDetected ? 'Repository detected' : 'No repository detected'
             ].filter(Boolean);
             statusText.textContent = st.lastError
                 ? `${flags.join(' · ')} · ${st.lastError}`
@@ -383,8 +448,9 @@
             } catch (_) { }
         };
 
-        root.appendChild(stateGroup);
+        root.appendChild(repoGroup);
         root.appendChild(cfgGroup);
+        root.appendChild(advancedGroup);
 
         hydrateFromState().catch(() => { });
 

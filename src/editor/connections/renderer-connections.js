@@ -108,6 +108,16 @@
             const sshFormStatus = document.getElementById('sshFormStatus');
             const sshSavedList = document.getElementById('sshSavedList');
             const sshSaveEnvBtn = document.getElementById('sshSaveEnvBtn');
+            const releaseConnectionCard = document.getElementById('releaseConnectionCard');
+            const releaseConnHostInput = document.getElementById('releaseConnHostInput');
+            const releaseConnPortInput = document.getElementById('releaseConnPortInput');
+            const releaseConnUserInput = document.getElementById('releaseConnUserInput');
+            const releaseConnPassInput = document.getElementById('releaseConnPassInput');
+            const releaseConnTestBtn = document.getElementById('releaseConnTestBtn');
+            const releaseConnSaveBtn = document.getElementById('releaseConnSaveBtn');
+            const releaseConnDeleteBtn = document.getElementById('releaseConnDeleteBtn');
+            const releaseConnFocusCompareBtn = document.getElementById('releaseConnFocusCompareBtn');
+            const releaseConnStatus = document.getElementById('releaseConnStatus');
 
             let savedProfiles = [];
             let dockerConfig = null;
@@ -300,8 +310,6 @@
 
             async function refreshDockerList() {
                 if (dockerListEl) dockerListEl.textContent = 'Loading...';
-                await window.ahmadIDE.setConnection('docker');
-                setConnStatus('Docker (local)', 'info');
                 appendOutput('🐳 Listing containers...', terminalState);
                 const res = await window.ahmadIDE.listDocker();
                 if (res.ok) {
@@ -403,6 +411,46 @@
                 if (sshConnectBtn) sshConnectBtn.disabled = false;
             }
 
+            // --- Release Connection (Compare with Release) ---
+            const releaseApi = window.AhmadIDEModules?.features?.releaseConnection;
+            const readReleaseForm = () => ({
+                host: (releaseConnHostInput?.value || '').trim(),
+                port: parseInt(releaseConnPortInput?.value || '22', 10) || 22,
+                username: (releaseConnUserInput?.value || '').trim(),
+                password: releaseConnPassInput?.value || ''
+            });
+
+            const setReleaseStatus = (message, severity = 'info') => {
+                if (!releaseConnStatus) return;
+                releaseConnStatus.textContent = message;
+                releaseConnStatus.style.background = severity === 'error'
+                    ? 'rgba(248,113,113,0.18)'
+                    : severity === 'success'
+                        ? 'rgba(74,222,128,0.14)'
+                        : 'rgba(91,213,255,0.12)';
+                releaseConnStatus.style.color = severity === 'error'
+                    ? '#fecdd3'
+                    : severity === 'success'
+                        ? '#4ade80'
+                        : '#38bdf8';
+            };
+
+            const loadReleaseIntoForm = () => {
+                if (!releaseApi || !releaseConnHostInput || !releaseConnUserInput || !releaseConnPortInput) return;
+                const cfg = releaseApi.loadConnection?.() || null;
+                if (cfg?.host) releaseConnHostInput.value = cfg.host;
+                if (cfg?.username) releaseConnUserInput.value = cfg.username;
+                releaseConnPortInput.value = String(cfg?.port || 22);
+                if (releaseConnPassInput) releaseConnPassInput.value = '';
+                if (cfg?.host && cfg?.username) {
+                    setReleaseStatus(`Configured: ${cfg.username}@${cfg.host}:${cfg.port || 22}`, 'info');
+                    if (releaseConnDeleteBtn) releaseConnDeleteBtn.disabled = false;
+                } else {
+                    setReleaseStatus('Not configured', 'info');
+                    if (releaseConnDeleteBtn) releaseConnDeleteBtn.disabled = true;
+                }
+            };
+
             if (connectionsPanel && connectionsPanel.dataset.wired !== '1') {
                 connectionsPanel.dataset.wired = '1';
 
@@ -475,19 +523,248 @@
                         if (e.key === 'Enter') handleSshConnect();
                     });
                 });
+
+                // Wire Release Connection card (hidden unless extension enabled).
+                loadReleaseIntoForm();
+                window.addEventListener('ahmadIDE:connections-updated', () => loadReleaseIntoForm());
+
+                releaseConnTestBtn?.addEventListener('click', async () => {
+                    if (!releaseApi?.testConnection) return;
+                    const cfg = readReleaseForm();
+                    if (!cfg.host || !cfg.username) return setReleaseStatus('Host and username are required', 'error');
+                    setReleaseStatus('Testing connection…', 'info');
+                    releaseConnTestBtn.disabled = true;
+                    try {
+                        const result = await releaseApi.testConnection(cfg);
+                        if (result?.success) setReleaseStatus(`✓ ${result.message || 'Connection successful'}`, 'success');
+                        else setReleaseStatus(`✗ ${result?.message || 'Connection failed'}`, 'error');
+                    } catch (e) {
+                        setReleaseStatus(`✗ ${String(e?.message || e || 'Connection failed')}`, 'error');
+                    } finally {
+                        releaseConnTestBtn.disabled = false;
+                    }
+                });
+
+                releaseConnSaveBtn?.addEventListener('click', async () => {
+                    if (!releaseApi?.saveConnection) return;
+                    const cfg = readReleaseForm();
+                    if (!cfg.host || !cfg.username) return setReleaseStatus('Host and username are required', 'error');
+                    releaseConnSaveBtn.disabled = true;
+                    setReleaseStatus('Saving…', 'info');
+                    try {
+                        const ok = releaseApi.saveConnection(cfg);
+                        if (!ok) throw new Error('Failed to save connection');
+                        // Ensure password persistence (releaseConnection.saveConnection may fire-and-forget).
+                        if (cfg.password && releaseApi.storePasswordSecurely) {
+                            await releaseApi.storePasswordSecurely(cfg.password);
+                        }
+                        setReleaseStatus('✓ Saved (password stored securely)', 'success');
+                        if (releaseConnPassInput) releaseConnPassInput.value = '';
+                        window.dispatchEvent(new CustomEvent('ahmadIDE:connections-updated'));
+                    } catch (e) {
+                        setReleaseStatus(`✗ ${String(e?.message || e || 'Failed to save')}`, 'error');
+                    } finally {
+                        releaseConnSaveBtn.disabled = false;
+                        loadReleaseIntoForm();
+                    }
+                });
+
+                releaseConnDeleteBtn?.addEventListener('click', async () => {
+                    if (!releaseApi?.deleteConnection) return;
+                    const cfg = releaseApi.loadConnection?.() || null;
+                    if (!cfg) return setReleaseStatus('Nothing to delete', 'info');
+                    if (!confirm('Delete Release Connection?')) return;
+                    releaseConnDeleteBtn.disabled = true;
+                    try {
+                        const ok = releaseApi.deleteConnection();
+                        if (!ok) throw new Error('Failed to delete');
+                        setReleaseStatus('✓ Deleted', 'success');
+                        window.dispatchEvent(new CustomEvent('ahmadIDE:connections-updated'));
+                    } catch (e) {
+                        setReleaseStatus(`✗ ${String(e?.message || e || 'Failed to delete')}`, 'error');
+                    } finally {
+                        releaseConnDeleteBtn.disabled = false;
+                        loadReleaseIntoForm();
+                    }
+                });
+
+                releaseConnFocusCompareBtn?.addEventListener('click', async () => {
+                    try { closeConnectionsPanel(); } catch (_) { }
+                    try { window.toggleToolWindowPanel?.('comparePanel', 'bottom'); } catch (_) { }
+                    const handler = window.AhmadIDEModules?.extensions?.compareWithRelease?.handleCompareWithRelease;
+                    if (typeof handler === 'function') {
+                        try { await handler({ source: 'connectionsPanel' }); } catch (_) { }
+                    }
+                });
+
+                // Keep release connection card hidden unless Compare with Release is enabled.
+                const applyReleaseVisibility = () => {
+                    if (!releaseConnectionCard) return;
+                    const extensionsService = window.AhmadIDEModules?.services?.extensionsService;
+                    const enabled = !!extensionsService?.isEnabled?.('compare-with-release');
+                    releaseConnectionCard.classList.toggle('hidden', !enabled);
+                };
+                applyReleaseVisibility();
+                try { window.AhmadIDEModules?.services?.extensionsService?.onChange?.(applyReleaseVisibility); } catch (_) { }
             }
+
+            // Wire up event from connectionsDialog.js
+            window.addEventListener('ahmadIDE:connect-profile', async (e) => {
+                const profile = e.detail?.profile;
+                if (!profile) return;
+
+                // Update status in dialog to "Connecting..." (optional, handled by dialog optimistically?)
+                // Here we perform the action
+                if (profile.type === 'docker') {
+                    await connectToDocker({
+                        containerId: profile.containerId,
+                        name: profile.name,
+                        routineState,
+                        editor,
+                        terminalState
+                    }, {
+                        appendOutput,
+                        setConnStatus,
+                        closeConnectionsPanel,
+                        loadRoutineList: async (rs, ed) => {
+                            await loadRoutineList(rs, ed, getRoutineSearchValue() || '', null);
+                        }
+                    });
+
+                    // Update dialog status
+                    const dialogImpl = window.AhmadIDEModules?.features?.connections?.createConnectionsDialog?.();
+                    if (dialogImpl && dialogImpl.setConnectionStatus) {
+                        dialogImpl.setConnectionStatus({ connected: true, type: 'docker', profile });
+                    }
+                } else if (profile.type === 'ssh') {
+                    // Reuse existing SSH logic by populating inputs and clicking connect?
+                    // Or invoke sshConnect method directly?
+                    // Existing handleSshConnect reads from inputs.
+                    // Let's populate inputs then trigger it to reuse logic (safe, lazy way)
+                    if (sshHostInput) sshHostInput.value = profile.host || '';
+                    if (sshPortInput) sshPortInput.value = profile.port || '22';
+                    if (sshUserInput) sshUserInput.value = profile.user || '';
+                    if (sshPassInput) sshPassInput.value = profile.password || ''; // Password might not be saved?
+                    if (sshEnvInput) sshEnvInput.value = profile.envKey || ''; // Profile structure might differ slightly?
+
+                    // Actually profiles in dialog are stored as: { id, type, name, host, port, user, password, containerId }
+                    // handleSshConnect expects inputs validation.
+
+                    await handleSshConnect();
+
+                    // Update dialog status if successful (handleSshConnect sets internal status, but dialog needs explicit update?)
+                    // handleSshConnect closes the panel on success.
+                    // The dialog (if open) needs to know.
+                    // If handleSshConnect succeeds, we should update the dialog state.
+                }
+            });
 
             cachedApi = {
                 openConnectionsPanel,
                 closeConnectionsPanel,
                 refreshDockerList,
-                handleSshConnect
+                handleSshConnect,
+                connectToDocker, // Expose for auto-connect
+                checkForAutoConnect
             };
             return cachedApi;
         }
 
+        // New Helper: Connect to a specific Docker container
+        async function connectToDocker({ containerId, name, routineState, editor, terminalState, config = null }, callbacks = {}) {
+            const appendOutput = callbacks.appendOutput || (() => { });
+            const setConnStatus = callbacks.setConnStatus || (() => { });
+            const closePanel = callbacks.closeConnectionsPanel || (() => { });
+
+            if (!containerId) {
+                appendOutput('✗ No container ID provided for Docker connection.', terminalState);
+                return false;
+            }
+
+            const dockerConfig = config || (() => {
+                try { return JSON.parse(localStorage.getItem('ahmadIDE:dockerConfig') || '{}'); } catch (e) { return {}; }
+            })();
+
+            // Merge container ID into config or use universal if no extra config
+            const fullConfig = { containerId, ...dockerConfig };
+
+            appendOutput(`🐳 Connecting to ${name || containerId}...`, terminalState);
+
+            // Validate the container is running (prevents "connected" UI when Docker isn't reachable).
+            try {
+                const listRes = await window.ahmadIDE.listDocker?.();
+                if (!listRes?.ok) {
+                    const msg = listRes?.message || listRes?.error || listRes?.stderr || 'Docker is not available';
+                    appendOutput(`✗ Docker unavailable: ${msg}`, terminalState);
+                    setConnStatus('Ready', 'subtle');
+                    return false;
+                }
+                const match = (listRes.containers || []).find((c) => {
+                    const id = String(c?.id || c?.containerId || '').trim();
+                    if (!id) return false;
+                    return id === containerId || id.startsWith(containerId) || containerId.startsWith(id);
+                });
+                if (!match) {
+                    appendOutput('✗ Selected container is not running. Refresh Docker list and try again.', terminalState);
+                    setConnStatus('Ready', 'subtle');
+                    return false;
+                }
+                // Prefer the actual name from Docker when available.
+                if (!name && match?.name) name = match.name;
+            } catch (e) {
+                appendOutput(`✗ Docker validation failed: ${String(e?.message || e)}`, terminalState);
+                setConnStatus('Ready', 'subtle');
+                return false;
+            }
+
+            const res = await window.ahmadIDE.setConnection('docker', { docker: fullConfig });
+
+            if (res) { // Assuming setConnection returns something truthy or void on success (it's usually void but awaited)
+                // Persistence for last used
+                try { localStorage.setItem('ahmadIDE:lastContainerId', containerId); } catch (e) { }
+
+                const modeLabel = fullConfig.ydbPath ? 'Docker (configured)' : 'Docker (universal)';
+                setConnStatus(name ? `Docker: ${name}` : modeLabel, 'success');
+                appendOutput(`✓ Connected to ${name || containerId}`, terminalState);
+
+                if (callbacks.loadRoutineList) {
+                    await callbacks.loadRoutineList(routineState, editor);
+                }
+
+                closePanel();
+                return true;
+            }
+            return false;
+        }
+
+        // New Helper: Auto-connect check
+        async function checkForAutoConnect({ editor, routineState, terminalState }, callbacks = {}) {
+            try {
+                // Check docker config for default container
+                const dockerConfigRaw = localStorage.getItem('ahmadIDE:dockerConfig');
+                if (!dockerConfigRaw) return;
+                const dockerConfig = JSON.parse(dockerConfigRaw);
+
+                if (dockerConfig && dockerConfig.defaultContainerId) {
+                    callbacks.appendOutput('⚡ Auto-connecting to default Docker container...', terminalState);
+                    await connectToDocker({
+                        containerId: dockerConfig.defaultContainerId,
+                        name: dockerConfig.defaultContainerName,
+                        routineState,
+                        editor,
+                        terminalState,
+                        config: dockerConfig
+                    }, callbacks);
+                }
+            } catch (e) {
+                console.warn('Auto-connect failed', e);
+            }
+        }
+
         return {
-            wireConnectionsPanel
+            wireConnectionsPanel,
+            connectToDocker,
+            checkForAutoConnect
         };
     }
 

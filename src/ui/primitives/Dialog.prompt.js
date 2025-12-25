@@ -2,7 +2,7 @@
     /**
      * Prompt & Confirm Dialog Helpers
      * Generic reusable dialogs for quick user input
-     * Matches PhpStorm 2025.3 New UI prompt/confirm patterns
+     * Matches  2025.3 New UI prompt/confirm patterns
      *
      * Checklist: PRM-001 to PRM-005
      */

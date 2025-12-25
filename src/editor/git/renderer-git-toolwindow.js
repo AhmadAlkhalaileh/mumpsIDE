@@ -10,6 +10,20 @@
 
         const toggleToolWindowPanel = deps?.toggleToolWindowPanel || (() => { });
 
+        const GLOBAL_REPO_ROOT_KEY = "ahmadIDE:gitRepoRootGlobal";
+        const VISTA_REPO_ROOT_KEY = "ahmadIDE:vistaRoutinesRepoPath";
+        const readGlobalRepoRoot = () => {
+            try {
+                const v = String(localStorage.getItem(GLOBAL_REPO_ROOT_KEY) || "").trim();
+                if (v) return v;
+            } catch (_) { }
+            try {
+                const v = String(localStorage.getItem(VISTA_REPO_ROOT_KEY) || "").trim();
+                if (v) return v;
+            } catch (_) { }
+            return "";
+        };
+
         // ✅ FIX: fallback must accept (cmd, opts) and scope to repoRoot (-C) when provided
         const runGitApi =
             deps?.runGit ||
@@ -55,7 +69,14 @@
                 } catch (_) { }
             };
 
+            const ensureCommitPanelMounted = () => {
+                try {
+                    featureRegistry?.ensureById?.("commitPanel");
+                } catch (_) { }
+            };
+
             let panelDomWired = false;
+            let commitPanelDomWired = false;
 
             const showPrompt = async ({ title, message, placeholder = "", defaultValue = "" } = {}) => {
                 try {
@@ -140,12 +161,13 @@
             };
 
             const perfUi = window.AhmadIDEModules?.features?.git?.perfUi || null;
+            console.log('[GitToolWindow] perfUi:', !!perfUi, 'createHistoryRenderer:', !!perfUi?.createHistoryRenderer);
             const diffRenderer = perfUi?.createDiffRenderer ? perfUi.createDiffRenderer({ maxLines: 6000 }) : null;
             const logDiffRenderer = perfUi?.createDiffRenderer
                 ? perfUi.createDiffRenderer({ maxLines: 6000, leftId: "gitLogDiffLeft", rightId: "gitLogDiffRight" })
                 : null;
 
-            const gitSelected = { staged: new Set(), unstaged: new Set() };
+            const gitSelected = { staged: new Set(), unstaged: new Set(), untracked: new Set() };
 
             const changesRenderer = perfUi?.createChangesRenderer
                 ? perfUi.createChangesRenderer({
@@ -173,12 +195,20 @@
                     }
                 })
                 : null;
+            console.log('[GitToolWindow] historyRenderer:', !!historyRenderer, 'render method:', !!historyRenderer?.render);
 
             let activeTab = "log";
             let lastStatusEntries = [];
             let historyAll = [];
             let lastHistoryItems = [];
             let branchSnapshot = { current: "", local: [], remote: [] };
+
+            let logAuthorFilter = "";
+            let logSinceFilter = "";
+            let logUntilFilter = "";
+            let logPathFilter = "";
+
+            let commitPanelSelected = { path: "", staged: false, status: "", oldPath: "" };
 
             let logIgnoreWhitespace = false;
             let logSelectedFilePath = "";
@@ -187,6 +217,37 @@
             let logDiffAnchorTimer = null;
             let logDiffObserver = null;
             let logDiffSyncing = false;
+
+            const ensureLogDiffLayout = () => {
+                const host = document.getElementById("gitLogDiffGrid");
+                if (!host) return;
+                // Already mounted
+                if (host.querySelector("#gitLogDiffLeft") && host.querySelector("#gitLogDiffRight")) return;
+
+                host.innerHTML = `
+                    <div class="git-diff-grid" role="region" aria-label="Commit diff">
+                        <div class="git-diff-pane" id="gitLogDiffLeft" aria-label="Original"></div>
+                        <div class="git-diff-pane" id="gitLogDiffRight" aria-label="Modified"></div>
+                    </div>
+                `;
+
+                // Keep panes scrolled together (IntelliJ-style)
+                const left = document.getElementById("gitLogDiffLeft");
+                const right = document.getElementById("gitLogDiffRight");
+                if (!left || !right) return;
+                const sync = (src, dst) => () => {
+                    if (logDiffSyncing) return;
+                    logDiffSyncing = true;
+                    try {
+                        dst.scrollTop = src.scrollTop;
+                        dst.scrollLeft = src.scrollLeft;
+                    } finally {
+                        logDiffSyncing = false;
+                    }
+                };
+                left.addEventListener("scroll", sync(left, right), { passive: true });
+                right.addEventListener("scroll", sync(right, left), { passive: true });
+            };
 
             const renderSideBySideDiff = (diffText) => {
                 if (diffRenderer && typeof diffRenderer.render === "function") {
@@ -204,6 +265,7 @@
             };
 
             const renderLogDiff = (diffText) => {
+                ensureLogDiffLayout();
                 if (logDiffRenderer && typeof logDiffRenderer.render === "function") {
                     logDiffRenderer.render(diffText);
                     scheduleLogDiffAnchorRecalc();
@@ -217,27 +279,224 @@
                 lastStatusEntries = Array.isArray(entries) ? entries : [];
                 if (changesRenderer && typeof changesRenderer.render === "function") {
                     changesRenderer.render(lastStatusEntries);
+                    syncChangesUI();
                     return;
                 }
-                const unstagedHost = document.getElementById("gitChangesUnstaged");
-                const stagedHost = document.getElementById("gitChangesStaged");
-                if (unstagedHost) unstagedHost.textContent = "Virtual list unavailable.";
-                if (stagedHost) stagedHost.textContent = "Virtual list unavailable.";
+
+                const unstaged = lastStatusEntries.filter(e => !e.staged);
+                const staged = lastStatusEntries.filter(e => e.staged);
+
+                renderFileList("gitChangesUnstaged", unstaged, false);
+                renderFileList("gitChangesStaged", staged, true);
+                syncChangesUI();
+            };
+
+            const renderFileList = (hostId, files, isStaged) => {
+                const host = document.getElementById(hostId);
+                if (!host) return;
+                host.innerHTML = "";
+
+                if (!files.length) {
+                    const empty = document.createElement("div");
+                    empty.className = "git-changes-empty";
+                    empty.textContent = isStaged ? "No staged files" : "No changes";
+                    host.appendChild(empty);
+                    return;
+                }
+
+                files.forEach((file) => {
+                    const item = document.createElement("div");
+                    item.className = "git-file-item";
+                    item.tabIndex = 0;
+                    item.dataset.path = file.path;
+                    item.dataset.staged = isStaged;
+
+                    const checkbox = document.createElement("input");
+                    checkbox.type = "checkbox";
+                    checkbox.className = "git-file-checkbox";
+                    checkbox.checked = (isStaged ? gitSelected.staged : gitSelected.unstaged).has(file.path);
+
+                    const status = document.createElement("span");
+                    status.className = `git-file-status ${file.status}`;
+                    status.textContent = file.status;
+
+                    const name = document.createElement("span");
+                    name.className = "git-file-name";
+                    name.textContent = file.path.split("/").pop();
+
+                    const pathParts = file.path.split("/");
+                    if (pathParts.length > 1) {
+                        const pathEl = document.createElement("span");
+                        pathEl.className = "git-file-path";
+                        pathEl.textContent = pathParts.slice(0, -1).join("/");
+                        item.appendChild(checkbox);
+                        item.appendChild(status);
+                        item.appendChild(name);
+                        item.appendChild(pathEl);
+                    } else {
+                        item.appendChild(checkbox);
+                        item.appendChild(status);
+                        item.appendChild(name);
+                    }
+
+                    checkbox.addEventListener("change", () => {
+                        const targetSet = isStaged ? gitSelected.staged : gitSelected.unstaged;
+                        if (checkbox.checked) targetSet.add(file.path);
+                        else targetSet.delete(file.path);
+                        syncGitActionStates();
+                    });
+
+                    item.addEventListener("click", (e) => {
+                        if (e.target === checkbox) return;
+                        checkbox.checked = !checkbox.checked;
+                        checkbox.dispatchEvent(new Event("change"));
+                    });
+
+                    item.addEventListener("dblclick", () => {
+                        previewDiffForPath(file.path, { staged: isStaged, status: file.status, oldPath: file.oldPath }).catch(() => { });
+                    });
+
+                    host.appendChild(item);
+                });
+            };
+
+            const syncChangesUI = () => {
+                const unstaged = lastStatusEntries.filter(e => !e.staged);
+                const staged = lastStatusEntries.filter(e => e.staged);
+
+                const changesCount = document.getElementById("gitChangesCount");
+                const stagedCount = document.getElementById("gitStagedCount");
+                const stagedSection = document.getElementById("gitStagedSection");
+
+                if (changesCount) changesCount.textContent = unstaged.length === 1 ? "1 file" : `${unstaged.length} files`;
+                if (stagedCount) stagedCount.textContent = staged.length === 1 ? "1 file" : `${staged.length} files`;
+                if (stagedSection) stagedSection.classList.toggle("hidden", staged.length === 0);
             };
 
             const renderGitHistory = (items = []) => {
+                console.log('[GitToolWindow] renderGitHistory called, items:', items.length, 'hasHistoryRenderer:', !!historyRenderer);
                 lastHistoryItems = Array.isArray(items) ? items : [];
                 if (historyRenderer && typeof historyRenderer.render === "function") {
+                    console.log('[GitToolWindow] Calling historyRenderer.render with', lastHistoryItems.length, 'items');
                     historyRenderer.render(lastHistoryItems);
                     return;
                 }
+                console.warn('[GitToolWindow] No historyRenderer available - falling back to basic render');
                 const host = document.getElementById("gitHistoryList");
                 if (!host) return;
                 host.innerHTML = "";
-                (items || []).slice(0, 50).forEach((line) => {
-                    const div = document.createElement("div");
-                    div.textContent = typeof line === "string" ? line : JSON.stringify(line);
-                    host.appendChild(div);
+
+                if (!items.length) {
+                    const empty = document.createElement("div");
+                    empty.className = "git-log-empty";
+                    empty.textContent = "No commits found";
+                    host.appendChild(empty);
+                    return;
+                }
+
+                const ROW_HEIGHT = 32;
+                const LANE_WIDTH = 16;
+                const NODE_RADIUS = 5;
+
+                items.forEach((commit, idx) => {
+                    const row = document.createElement("div");
+                    row.className = "git-log-row";
+                    row.dataset.hash = commit.hash;
+                    row.tabIndex = 0;
+
+                    const graphCell = document.createElement("div");
+                    graphCell.className = "git-log-graph";
+
+                    const maxLane = Math.max(commit.lane || 0, ...(commit.edges || []).map(e => Math.max(e.from, e.to)));
+                    const graphWidth = (maxLane + 1) * LANE_WIDTH + 16;
+
+                    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                    svg.setAttribute("width", graphWidth);
+                    svg.setAttribute("height", ROW_HEIGHT);
+                    svg.setAttribute("class", "git-graph-svg");
+
+                    const centerX = (commit.lane || 0) * LANE_WIDTH + LANE_WIDTH / 2;
+                    const centerY = ROW_HEIGHT / 2;
+
+                    (commit.edges || []).forEach(edge => {
+                        const fromX = edge.from * LANE_WIDTH + LANE_WIDTH / 2;
+                        const toX = edge.to * LANE_WIDTH + LANE_WIDTH / 2;
+                        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+
+                        if (edge.type === "direct") {
+                            path.setAttribute("d", `M ${fromX} ${centerY} L ${toX} ${ROW_HEIGHT}`);
+                            path.setAttribute("class", "git-edge git-edge-direct");
+                        } else if (edge.type === "merge") {
+                            const ctrlY = centerY + 12;
+                            path.setAttribute("d", `M ${fromX} ${centerY} Q ${fromX} ${ctrlY}, ${toX} ${ROW_HEIGHT}`);
+                            path.setAttribute("class", "git-edge git-edge-merge");
+                        } else {
+                            path.setAttribute("d", `M ${fromX} 0 L ${fromX} ${ROW_HEIGHT}`);
+                            path.setAttribute("class", "git-edge git-edge-passthrough");
+                        }
+
+                        path.setAttribute("stroke", commit.color || "#d19a66");
+                        svg.appendChild(path);
+                    });
+
+                    const isMerge = (commit.parents || []).length > 1;
+                    if (isMerge) {
+                        const diamond = document.createElementNS("http://www.w3.org/2000/svg", "polygon");
+                        const size = NODE_RADIUS + 1;
+                        diamond.setAttribute("points", `${centerX},${centerY - size} ${centerX + size},${centerY} ${centerX},${centerY + size} ${centerX - size},${centerY}`);
+                        diamond.setAttribute("fill", commit.color || "#d19a66");
+                        diamond.setAttribute("class", "git-node git-node-diamond");
+                        svg.appendChild(diamond);
+                    } else {
+                        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                        circle.setAttribute("cx", centerX);
+                        circle.setAttribute("cy", centerY);
+                        circle.setAttribute("r", NODE_RADIUS);
+                        circle.setAttribute("fill", commit.color || "#d19a66");
+                        circle.setAttribute("class", "git-node git-node-circle");
+                        svg.appendChild(circle);
+                    }
+
+                    graphCell.appendChild(svg);
+
+                    const content = document.createElement("div");
+                    content.className = "git-log-content";
+
+                    const message = document.createElement("div");
+                    message.className = "git-log-message";
+                    message.textContent = commit.subject || "";
+
+                    if (commit.refs) {
+                        const refs = commit.refs.split(",").map(r => r.trim()).filter(Boolean);
+                        refs.forEach(ref => {
+                            const badge = document.createElement("span");
+                            badge.className = "git-log-ref";
+                            badge.textContent = ref;
+                            message.appendChild(badge);
+                        });
+                    }
+
+                    const meta = document.createElement("div");
+                    meta.className = "git-log-meta";
+                    meta.innerHTML = `<span class="git-log-author">${commit.author || ""}</span> · <span class="git-log-date">${commit.date || ""}</span>`;
+
+                    content.appendChild(message);
+                    content.appendChild(meta);
+
+                    row.appendChild(graphCell);
+                    row.appendChild(content);
+
+                    row.addEventListener("click", () => {
+                        host.querySelectorAll(".git-log-row").forEach(r => r.classList.remove("selected"));
+                        row.classList.add("selected");
+                        if (selectedCommitRef) {
+                            selectedCommitRef.hash = commit.hash;
+                            selectedCommitRef.parents = commit.parents || [];
+                        }
+                        loadCommitDetails(commit.hash).catch(() => { });
+                    });
+
+                    host.appendChild(row);
                 });
             };
 
@@ -265,6 +524,11 @@
 
             const isGitPanelVisible = () => {
                 const panel = document.getElementById("gitToolPanel");
+                return !!panel && !panel.classList.contains("hidden");
+            };
+
+            const isCommitPanelVisible = () => {
+                const panel = document.getElementById("commitPanel");
                 return !!panel && !panel.classList.contains("hidden");
             };
 
@@ -319,13 +583,47 @@
                 const commitBtn = document.getElementById("gitCommitBtn");
                 const commitAndPushBtn = document.getElementById("gitCommitAndPushBtn");
                 const hasMessage = Boolean(msgEl?.value?.trim());
-                if (commitBtn) commitBtn.disabled = !repoReady || !hasMessage;
-                if (commitAndPushBtn) commitAndPushBtn.disabled = !repoReady || !hasMessage;
+                const hasStagedFiles = lastStatusEntries.some(e => e.staged);
+                if (commitBtn) commitBtn.disabled = !repoReady || !hasMessage || !hasStagedFiles;
+                if (commitAndPushBtn) commitAndPushBtn.disabled = !repoReady || !hasMessage || !hasStagedFiles;
 
                 ["gitFetchBtn", "gitPullBtn", "gitPushBtn", "gitCheckoutBtn"].forEach((id) => {
                     const el = document.getElementById(id);
                     if (el) el.disabled = !repoReady;
                 });
+            };
+
+            const performCommit = async (andPush = false) => {
+                const msgEl = document.getElementById("gitCommitMessage");
+                const amendCb = document.getElementById("gitAmendCheckbox");
+                const message = String(msgEl?.value || "").trim();
+
+                if (!message) {
+                    showToast("error", "Git", "Commit message is required");
+                    return;
+                }
+
+                const isAmend = amendCb?.checked || false;
+                const flags = [];
+                if (isAmend) flags.push("--amend");
+
+                const quotedMsg = message.replace(/'/g, "'\\''");
+                const cmd = `git commit ${flags.join(" ")} -m '${quotedMsg}'`.trim();
+
+                const res = await runGit(cmd);
+                if (!res.ok) return;
+
+                showToast("success", "Git", isAmend ? "Commit amended" : "Committed successfully");
+                if (msgEl) msgEl.value = "";
+                if (amendCb) amendCb.checked = false;
+
+                await refreshGitStatus();
+                await loadGitHistory();
+
+                if (andPush) {
+                    const pushRes = await runGit("git push");
+                    if (pushRes.ok) showToast("success", "Git", "Pushed to remote");
+                }
             };
 
             let branchTreeSelection = "";
@@ -484,7 +782,13 @@
             };
 
             const applyLogFilter = () => {
-                const q = (document.getElementById("gitLogSearchInput")?.value || "").trim().toLowerCase();
+                const q = (
+                    document.getElementById("gitSearchInput")?.value ||
+                    document.getElementById("gitLogSearchInput")?.value ||
+                    ""
+                )
+                    .trim()
+                    .toLowerCase();
                 const filtered = !q
                     ? historyAll
                     : historyAll.filter((c) => {
@@ -502,7 +806,8 @@
                 }
             };
 
-            const quoteGitPath = (p) => `"${String(p || "").replace(/"/g, '\\"')}"`;
+            const quoteGitArg = (value) => `"${String(value || "").replace(/"/g, '\\"')}"`;
+            const quoteGitPath = (p) => quoteGitArg(p);
 
             const updateLogDiffNavUi = () => {
                 const prevBtn = document.getElementById("gitLogDiffPrevBtn");
@@ -597,7 +902,35 @@
                     : ["git show", "-1", wFlag, '--pretty=format:""', commitHash].filter(Boolean).join(" ");
 
                 const diffRes = await runGit(cmd, { silent: true });
-                renderLogDiff(diffRes.ok ? diffRes.stdout || "" : "");
+                const diffText = diffRes.ok ? diffRes.stdout || "" : "";
+
+                updateDiffHeader(commitHash, filePath, diffText);
+                renderLogDiff(diffText);
+            };
+
+            const updateDiffHeader = (commitHash, filePath, diffText) => {
+                const header = document.getElementById("gitDiffHeader");
+                const leftHash = document.getElementById("gitDiffLeftHash");
+                const rightHash = document.getElementById("gitDiffRightHash");
+                const filePathEl = document.getElementById("gitDiffFilePath");
+                const countEl = document.getElementById("gitDiffCount");
+
+                if (!header) return;
+
+                const parent = selectedCommitRef?.parents?.[0] || "";
+                const shortParent = parent ? parent.slice(0, 8) : "";
+                const shortCommit = commitHash ? commitHash.slice(0, 8) : "";
+
+                if (leftHash) leftHash.textContent = shortParent || "—";
+                if (rightHash) rightHash.textContent = shortCommit;
+                if (filePathEl) filePathEl.textContent = filePath || "";
+
+                const addCount = (diffText.match(/^\+[^+]/gm) || []).length;
+                const delCount = (diffText.match(/^-[^-]/gm) || []).length;
+                const total = addCount + delCount;
+                if (countEl) countEl.textContent = total === 1 ? "1 difference" : `${total} differences`;
+
+                header.classList.toggle("hidden", !filePath && !diffText.trim());
             };
 
             const clearLogDetails = () => {
@@ -668,6 +1001,14 @@
                             el.classList.toggle("selected", el.dataset?.path === fp);
                         });
 
+                        await reloadLogDiff(String(hash || "").trim());
+                    };
+
+                    row.classList.toggle("selected", Boolean(logSelectedFilePath) && logSelectedFilePath === String(ent.path || "").trim());
+                    row.addEventListener("click", () => open().catch(() => { }));
+                    row.addEventListener("dblclick", async () => {
+                        const fp = String(ent.path || "").trim();
+                        if (!fp) return;
                         await openDiffTab({
                             kind: "commit",
                             commitHash: String(hash || "").trim(),
@@ -678,10 +1019,7 @@
                             status: String(ent.status || "").trim(),
                             source: "log-files"
                         });
-                    };
-
-                    row.classList.toggle("selected", Boolean(logSelectedFilePath) && logSelectedFilePath === String(ent.path || "").trim());
-                    row.addEventListener("click", () => open().catch(() => { }));
+                    });
                     row.addEventListener("keydown", (e) => {
                         if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
@@ -698,6 +1036,7 @@
                 const detailsBody = document.getElementById("gitLogDetailsBody");
                 if (!detailsBody) return;
 
+                ensureLogDiffLayout();
                 const metaRes = await runGit(
                     `git show -1 --no-patch --date=iso-strict --pretty=format:"%H%x00%P%x00%an%x00%ad%x00%s" ${hash}`,
                     { silent: true }
@@ -748,6 +1087,9 @@
 
                 document.getElementById("gitLogEmptyState")?.classList.add("hidden");
                 detailsBody.classList.remove("hidden");
+
+                // Default: show the full commit diff until a file is selected.
+                reloadLogDiff(hash).catch(() => { });
             };
 
             // ✅ FIX: runGit ALWAYS passes repoRoot + normalizes ok/code/exitCode
@@ -871,24 +1213,22 @@
                 await runGit('git branch --format="%(refname:short)"', {
                     silent: true,
                     onSuccess: (out) => {
-                        const select = document.getElementById("gitBranchSelect");
-                        const logSelect = document.getElementById("gitLogBranchSelect");
-                        const prior = select?.value || "";
-                        const priorLog = logSelect?.value || "__ALL__";
-                        if (!select) return;
-
-                        select.innerHTML = "";
                         const locals = (out || "").split("\n").filter(Boolean);
-                        locals.forEach((b) => {
-                            const opt = document.createElement("option");
-                            opt.value = b;
-                            opt.textContent = b;
-                            select.appendChild(opt);
-                        });
-                        if (prior) select.value = prior;
-
                         branchSnapshot.local = locals;
-                        if (logSelect) logSelect.value = priorLog;
+
+                        // Optional legacy select (if present in some layouts)
+                        const select = document.getElementById("gitBranchSelect");
+                        if (select) {
+                            const prior = select.value || "";
+                            select.innerHTML = "";
+                            locals.forEach((b) => {
+                                const opt = document.createElement("option");
+                                opt.value = b;
+                                opt.textContent = b;
+                                select.appendChild(opt);
+                            });
+                            if (prior) select.value = prior;
+                        }
                     }
                 });
 
@@ -940,46 +1280,132 @@
                 } catch (_) { }
 
                 renderBranchesTree();
+                syncCommitPanelChanges();
+                syncCommitPanelActions();
                 syncGitActionStates();
                 fetchCurrentBranch?.().catch(() => { });
                 return statusRes;
             };
 
+            const calculateGraphLayout = (commits) => {
+                if (!commits.length) return commits;
+
+                const hashToIndex = new Map();
+                commits.forEach((c, i) => hashToIndex.set(c.hash, i));
+
+                const lanes = [];
+                const colors = ["#d19a66", "#56b6c2", "#98c379", "#c678dd", "#e5c07b", "#61afef"];
+
+                commits.forEach((commit, idx) => {
+                    let lane = -1;
+                    const myHash = commit.hash;
+                    const myParents = commit.parents || [];
+
+                    for (let i = 0; i < lanes.length; i++) {
+                        if (lanes[i] === myHash) {
+                            lane = i;
+                            break;
+                        }
+                    }
+
+                    if (lane === -1) {
+                        lane = lanes.findIndex(l => !l);
+                        if (lane === -1) lane = lanes.length;
+                    }
+
+                    commit.lane = lane;
+                    commit.color = colors[lane % colors.length];
+                    commit.edges = [];
+
+                    if (myParents.length === 0) {
+                        lanes[lane] = null;
+                    } else if (myParents.length === 1) {
+                        lanes[lane] = myParents[0];
+                        commit.edges.push({ from: lane, to: lane, toHash: myParents[0], type: "direct" });
+                    } else {
+                        lanes[lane] = myParents[0];
+                        commit.edges.push({ from: lane, to: lane, toHash: myParents[0], type: "direct" });
+                        for (let i = 1; i < myParents.length; i++) {
+                            let targetLane = lanes.findIndex(l => !l);
+                            if (targetLane === -1) targetLane = lanes.length;
+                            lanes[targetLane] = myParents[i];
+                            commit.edges.push({ from: lane, to: targetLane, toHash: myParents[i], type: "merge" });
+                        }
+                    }
+
+                    for (let i = 0; i < lanes.length; i++) {
+                        if (i !== lane && lanes[i]) {
+                            const nextIdx = hashToIndex.get(lanes[i]);
+                            if (nextIdx !== undefined && nextIdx > idx) {
+                                const nextCommit = commits[nextIdx];
+                                if (!commit.edges.some(e => e.from === i)) {
+                                    commit.edges.push({ from: i, to: i, toHash: lanes[i], type: "passthrough" });
+                                }
+                            }
+                        }
+                    }
+                });
+
+                return commits;
+            };
+
             const loadGitHistory = async () => {
-                console.log("[GitToolWindow] loadGitHistory called");
-                const logSelect = document.getElementById("gitLogBranchSelect");
-                const selected = logSelect?.value || "__ALL__";
-                const rangeArg = selected && selected !== "__ALL__" ? selected : "--all";
-                const limit = 2500;
+                try {
+                    console.log("[GitToolWindow] loadGitHistory called");
+                    const logSelect = document.getElementById("gitLogBranchSelect");
+                    const selected = logSelect?.value || "__ALL__";
+                    const rangeArg = selected && selected !== "__ALL__" ? selected : "--all";
+                    const limit = 2500;
 
-                const cmd = `git log ${rangeArg} -${limit} --topo-order --date=iso --decorate=short --pretty=format:"%H%x1f%P%x1f%D%x1f%an%x1f%ad%x1f%s"`;
-                const res = await runGit(cmd, { silent: true });
-                console.log("[GitToolWindow] git log result:", res.ok, res.stdout?.length);
+                    const extraArgs = [];
+                    if (logAuthorFilter) extraArgs.push(`--author=${quoteGitArg(logAuthorFilter)}`);
+                    if (logSinceFilter) extraArgs.push(`--since=${quoteGitArg(logSinceFilter)}`);
+                    if (logUntilFilter) extraArgs.push(`--until=${quoteGitArg(logUntilFilter)}`);
 
-                if (res.ok) {
-                    const rows = (res.stdout || "")
-                        .split("\n")
-                        .filter(Boolean)
-                        .map((line) => {
-                            const parts = String(line).split("\x1f");
-                            const hash = String(parts[0] || "").trim();
-                            const parentsRaw = String(parts[1] || "").trim();
-                            const refs = String(parts[2] || "").trim();
-                            const author = String(parts[3] || "").trim();
-                            const date = String(parts[4] || "").trim();
-                            const subject = parts.length > 5 ? String(parts.slice(5).join("\x1f")).trim() : "";
-                            const parents = parentsRaw ? parentsRaw.split(/\s+/).filter(Boolean) : [];
-                            return { hash, shortHash: hash ? hash.slice(0, 7) : "", parents, refs, author, date, subject };
-                        })
-                        .filter((c) => c.hash);
+                    const pathSpec = logPathFilter ? ` -- ${quoteGitPath(logPathFilter)}` : "";
 
-                    historyAll = rows;
-                    applyLogFilter();
-                } else {
-                    console.error("[GitToolWindow] git log failed:", res.error);
+                    const cmd = `git log ${rangeArg} ${extraArgs.join(" ")} -${limit} --topo-order --date=iso --decorate=short --pretty=format:"%H%x1f%P%x1f%D%x1f%an%x1f%ad%x1f%s"${pathSpec}`;
+                    console.log("[GitToolWindow] Running git log command:", cmd);
+                    const res = await runGit(cmd, { silent: true });
+                    console.log("[GitToolWindow] git log result:", {
+                        ok: res.ok,
+                        stdoutLength: res.stdout?.length,
+                        error: res.error
+                    });
+
+                    if (res.ok) {
+                        const rows = (res.stdout || "")
+                            .split("\n")
+                            .filter(Boolean)
+                            .map((line) => {
+                                const parts = String(line).split("\x1f");
+                                const hash = String(parts[0] || "").trim();
+                                const parentsRaw = String(parts[1] || "").trim();
+                                const refs = String(parts[2] || "").trim();
+                                const author = String(parts[3] || "").trim();
+                                const date = String(parts[4] || "").trim();
+                                const subject = parts.length > 5 ? String(parts.slice(5).join("\x1f")).trim() : "";
+                                const parents = parentsRaw ? parentsRaw.split(/\s+/).filter(Boolean) : [];
+                                return { hash, shortHash: hash ? hash.slice(0, 7) : "", parents, refs, author, date, subject };
+                            })
+                            .filter((c) => c.hash);
+
+                        console.log("[GitToolWindow] Parsed commits:", rows.length);
+                        const withGraph = calculateGraphLayout(rows);
+                        historyAll = withGraph;
+                        console.log("[GitToolWindow] Calling applyLogFilter, historyAll length:", historyAll.length);
+                        applyLogFilter();
+                    } else {
+                        console.error("[GitToolWindow] git log failed:", res.error);
+                        showToast("error", "Git", `Failed to load history: ${res.error || 'Unknown error'}`);
+                    }
+
+                    return res;
+                } catch (err) {
+                    console.error("[GitToolWindow] loadGitHistory exception:", err);
+                    showToast("error", "Git", `History load error: ${err.message || 'Unknown error'}`);
+                    return { ok: false, error: err.message };
                 }
-
-                return res;
             };
 
             const renderRepoUnavailableUi = (message) => {
@@ -995,236 +1421,676 @@
             };
 
             const ensureGitLoaded = async ({ source, skipReconnect } = {}) => {
-                console.log("[GitToolWindow] ensureGitLoaded source:", source);
-                if (ensureLoadedPromise) return ensureLoadedPromise;
+                try {
+                    console.log("[GitToolWindow] ensureGitLoaded called, source:", source, "skipReconnect:", skipReconnect);
+                    if (ensureLoadedPromise) {
+                        console.log("[GitToolWindow] ensureLoadedPromise already exists, returning it");
+                        return ensureLoadedPromise;
+                    }
 
-                ensureLoadedPromise = (async () => {
-                    setGitLifecycle("detectingRepo");
-                    let reconnectErr = "";
+                    ensureLoadedPromise = (async () => {
+                        setGitLifecycle("detectingRepo");
+                        let reconnectErr = "";
 
-                    if (!skipReconnect) {
+                        // If no project is open, but we have a configured repo root, use it for Git tool window.
                         try {
-                            await gitActions?.reconnect?.({ reason: `toolwindow:${source || "open"}` });
-                        } catch (err) {
-                            reconnectErr = String(err?.message || err || "").trim();
-                        }
-                    }
-
-                    const st = getGitRepoState?.() || {};
-                    syncGitActionStates();
-
-                    if (!st.projectRoot) {
-                        setGitLifecycle("idle");
-                        setGitBanner({ message: "Open a project to use Git.", actions: [] });
-                        renderRepoUnavailableUi("No project opened.");
-                        return;
-                    }
-
-                    if (st.gitDisabled) {
-                        setGitLifecycle("idle");
-                        setGitBanner({
-                            message: "Git is disabled for this project.",
-                            actions: [
-                                {
-                                    label: "Enable Git",
-                                    onClick: async () => {
-                                        await gitActions?.enableGit?.();
-                                        await ensureGitLoaded({ source: "enable" });
+                            const st0 = getGitRepoState?.() || {};
+                            if (!st0.projectRoot) {
+                                const savedRoot = readGlobalRepoRoot();
+                                if (savedRoot) {
+                                    const repoManager =
+                                        window.AhmadIDEModules?.git?.repoManager || window.AhmadIDE?.gitRepoManager || null;
+                                    if (repoManager?.setProject) {
+                                        console.log("[GitToolWindow] No project open; setting Git project root to saved repo:", savedRoot);
+                                        await repoManager.setProject(savedRoot);
                                     }
                                 }
-                            ]
-                        });
-                        renderRepoUnavailableUi("Git is disabled.");
-                        return;
-                    }
+                            }
+                        } catch (_) { }
 
-                    if (!st.gitAvailable) {
-                        setGitLifecycle("error");
-                        setGitBanner({
-                            message: st.lastError || reconnectErr || "Git is not available (git --version failed).",
-                            actions: [{ label: "Retry", onClick: () => ensureGitLoaded({ source: "retry" }) }]
-                        });
-                        renderRepoUnavailableUi("Git is not available.");
-                        return;
-                    }
+                        if (!skipReconnect) {
+                            try {
+                                console.log("[GitToolWindow] Calling gitActions.reconnect");
+                                await gitActions?.reconnect?.({ reason: `toolwindow:${source || "open"}` });
+                                console.log("[GitToolWindow] reconnect completed successfully");
+                            } catch (err) {
+                                reconnectErr = String(err?.message || err || "").trim();
+                                console.error("[GitToolWindow] reconnect failed:", reconnectErr);
+                            }
+                        }
 
-                    if (!st.repoDetected) {
-                        setGitLifecycle("idle");
-                        setGitBanner({
-                            message: st.lastError || "No Git repository detected in this project.",
-                            actions: [
-                                { label: "Initialize", onClick: () => gitActions?.initializeRepo?.({}) },
-                                {
-                                    label: "Clone…",
-                                    onClick: async () => {
-                                        const url = await showPrompt({
-                                            title: "Clone Repository",
-                                            message: "Enter repository URL",
-                                            placeholder: "https://github.com/user/repo.git"
-                                        });
-                                        if (!url) return;
-                                        const directory = await showPrompt({
-                                            title: "Clone Repository",
-                                            message: "Enter target directory",
-                                            placeholder: "/path/to/clone/repo"
-                                        });
-                                        if (!directory) return;
-                                        await gitActions?.cloneRepo?.({ url, directory });
-                                        await ensureGitLoaded({ source: "clone" });
+                        const st = getGitRepoState?.() || {};
+                        console.log("[GitToolWindow] Git repo state:", {
+                            projectRoot: st.projectRoot,
+                            repoRoot: st.repoRoot,
+                            repoDetected: st.repoDetected,
+                            gitAvailable: st.gitAvailable,
+                            gitDisabled: st.gitDisabled
+                        });
+                        syncGitActionStates();
+
+                        if (!st.projectRoot) {
+                            setGitLifecycle("idle");
+                            const repoManager =
+                                window.AhmadIDEModules?.git?.repoManager || window.AhmadIDE?.gitRepoManager || null;
+                            setGitBanner({
+                                message: "No project open. Choose a Git repository to use the Git tool window.",
+                                actions: [
+                                    {
+                                        label: "Choose Repo…",
+                                        onClick: async () => {
+                                            try {
+                                                if (!window.ahmadIDE?.openFolderDialog || !repoManager?.setProject) return;
+                                                const res = await window.ahmadIDE.openFolderDialog();
+                                                if (!res?.ok || !res.path) return;
+                                                const selected = String(res.path).trim();
+                                                if (!selected) return;
+                                                try {
+                                                    localStorage.setItem(GLOBAL_REPO_ROOT_KEY, selected);
+                                                    localStorage.setItem(VISTA_REPO_ROOT_KEY, selected);
+                                                } catch (_) { }
+                                                await repoManager.setProject(selected);
+                                                await ensureGitLoaded({ source: "choose-repo" });
+                                            } catch (_) { }
+                                        }
                                     }
-                                },
-                                {
-                                    label: "Connect Existing…",
-                                    onClick: async () => {
-                                        const repoRoot = await showPrompt({
-                                            title: "Connect Existing Repository",
-                                            message: "Enter repository root folder (must contain .git)",
-                                            placeholder: "/path/to/repo"
-                                        });
-                                        if (!repoRoot) return;
-                                        await gitActions?.connectExisting?.({ repoRoot });
-                                        await ensureGitLoaded({ source: "connect-existing" });
-                                    }
-                                },
-                                { label: "Choose Repo Root…", onClick: () => gitActions?.chooseRepoRoot?.() },
-                                { label: "Reconnect", onClick: () => gitActions?.reconnect?.({ reason: "manual" }) }
-                            ]
-                        });
-                        renderRepoUnavailableUi("No repository detected.");
-                        return;
-                    }
+                                ]
+                            });
+                            renderRepoUnavailableUi("No project opened.");
+                            return;
+                        }
 
-                    setGitBanner({ message: "" });
-                    setGitLifecycle("loading");
-                    await refreshGitStatus().catch(() => { });
-                    await loadGitHistory().catch(() => { });
-                    setGitLifecycle("ready");
-                })().finally(() => {
+                        if (st.gitDisabled) {
+                            setGitLifecycle("idle");
+                            setGitBanner({
+                                message: "Git is disabled for this project.",
+                                actions: [
+                                    {
+                                        label: "Enable Git",
+                                        onClick: async () => {
+                                            await gitActions?.enableGit?.();
+                                            await ensureGitLoaded({ source: "enable" });
+                                        }
+                                    }
+                                ]
+                            });
+                            renderRepoUnavailableUi("Git is disabled.");
+                            return;
+                        }
+
+                        if (!st.gitAvailable) {
+                            setGitLifecycle("error");
+                            setGitBanner({
+                                message: st.lastError || reconnectErr || "Git is not available (git --version failed).",
+                                actions: [{ label: "Retry", onClick: () => ensureGitLoaded({ source: "retry" }) }]
+                            });
+                            renderRepoUnavailableUi("Git is not available.");
+                            return;
+                        }
+
+                        if (!st.repoDetected) {
+                            setGitLifecycle("idle");
+                            setGitBanner({
+                                message: st.lastError || "No Git repository detected in this project.",
+                                actions: [
+                                    { label: "Initialize", onClick: () => gitActions?.initializeRepo?.({}) },
+                                    {
+                                        label: "Clone…",
+                                        onClick: async () => {
+                                            const url = await showPrompt({
+                                                title: "Clone Repository",
+                                                message: "Enter repository URL",
+                                                placeholder: "git@github.com:user/repo.git"
+                                            });
+                                            if (!url) return;
+                                            const directory = await showPrompt({
+                                                title: "Clone Repository",
+                                                message: "Enter target directory",
+                                                placeholder: "/path/to/clone/repo"
+                                            });
+                                            if (!directory) return;
+                                            await gitActions?.cloneRepo?.({ url, directory });
+                                            await ensureGitLoaded({ source: "clone" });
+                                        }
+                                    },
+                                    {
+                                        label: "Connect Existing…",
+                                        onClick: async () => {
+                                            const repoRoot = await showPrompt({
+                                                title: "Connect Existing Repository",
+                                                message: "Enter repository root folder (must contain .git)",
+                                                placeholder: "/path/to/repo"
+                                            });
+                                            if (!repoRoot) return;
+                                            await gitActions?.connectExisting?.({ repoRoot });
+                                            await ensureGitLoaded({ source: "connect-existing" });
+                                        }
+                                    },
+                                    { label: "Choose Repo Root…", onClick: () => gitActions?.chooseRepoRoot?.() },
+                                    { label: "Reconnect", onClick: () => gitActions?.reconnect?.({ reason: "manual" }) }
+                                ]
+                            });
+                            renderRepoUnavailableUi("No repository detected.");
+                            return;
+                        }
+
+                        setGitBanner({ message: "" });
+                        setGitLifecycle("loading");
+                        await refreshGitStatus().catch(() => { });
+                        await loadGitHistory().catch(() => { });
+                        setGitLifecycle("ready");
+                    })().finally(() => {
+                        ensureLoadedPromise = null;
+                    });
+
+                    return ensureLoadedPromise;
+                } catch (err) {
+                    console.error("[GitToolWindow] ensureGitLoaded outer exception:", err);
                     ensureLoadedPromise = null;
+                    return { ok: false, error: err.message };
+                }
+            };
+
+            const openGitToolWindow = (opts = {}) => {
+                ensurePanelMounted();
+                wirePanelDom();
+                toggleToolWindowPanel("gitToolPanel", "bottom");
+                setActiveGitTab(opts.tab || "log");
+                if (!opts.skipRefresh) ensureGitLoaded({ source: opts.source || "open" }).catch(() => { });
+            };
+
+            const openCommitToolWindow = (opts = {}) => {
+                ensureCommitPanelMounted();
+                wireCommitPanelDom();
+                toggleToolWindowPanel("commitPanel", "left");
+                if (!opts.skipRefresh) refreshGitStatus().catch(() => { });
+                setTimeout(() => document.getElementById("commitMessageInput")?.focus?.(), 50);
+            };
+
+            const openGitPanel = () => openGitToolWindow({ tab: "log" });
+
+            const stageOrUnstage = async (targetSet, staged) => {
+                const files = Array.from(targetSet);
+                if (!files.length) {
+                    gitOutput(staged ? "No staged selection." : "No unstaged selection.");
+                    return;
+                }
+
+                // ✅ FIX: use `--` before paths (handles weird filenames safely)
+                const paths = files.map((f) => `"${String(f).replace(/"/g, '\\"')}"`).join(" ");
+                const cmd = staged ? `git restore --staged -- ${paths}` : `git add -- ${paths}`;
+
+                await runGit(cmd);
+                await refreshGitStatus();
+            };
+
+            function wirePanelDom() {
+                if (panelDomWired) return;
+
+                const historyHost = document.getElementById("gitHistoryList");
+                const branchSelect = document.getElementById("gitLogBranchSelect");
+                const searchInput =
+                    document.getElementById("gitSearchInput") ||
+                    document.getElementById("gitLogSearchInput");
+
+                // New panel doesn't have the legacy controls; consider it "mounted" when the history host exists.
+                if (!historyHost && !branchSelect && !searchInput) return;
+                panelDomWired = true;
+
+                const refreshBtn = document.getElementById("gitLogRefreshBtn") || document.getElementById("gitRefreshBtn");
+                refreshBtn?.addEventListener("click", () => ensureGitLoaded({ source: "refresh" }).catch(() => { }));
+
+                // Branch scope (All / Local / Remote)
+                branchSelect?.addEventListener("change", () => {
+                    const value = String(branchSelect.value || "__ALL__");
+                    branchTreeSelection = value && value !== "__ALL__" ? value : "";
+                    renderBranchesTree();
+                    loadGitHistory().catch(() => { });
                 });
 
-                return ensureLoadedPromise;
-            };
-const openGitToolWindow = (opts = {}) => {
-    ensurePanelMounted();
-    wirePanelDom();
-    toggleToolWindowPanel("gitToolPanel", "bottom");
-    setActiveGitTab(opts.tab || "log");
-    if (!opts.skipRefresh) ensureGitLoaded({ source: opts.source || "open" }).catch(() => { });
-};
+                // Search filter (client-side)
+                if (searchInput) {
+                    let t = 0;
+                    const apply = () => {
+                        if (t) clearTimeout(t);
+                        t = setTimeout(() => applyLogFilter(), 80);
+                    };
+                    searchInput.addEventListener("input", apply);
+                    searchInput.addEventListener("change", apply);
+                }
 
-const openCommitToolWindow = () => {
-    openGitToolWindow({ tab: "changes" });
-    document.getElementById("gitCommitMessage")?.focus?.();
-};
+                // Graph toggle
+                const GRAPH_PREF_KEY = "ahmadIDE:gitGraphVisible";
+                const graphBtn = document.getElementById("gitShowGraphBtn");
+                const applyGraphUi = (visible) => {
+                    if (historyHost) historyHost.classList.toggle("git-graph-hidden", !visible);
+                    if (graphBtn) {
+                        graphBtn.classList.toggle("active", visible);
+                        graphBtn.setAttribute("aria-pressed", visible ? "true" : "false");
+                    }
+                };
 
-const openGitPanel = () => openGitToolWindow({ tab: "log" });
+                try {
+                    const stored = localStorage.getItem(GRAPH_PREF_KEY);
+                    if (stored === "0") applyGraphUi(false);
+                } catch (_) { }
 
-const stageOrUnstage = async (targetSet, staged) => {
-    const files = Array.from(targetSet);
-    if (!files.length) {
-        gitOutput(staged ? "No staged selection." : "No unstaged selection.");
-        return;
+                graphBtn?.addEventListener("click", () => {
+                    const isVisible = historyHost ? !historyHost.classList.contains("git-graph-hidden") : true;
+                    const nextVisible = !isVisible;
+                    applyGraphUi(nextVisible);
+                    try {
+                        localStorage.setItem(GRAPH_PREF_KEY, nextVisible ? "1" : "0");
+                    } catch (_) { }
+                    renderGitHistory(lastHistoryItems);
+                });
+
+                // Toolbar actions
+                document.getElementById("gitOpenCommitPanelBtn")?.addEventListener("click", () => openCommitToolWindow({ source: "git-toolbar" }));
+
+                const syncFilterButtons = () => {
+                    document.getElementById("gitFilterAuthorBtn")?.classList.toggle("active", !!logAuthorFilter);
+                    document.getElementById("gitFilterDateBtn")?.classList.toggle("active", !!(logSinceFilter || logUntilFilter));
+                    document.getElementById("gitFilterPathBtn")?.classList.toggle("active", !!logPathFilter);
+                };
+                syncFilterButtons();
+
+                document.getElementById("gitFilterAuthorBtn")?.addEventListener("click", async () => {
+                    const next = await showPrompt({
+                        title: "Filter by Author",
+                        message: "Enter an author name/email substring (leave empty to clear).",
+                        placeholder: "e.g. Ahmad",
+                        defaultValue: logAuthorFilter
+                    });
+                    if (next == null) return;
+                    logAuthorFilter = String(next || "").trim();
+                    syncFilterButtons();
+                    loadGitHistory().catch(() => { });
+                });
+
+                document.getElementById("gitFilterDateBtn")?.addEventListener("click", async () => {
+                    const since = await showPrompt({
+                        title: "Filter by Date",
+                        message: "Since (leave empty to clear). Examples: 2025-01-01, \"2 weeks ago\"",
+                        placeholder: "e.g. 2025-01-01",
+                        defaultValue: logSinceFilter
+                    });
+                    if (since == null) return;
+                    const until = await showPrompt({
+                        title: "Filter by Date",
+                        message: "Until (optional). Examples: 2025-12-31, \"yesterday\"",
+                        placeholder: "e.g. 2025-12-31",
+                        defaultValue: logUntilFilter
+                    });
+                    if (until == null) return;
+                    logSinceFilter = String(since || "").trim();
+                    logUntilFilter = String(until || "").trim();
+                    syncFilterButtons();
+                    loadGitHistory().catch(() => { });
+                });
+
+                document.getElementById("gitFilterPathBtn")?.addEventListener("click", async () => {
+                    const next = await showPrompt({
+                        title: "Filter by Path",
+                        message: "Enter a file/folder path (leave empty to clear).",
+                        placeholder: "e.g. src/app/main.js",
+                        defaultValue: logPathFilter
+                    });
+                    if (next == null) return;
+                    logPathFilter = String(next || "").trim();
+                    syncFilterButtons();
+                    loadGitHistory().catch(() => { });
+                });
+
+                document.getElementById("gitOpenGitSettingsBtn")?.addEventListener("click", () => {
+                    const dialogRegistry = window.AhmadIDEModules?.app?.dialogRegistry;
+                    if (dialogRegistry?.show?.("settings")) return;
+                    showToast("info", "Settings", "Settings panel is not available.");
+                });
+            }
+
+            function wireCommitPanelDom() {
+                if (commitPanelDomWired) return;
+
+                const msgEl = document.getElementById("commitMessageInput");
+                const commitBtn = document.getElementById("commitBtnMain");
+                const commitPushBtn = document.getElementById("commitAndPushBtn");
+                if (!msgEl || !commitBtn || !commitPushBtn) return;
+                commitPanelDomWired = true;
+
+                const amendCb = document.getElementById("commitAmend");
+
+                const perform = async (andPush) => {
+                    const message = String(msgEl.value || "").trim();
+                    if (!message) {
+                        showToast("error", "Commit", "Commit message is required");
+                        return;
+                    }
+
+                    const repoState = getGitRepoState?.() || {};
+                    if (repoState.gitDisabled) {
+                        showToast("error", "Git", "Git is disabled for this project");
+                        return;
+                    }
+                    if (!repoState.repoDetected) {
+                        showToast("error", "Git", "No Git repository detected");
+                        return;
+                    }
+
+                    // Stage everything (commit panel currently has no per-file staging UI)
+                    await runGit("git add -A", { silent: true });
+
+                    const isAmend = amendCb?.checked || false;
+                    const flags = [];
+                    if (isAmend) flags.push("--amend");
+
+                    const quotedMsg = message.replace(/'/g, "'\\''");
+                    const cmd = `git commit ${flags.join(" ")} -m '${quotedMsg}'`.trim();
+
+                    const res = await runGit(cmd, { silent: true });
+                    if (!res.ok) {
+                        showToast("error", "Commit", res.error || "Commit failed");
+                        return;
+                    }
+
+                    showToast("success", "Commit", isAmend ? "Commit amended" : "Committed successfully");
+                    msgEl.value = "";
+                    if (amendCb) amendCb.checked = false;
+
+                    await refreshGitStatus().catch(() => { });
+                    await loadGitHistory().catch(() => { });
+
+                    if (andPush) {
+                        const pushRes = await runGit("git push", { silent: true });
+                        if (pushRes.ok) showToast("success", "Git", "Pushed to remote");
+                        else showToast("error", "Git", pushRes.error || "Push failed");
+                    }
+                };
+
+                const sync = () => syncCommitPanelActions();
+
+                msgEl.addEventListener("input", sync);
+                amendCb?.addEventListener("change", sync);
+                commitBtn.addEventListener("click", () => perform(false).catch(() => { }));
+                commitPushBtn.addEventListener("click", () => perform(true).catch(() => { }));
+
+                document.getElementById("commitRefreshBtn")?.addEventListener("click", () => {
+                    refreshGitStatus().catch(() => { });
+                });
+
+                document.getElementById("commitExpandBtn")?.addEventListener("click", () => {
+                    document.getElementById("commitFileList")?.classList.remove("hidden");
+                });
+
+                document.getElementById("commitCollapseBtn")?.addEventListener("click", () => {
+                    document.getElementById("commitFileList")?.classList.add("hidden");
+                });
+
+                document.getElementById("commitCloseBtn")?.addEventListener("click", () => {
+                    toggleToolWindowPanel("projectPanel", "left");
+                });
+
+                document.getElementById("commitDiffBtn")?.addEventListener("click", async () => {
+                    const list = Array.isArray(lastStatusEntries) ? lastStatusEntries : [];
+                    const fallback = list.length === 1 ? list[0] : null;
+                    const pick = commitPanelSelected?.path ? commitPanelSelected : null;
+                    const entry = pick?.path
+                        ? {
+                            path: pick.path,
+                            oldPath: pick.oldPath,
+                            status: pick.status,
+                            staged: pick.staged
+                        }
+                        : fallback;
+                    const fp = String(entry?.path || "").trim();
+                    if (!fp) {
+                        showToast("info", "Diff", "Select a file in the Commit panel to view its diff.");
+                        return;
+                    }
+                    await openDiffTab({
+                        kind: "worktree",
+                        path: fp,
+                        oldPath: String(entry?.oldPath || "").trim(),
+                        status: String(entry?.status || "").trim(),
+                        staged: !!entry?.staged,
+                        source: "commit-panel-toolbar"
+                    });
+                });
+
+                document.getElementById("commitRollbackBtn")?.addEventListener("click", async () => {
+                    const fp = String(commitPanelSelected?.path || "").trim();
+                    if (!fp) {
+                        showToast("info", "Rollback", "Select a file in the Commit panel first.");
+                        return;
+                    }
+
+                    const ok = await showConfirm({
+                        title: "Discard Changes",
+                        message: `Discard changes for:\n\n${fp}\n\nThis cannot be undone.`,
+                        variant: "danger"
+                    });
+                    if (!ok) return;
+
+                    if (commitPanelSelected?.status === "?") {
+                        showToast("error", "Rollback", "Cannot rollback an untracked file.");
+                        return;
+                    }
+
+                    const quoted = quoteGitPath(fp);
+                    if (commitPanelSelected?.staged) {
+                        await runGit(`git restore --staged -- ${quoted}`, { silent: true });
+                    }
+                    await runGit(`git restore -- ${quoted}`, { silent: true });
+                    await refreshGitStatus().catch(() => { });
+                });
+
+                document.getElementById("commitDownloadBtn")?.addEventListener("click", async () => {
+                    const staged = await runGit("git diff --cached", { silent: true });
+                    const unstaged = await runGit("git diff", { silent: true });
+
+                    const chunks = [];
+                    const stagedText = String(staged?.stdout || "").trim();
+                    const unstagedText = String(unstaged?.stdout || "").trim();
+                    if (stagedText) chunks.push(`# Staged\n${stagedText}`);
+                    if (unstagedText) chunks.push(`# Unstaged\n${unstagedText}`);
+
+                    const patch = chunks.join("\n\n").trim();
+                    if (!patch) {
+                        showToast("info", "Patch", "No changes to export.");
+                        return;
+                    }
+
+                    await copyToClipboard(patch, "Patch copied to clipboard");
+                });
+
+                document.getElementById("commitChangesToggle")?.addEventListener("click", () => {
+                    const list = document.getElementById("commitFileList");
+                    if (!list) return;
+                    list.classList.toggle("hidden");
+                });
+
+                document.getElementById("commitHeaderMinimizeBtn")?.addEventListener("click", () => {
+                    toggleToolWindowPanel("projectPanel", "left");
+                });
+
+                document.getElementById("commitHeaderMenuBtn")?.addEventListener("click", () => {
+                    showToast("info", "Commit", "Menu not implemented yet");
+                });
+
+                document.getElementById("commitAmendOptionsBtn")?.addEventListener("click", () => {
+                    showToast("info", "Commit", "Amend options not implemented yet");
+                });
+                document.getElementById("commitTimeBtn")?.addEventListener("click", () => {
+                    showToast("info", "Commit", "Commit time not implemented yet");
+                });
+                document.getElementById("commitCleanupBtn")?.addEventListener("click", () => {
+                    showToast("info", "Commit", "Cleanup not implemented yet");
+                });
+                document.getElementById("commitSettingsBtn")?.addEventListener("click", () => {
+                    const dialogRegistry = window.AhmadIDEModules?.app?.dialogRegistry;
+                    if (dialogRegistry?.show?.("settings")) return;
+                    showToast("info", "Settings", "Settings panel is not available.");
+                });
+
+                syncCommitPanelActions();
+                syncCommitPanelChanges();
+            }
+
+            function syncCommitPanelActions() {
+                const msgEl = document.getElementById("commitMessageInput");
+                const commitBtn = document.getElementById("commitBtnMain");
+                const commitPushBtn = document.getElementById("commitAndPushBtn");
+
+                if (!msgEl || !commitBtn || !commitPushBtn) return;
+
+                const repoState = getGitRepoState?.() || {};
+                const repoReady = !!repoState.repoDetected && !!repoState.gitAvailable && !repoState.gitDisabled;
+                const hasMessage = Boolean(String(msgEl.value || "").trim());
+                const hasChanges = Array.isArray(lastStatusEntries) && lastStatusEntries.length > 0;
+                const allowNoChanges = !!(document.getElementById("commitAmend")?.checked);
+                const canCommit = repoReady && hasMessage && (hasChanges || allowNoChanges);
+
+                commitBtn.disabled = !canCommit;
+                commitPushBtn.disabled = !canCommit;
+            }
+
+            function syncCommitPanelChanges() {
+                const listHost = document.getElementById("commitFileList");
+                const countEl = document.getElementById("commitChangesCount");
+                if (!listHost && !countEl) return;
+
+                const list = Array.isArray(lastStatusEntries) ? lastStatusEntries : [];
+                if (
+                    commitPanelSelected?.path &&
+                    !list.some(
+                        (e) => String(e?.path || "").trim() === commitPanelSelected.path && !!e?.staged === !!commitPanelSelected.staged
+                    )
+                ) {
+                    commitPanelSelected = { path: "", staged: false, status: "", oldPath: "" };
+                }
+                if (countEl) countEl.textContent = list.length === 1 ? "1 file" : `${list.length} files`;
+
+                if (!listHost) return;
+                listHost.innerHTML = "";
+
+                if (!list.length) {
+                    listHost.textContent = "No changes";
+                    return;
+                }
+
+                list.forEach((ent) => {
+                    const fp = String(ent.path || "").trim();
+                    const row = document.createElement("div");
+                    row.className = "git-file-row";
+                    row.tabIndex = 0;
+                    row.dataset.path = fp;
+                    row.dataset.staged = ent.staged ? "1" : "0";
+
+                    const status = document.createElement("span");
+                    status.className = "git-file-status";
+                    status.textContent = String(ent.status || "").trim() || "M";
+
+                    const p = document.createElement("span");
+                    p.className = "git-file-path";
+                    p.textContent = String(ent.path || "").trim();
+
+                    row.appendChild(status);
+                    row.appendChild(p);
+
+                    const open = async () => {
+                        if (!fp) return;
+                        commitPanelSelected = {
+                            path: fp,
+                            staged: !!ent.staged,
+                            status: String(ent.status || "").trim(),
+                            oldPath: String(ent.oldPath || "").trim()
+                        };
+                        listHost.querySelectorAll(".git-file-row").forEach((el) => {
+                            const samePath = String(el.dataset?.path || "") === fp;
+                            const sameStaged = String(el.dataset?.staged || "0") === (ent.staged ? "1" : "0");
+                            el.classList.toggle("selected", samePath && sameStaged);
+                        });
+                        await openDiffTab({
+                            kind: "worktree",
+                            path: fp,
+                            oldPath: String(ent.oldPath || "").trim(),
+                            status: String(ent.status || "").trim(),
+                            staged: !!ent.staged,
+                            source: "commit-panel"
+                        });
+                    };
+
+                    row.classList.toggle(
+                        "selected",
+                        !!fp && commitPanelSelected.path === fp && !!commitPanelSelected.staged === !!ent.staged
+                    );
+                    row.addEventListener("click", () => open().catch(() => { }));
+                    row.addEventListener("keydown", (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            open().catch(() => { });
+                        }
+                    });
+
+                    listHost.appendChild(row);
+                });
+            }
+
+            document.getElementById("toolbarGitBtn")?.addEventListener("click", () => openGitToolWindow());
+            document.getElementById("toolbarCommitBtn")?.addEventListener("click", () => openCommitToolWindow());
+
+            // Tool window activation
+            window.addEventListener("ahmadIDE:toolwindow-activated", (e) => {
+                const panelId = e?.detail?.panelId;
+                if (panelId === "gitToolPanel") {
+                    wirePanelDom();
+                    ensureGitLoaded({ source: "activated" }).catch(() => { });
+                    return;
+                }
+                if (panelId === "commitPanel") {
+                    wireCommitPanelDom();
+                    refreshGitStatus().catch(() => { });
+                }
+            });
+
+            // Keep Git UI in sync with repo state changes
+            try {
+                subscribeGitRepoState((s) => {
+                    if (!s) return;
+                    if (isGitPanelVisible()) {
+                        ensureGitLoaded({ source: "repo-state", skipReconnect: true }).catch(() => { });
+                    } else if (isCommitPanelVisible()) {
+                        refreshGitStatus().catch(() => { });
+                    }
+                });
+            } catch (_) { }
+
+            // Lazy-mount support
+            if (featureRegistry && typeof featureRegistry.onMounted === "function") {
+                featureRegistry.onMounted("gitToolPanel", () => {
+                    wirePanelDom();
+                    const panel = document.getElementById("gitToolPanel");
+                    if (panel && !panel.classList.contains("hidden")) ensureGitLoaded({ source: "mounted" }).catch(() => { });
+                });
+                featureRegistry.onMounted("commitPanel", () => {
+                    wireCommitPanelDom();
+                    const panel = document.getElementById("commitPanel");
+                    if (panel && !panel.classList.contains("hidden")) refreshGitStatus().catch(() => { });
+                });
+            } else {
+                wirePanelDom();
+                ensureGitLoaded({ source: "startup" }).catch(() => { });
+            }
+
+            return { openGitToolWindow, openCommitToolWindow, openGitPanel };
+        }
+
+        return { wireGitToolWindow };
     }
 
-    // ✅ FIX: use `--` before paths (handles weird filenames safely)
-    const paths = files.map((f) => `"${String(f).replace(/"/g, '\\"')}"`).join(" ");
-    const cmd = staged ? `git restore --staged -- ${paths}` : `git add -- ${paths}`;
-
-    await runGit(cmd);
-    await refreshGitStatus();
-};
-
-function wirePanelDom() {
-    if (panelDomWired) return;
-    if (!document.getElementById("gitRefreshBtn")) return; // panel not mounted yet
-    panelDomWired = true;
-
-    document.querySelectorAll("#gitToolWindow .git-tw-tab").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            const tab = btn.getAttribute("data-git-tab");
-            setActiveGitTab(tab);
-        });
-    });
-
-    document.getElementById("gitRefreshBtn")?.addEventListener("click", () => ensureGitLoaded({ source: "refresh" }).catch(() => { }));
-    document.getElementById("gitBranchesRefreshBtn")?.addEventListener("click", () => ensureGitLoaded({ source: "branches-refresh" }).catch(() => { }));
-    document.getElementById("gitFocusSearchBtn")?.addEventListener("click", () => {
-        setActiveGitTab("log");
-        document.getElementById("gitLogSearchInput")?.focus?.();
-    });
-
-    document.getElementById("gitFilterBtn")?.addEventListener("click", () => showToast("info", "Git", "Not implemented yet: Filters"));
-
-    document.getElementById("gitStatusBtn")?.addEventListener("click", () => {
-        setActiveGitTab("changes");
-        ensureGitLoaded({ source: "status" }).catch(() => { });
-    });
-
-    document.getElementById("gitLogBtn")?.addEventListener("click", () => {
-        setActiveGitTab("log");
-        ensureGitLoaded({ source: "log" }).catch(() => { });
-    });
-
-    document.getElementById("gitDiffBtn")?.addEventListener("click", () => runGit("git diff --stat").catch(() => { }));
-    document.getElementById("gitClearBtn")?.addEventListener("click", () => {
-        const out = document.getElementById("gitOutput");
-        if (out) out.textContent = "Git ready.";
-    });
-
-    document.getElementById("gitStageSelectedBtn")?.addEventListener("click", () => stageOrUnstage(gitSelected.unstaged, false));
-    document.getElementById("gitUnstageSelectedBtn")?.addEventListener("click", () => stageOrUnstage(gitSelected.staged, true));
-
-    // (rest of your DOM wiring remains the same)
-    // NOTE: I’m not changing your UI/feature behavior here—only the git execution/scoping bugs.
-
-    // Initialize default tab
-    setActiveGitTab(activeTab);
-    syncGitActionStates();
-    previewSelectedFileDiff().catch(() => { });
-}
-
-document.getElementById("toolbarGitBtn")?.addEventListener("click", () => openGitToolWindow());
-document.getElementById("toolbarCommitBtn")?.addEventListener("click", () => openCommitToolWindow());
-
-// Tool window activation
-window.addEventListener("ahmadIDE:toolwindow-activated", (e) => {
-    const panelId = e?.detail?.panelId;
-    if (panelId !== "gitToolPanel") return;
-    wirePanelDom();
-    ensureGitLoaded({ source: "activated" }).catch(() => { });
-});
-
-// Keep Git UI in sync with repo state changes
-try {
-    subscribeGitRepoState((s) => {
-        if (!isGitPanelVisible()) return;
-        if (!s) return;
-        ensureGitLoaded({ source: "repo-state", skipReconnect: true }).catch(() => { });
-    });
-} catch (_) { }
-
-// Lazy-mount support
-if (featureRegistry && typeof featureRegistry.onMounted === "function") {
-    featureRegistry.onMounted("gitToolPanel", () => {
-        wirePanelDom();
-        const panel = document.getElementById("gitToolPanel");
-        if (panel && !panel.classList.contains("hidden")) ensureGitLoaded({ source: "mounted" }).catch(() => { });
-    });
-} else {
-    wirePanelDom();
-    ensureGitLoaded({ source: "startup" }).catch(() => { });
-}
-
-return { openGitToolWindow, openCommitToolWindow, openGitPanel };
-}
-
-return { wireGitToolWindow };
+    if (typeof window !== "undefined") {
+        window.AhmadIDEModules = window.AhmadIDEModules || {};
+        window.AhmadIDEModules.git = window.AhmadIDEModules.git || {};
+        window.AhmadIDEModules.git.createGitToolWindowManager = createGitToolWindowManager;
     }
-
-if (typeof window !== "undefined") {
-    window.AhmadIDEModules = window.AhmadIDEModules || {};
-    window.AhmadIDEModules.git = window.AhmadIDEModules.git || {};
-    window.AhmadIDEModules.git.createGitToolWindowManager = createGitToolWindowManager;
-}
-}) ();
+})();

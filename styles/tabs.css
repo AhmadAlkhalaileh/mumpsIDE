@@ -1,11 +1,11 @@
 /* ============================================
-   PhpStorm-style Editor Tabs
+   -style Editor Tabs
    ============================================ */
 .tabbar {
     display: flex;
     align-items: center;
-    background: #3c3f41 !important;
-    border-bottom: 1px solid #323232;
+    background: var(--panel) !important;
+    border-bottom: 1px solid var(--border);
     height: 28px;
     flex-shrink: 0;
     overflow: hidden;
@@ -64,7 +64,7 @@
     color: var(--text);
 }
 
-/* Individual tab (PhpStorm style) */
+/* Individual tab ( style) */
 .tab {
     position: relative;
     display: flex;
@@ -93,7 +93,7 @@
     background: var(--hover-bg);
 }
 
-/* Active tab (PhpStorm: lighter background, no bottom border) */
+/* Active tab (: lighter background, no bottom border) */
 .tab.active {
     background: var(--editor-bg);
     color: var(--text);
@@ -125,13 +125,13 @@
     font-weight: 500;
 }
 
-/* Modified indicator (PhpStorm: asterisk or dot) */
+/* Modified indicator (: asterisk or dot) */
 .tab.modified .tab-name::after {
     content: ' •';
     color: var(--accent-blue);
 }
 
-/* Close button (PhpStorm: small X on right) */
+/* Close button (: small X on right) */
 .tab-close {
     display: inline-flex;
     align-items: center;
@@ -206,10 +206,9 @@
     align-items: center;
     justify-content: flex-start;
     gap: 12px;
-    background: #3c3f41 !important;
-    border-bottom: 1px solid #323232;
+    background: var(--panel) !important;
+    border-bottom: 1px solid var(--border);
     padding: 4px 8px;
     height: 32px;
     flex-shrink: 0;
 }
-

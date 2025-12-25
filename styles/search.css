@@ -222,7 +222,7 @@
 }
 
 .bp-item.active {
-    background: rgba(114, 147, 191, 0.08);
+    background: rgba(189, 147, 249, 0.08);
     border-radius: 8px;
     padding-inline: 8px;
 }
@@ -240,16 +240,16 @@
     height: 10px;
     border-radius: 50%;
     background: var(--accent-blue);
-    box-shadow: 0 0 0 2px rgba(74, 159, 232, 0.2);
+    box-shadow: 0 0 0 2px rgba(139, 233, 253, 0.20);
 }
 
 .bp-item.active .bp-dot {
     background: var(--accent-2);
-    box-shadow: 0 0 0 2px rgba(240, 194, 123, 0.25);
+    box-shadow: 0 0 0 2px rgba(255, 121, 198, 0.22);
 }
 
 .bp-file {
-    color: #c5d9f5;
+    color: var(--accent-blue);
 }
 
 .bp-line {

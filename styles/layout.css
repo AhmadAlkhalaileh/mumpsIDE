@@ -1,12 +1,12 @@
 /* ============================================
-   PhpStorm-style IDE Layout (CSS Grid)
+   -style IDE Layout (CSS Grid)
    ============================================ */
 
-/* Main IDE body - 3-column grid layout */
+/* Main IDE body - 5-column grid layout */
 .ide-body {
     position: relative;
     display: grid;
-    grid-template-columns: auto auto 1fr;
+    grid-template-columns: auto auto 1fr auto auto;
     grid-template-rows: 1fr;
     overflow: hidden;
     z-index: var(--ui-z-base);
@@ -14,7 +14,7 @@
     margin: 0;
     padding: 0;
     gap: 0;
-    background: #2b2b2b;
+    background: var(--bg);
 }
 
 /* Tool Window Bars (icon strips on edges) */
@@ -46,7 +46,7 @@
     padding: 0 4px;
 }
 
-/* Tool Window Stripe Buttons (PhpStorm-style) */
+/* Tool Window Stripe Buttons (-style) */
 .tool-window-stripe-btn {
     display: flex;
     align-items: center;
@@ -54,7 +54,7 @@
     padding: 8px 6px;
     background: transparent !important;
     border: none;
-    color: #808080 !important;
+    color: var(--muted) !important;
     cursor: pointer;
     transition: all 0.12s ease;
     position: relative;
@@ -86,8 +86,8 @@
 }
 
 .tool-window-stripe-btn:hover {
-    background: #2d2f30 !important;
-    color: #bbbbbb !important;
+    background: var(--hover-bg) !important;
+    color: var(--text-bright) !important;
 }
 
 .tool-window-stripe-btn:hover svg {
@@ -95,22 +95,22 @@
 }
 
 .tool-window-stripe-btn.active {
-    background: #2d2f30 !important;
-    color: #bbbbbb !important;
+    background: var(--hover-bg) !important;
+    color: var(--text-bright) !important;
 }
 
 .tool-window-bar-left .tool-window-stripe-btn.active {
-    border-left: 2px solid #4a9eff;
+    border-left: 2px solid var(--accent);
     padding-left: 4px;
 }
 
 .tool-window-bar-right .tool-window-stripe-btn.active {
-    border-right: 2px solid #4a9eff;
+    border-right: 2px solid var(--accent);
     padding-right: 4px;
 }
 
 .tool-window-bar-bottom .tool-window-stripe-btn.active {
-    border-bottom: 2px solid #4a9eff;
+    border-bottom: 2px solid var(--accent);
     margin-bottom: -2px;
 }
 
@@ -184,8 +184,8 @@
     justify-content: space-between;
     padding: 0 var(--ui-space-3);
     height: var(--ui-toolwindow-header-h);
-    background: #3c3f41 !important;
-    border-bottom: 1px solid #323232;
+    background: var(--panel-strong) !important;
+    border-bottom: 1px solid var(--border);
     flex-shrink: 0;
 }
 
@@ -252,7 +252,7 @@
     padding: 0;
     min-height: 0;
     overflow: hidden;
-    background: #2b2b2b;
+    background: var(--bg);
 }
 
 /* Bottom Panels Container */
@@ -267,7 +267,7 @@
     flex: 1;
     min-height: 200px;
     max-height: var(--bottom-toolwindow-height);
-    background: #2b2b2b !important;
+    background: var(--bg) !important;
     border-top: none;
     /* Already has border on wrapper */
     display: flex;

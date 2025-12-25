@@ -160,6 +160,21 @@
                 return;
             }
             try {
+                // Validate container is running before marking as connected.
+                const listRes = await window.ahmadIDE.listDocker?.();
+                if (!listRes?.ok) {
+                    const msg = listRes?.message || listRes?.error || listRes?.stderr || 'Docker is not available';
+                    throw new Error(msg);
+                }
+                const isRunning = (listRes.containers || []).some((c) => {
+                    const id = String(c?.id || c?.containerId || '').trim();
+                    if (!id) return false;
+                    return id === containerId || id.startsWith(containerId) || containerId.startsWith(id);
+                });
+                if (!isRunning) {
+                    throw new Error('Selected container is not running. Refresh the list and try again.');
+                }
+
                 const config = loadDockerConfig();
                 await window.ahmadIDE.setConnection('docker', { docker: { containerId, ...config } });
                 localStorage.setItem('ahmadIDE:lastContainerId', containerId);
@@ -173,7 +188,7 @@
         const connectDockerUniversal = async () => {
             try {
                 await window.ahmadIDE.setConnection('docker', { docker: { containerId: null } });
-                setStatus('Docker (local)', 'info');
+                setStatus('Ready', 'subtle');
                 await refreshRoutines();
             } catch (e) {
                 notify('error', 'Docker', String(e?.message || e || 'Docker connect failed'));
@@ -185,7 +200,6 @@
                 return [];
             }
             try {
-                await window.ahmadIDE.setConnection('docker');
                 const res = await window.ahmadIDE.listDocker();
                 if (!res?.ok) throw new Error(res?.error || 'Docker list failed');
                 const list = res.containers || [];

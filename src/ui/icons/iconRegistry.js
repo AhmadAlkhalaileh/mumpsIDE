@@ -20,7 +20,7 @@
         window.AhmadIDEModules.ui = window.AhmadIDEModules.ui || {};
         if (!window.AhmadIDEModules.ui.__iconsLoaded) {
             window.AhmadIDEModules.ui.__iconsLoaded = true;
-            loadScript('./src/ui/icons/index.js');
+            loadScript('./src/ui/icons/icon-map.js');
             loadScript('./src/ui/components/Icon.js');
         }
     }

@@ -74,16 +74,17 @@ parts:
       echo "=== Current directory: $(pwd) ==="
       echo "=== Checking for node_modules ==="
 
-      if [ ! -d "node_modules" ] || [ ! -f "node_modules/electron/dist/electron" ]; then
-        echo "ERROR: node_modules not found or incomplete!"
-        echo "Please run this command BEFORE building the snap:"
-        echo ""
-        echo "  npm install --include=dev"
-        echo ""
-        echo "This will install all dependencies including Electron locally."
-        echo "Then run the snap build again."
-        exit 1
-      fi
+        if [ ! -d "node_modules" ] || [ ! -f "node_modules/electron/dist/electron" ]; then
+          echo "ERROR: node_modules not found or incomplete!"
+          echo "Please run this command BEFORE building the snap:"
+          echo ""
+          echo "  npm install --include=dev"
+          echo "  npm run rebuild:pty"
+          echo ""
+          echo "This will install all dependencies including Electron locally."
+          echo "Then run the snap build again."
+          exit 1
+        fi
 
       echo "=== Verifying electron installation ==="
       ls -lh node_modules/electron/dist/electron

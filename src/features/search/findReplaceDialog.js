@@ -2,7 +2,6 @@
     /**
      * Find/Replace Dialog
      * Compact floating dialog for in-file search
-     * Matches PhpStorm 2025.3 New UI Find/Replace widget
      *
      * Checklist: FND-001 to FND-008
      */

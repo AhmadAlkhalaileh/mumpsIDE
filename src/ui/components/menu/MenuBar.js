@@ -4,142 +4,36 @@
         if (!controller) throw new Error('MenuBar requires menu controller');
         if (!Array.isArray(menus)) throw new Error('MenuBar requires menus array');
 
-        let focused = false;
-        let focusedIndex = 0;
-        let openIndex = -1;
-        let switchTimer = null;
-        let altArmed = false;
-        let lastAltTs = 0;
+        let hamburgerBtn = null;
+        let menuContainer = null;
+        let isOpen = false;
+        let closeTimer = null;
 
-        const items = [];
-        const rootMeta = {
-            onAction,
-            onRequestRootSwitch: (dir) => {
-                if (!items.length) return;
-                const next = (openIndex + dir + items.length) % items.length;
-                openMenu(next, { focusMenu: true });
-            }
+        const closeMenu = () => {
+            if (!isOpen) return;
+            isOpen = false;
+            hamburgerBtn?.classList.remove('active');
+            menuContainer?.classList.add('hidden');
         };
 
-        const setFocusedVisual = () => {
-            host.classList.toggle('ui-menubar--focused', focused);
-            items.forEach((btn, idx) => {
-                btn.classList.toggle('focused', focused && idx === focusedIndex);
-                btn.setAttribute('aria-expanded', idx === openIndex ? 'true' : 'false');
-                btn.tabIndex = focused && idx === focusedIndex ? 0 : -1;
-            });
+        const openMenu = () => {
+            if (isOpen) return;
+            isOpen = true;
+            hamburgerBtn?.classList.add('active');
+            menuContainer?.classList.remove('hidden');
+
+            // Close when clicking outside
+            const outsideClick = (e) => {
+                if (!host.contains(e.target) && !document.querySelector('.ui-menu')?.contains(e.target)) {
+                    closeMenu();
+                    document.removeEventListener('pointerdown', outsideClick, true);
+                }
+            };
+            setTimeout(() => document.addEventListener('pointerdown', outsideClick, true), 10);
         };
 
-        const closeMenus = () => {
-            openIndex = -1;
-            controller.closeAll();
-            setFocusedVisual();
-        };
-
-        const openMenu = (idx, { focusMenu = false } = {}) => {
-            const def = menus[idx];
-            if (!def) return;
-
-            openIndex = idx;
-            focusedIndex = idx;
-            const ctx = typeof getContext === 'function' ? getContext() : {};
-            controller.openAtElement({
-                anchorEl: items[idx],
-                items: def.items || [],
-                ctx,
-                onAction,
-                rootMeta
-            });
-            setFocusedVisual();
-            if (focusMenu) {
-                requestAnimationFrame(() => {
-                    const activeRow = document.querySelector('.ui-menu .ui-menu-item.active');
-                    activeRow?.focus?.();
-                });
-            }
-        };
-
-        const focusBar = () => {
-            focused = true;
-            setFocusedVisual();
-            items[focusedIndex]?.focus?.();
-        };
-
-        const blurBar = () => {
-            focused = false;
-            closeMenus();
-        };
-
-        const onKeyDown = (e) => {
-            if (e.key === 'Alt') {
-                altArmed = true;
-                lastAltTs = Date.now();
-                return;
-            }
-            if (altArmed) altArmed = false;
-            if (!focused) return;
-
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                blurBar();
-                return;
-            }
-            if (e.key === 'ArrowLeft') {
-                e.preventDefault();
-                focusedIndex = (focusedIndex - 1 + items.length) % items.length;
-                if (openIndex >= 0) openMenu(focusedIndex);
-                else setFocusedVisual();
-                items[focusedIndex]?.focus?.();
-                return;
-            }
-            if (e.key === 'ArrowRight') {
-                e.preventDefault();
-                focusedIndex = (focusedIndex + 1) % items.length;
-                if (openIndex >= 0) openMenu(focusedIndex);
-                else setFocusedVisual();
-                items[focusedIndex]?.focus?.();
-                return;
-            }
-            if (e.key === 'ArrowDown' || e.key === 'Enter') {
-                e.preventDefault();
-                openMenu(focusedIndex, { focusMenu: true });
-                return;
-            }
-        };
-
-        const onKeyUp = (e) => {
-            if (e.key !== 'Alt') return;
-            const now = Date.now();
-            const within = now - lastAltTs < 400;
-            if (!within || !altArmed) {
-                altArmed = false;
-                return;
-            }
-            altArmed = false;
-            e.preventDefault();
-            if (focused) blurBar();
-            else focusBar();
-        };
-
-        const onBarPointerDown = (idx, e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            focused = true;
-            if (openIndex === idx) {
-                closeMenus();
-            } else {
-                openMenu(idx, { focusMenu: false });
-            }
-        };
-
-        const onBarPointerEnter = (idx) => {
-            if (openIndex < 0) return;
-            if (idx === openIndex) return;
-            if (switchTimer) clearTimeout(switchTimer);
-            switchTimer = setTimeout(() => {
-                switchTimer = null;
-                openMenu(idx, { focusMenu: false });
-            }, 90);
+        const toggleMenu = () => {
+            isOpen ? closeMenu() : openMenu();
         };
 
         const mount = () => {
@@ -147,34 +41,79 @@
             host.classList.add('ui-menubar');
             host.setAttribute('role', 'menubar');
 
-            menus.forEach((m, idx) => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'ui-menubar-item';
-                btn.textContent = m.label || m.id || 'Menu';
-                btn.setAttribute('role', 'menuitem');
-                btn.setAttribute('aria-haspopup', 'true');
-                btn.setAttribute('aria-expanded', 'false');
-                btn.tabIndex = idx === 0 ? 0 : -1;
-                btn.addEventListener('pointerdown', (e) => onBarPointerDown(idx, e));
-                btn.addEventListener('pointerenter', () => onBarPointerEnter(idx));
-                items.push(btn);
-                host.appendChild(btn);
+            // 1. Create Hamburger Button
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'ui-menubar-hamburger';
+            btn.setAttribute('aria-label', 'Main Menu');
+            btn.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 12H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M3 6H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M3 18H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            `;
+
+            // ONLY click to open - no hover on hamburger
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleMenu();
             });
 
-            document.addEventListener('keydown', onKeyDown, true);
-            document.addEventListener('keyup', onKeyUp, true);
-            document.addEventListener('pointerdown', (e) => {
-                if (!focused) return;
-                if (host.contains(e.target)) return;
-                if (controller.isOpen() && document.querySelector('.ui-menu')?.contains(e.target)) return;
-                blurBar();
-            }, true);
+            hamburgerBtn = btn;
+            host.appendChild(btn);
 
-            setFocusedVisual();
+            // 2. Create Horizontal Menu Container
+            const container = document.createElement('div');
+            container.className = 'ui-menubar-horizontal-dropdown hidden';
+
+            menus.forEach(m => {
+                const menuBtn = document.createElement('button');
+                menuBtn.className = 'ui-menubar-item';
+                menuBtn.textContent = m.label || m.id;
+
+                // Click to open submenu
+                menuBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const ctx = typeof getContext === 'function' ? getContext() : {};
+                    controller.openAtElement({
+                        anchorEl: menuBtn,
+                        items: m.items || [],
+                        ctx,
+                        onAction: (action, ctx) => {
+                            closeMenu();
+                            if (onAction) onAction(action, ctx);
+                        }
+                    });
+                });
+
+                // Hover opens submenu (once menu bar is visible)
+                menuBtn.addEventListener('pointerenter', () => {
+                    if (!isOpen) return;
+                    // Check if controller has an open menu, switch to this one
+                    if (controller.isOpen?.()) {
+                        const ctx = typeof getContext === 'function' ? getContext() : {};
+                        controller.openAtElement({
+                            anchorEl: menuBtn,
+                            items: m.items || [],
+                            ctx,
+                            onAction: (action, ctx) => {
+                                closeMenu();
+                                if (onAction) onAction(action, ctx);
+                            }
+                        });
+                    }
+                });
+
+                container.appendChild(menuBtn);
+            });
+
+            menuContainer = container;
+            host.appendChild(container);
         };
 
-        return { mount, focusBar, blurBar };
+        return { mount, focusBar: () => hamburgerBtn?.focus(), blurBar: closeMenu };
     }
 
     if (typeof window !== 'undefined') {

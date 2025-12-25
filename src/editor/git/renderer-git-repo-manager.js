@@ -5,14 +5,14 @@
             deps?.logger || { debug: () => { }, info: () => { }, warn: () => { }, error: () => { } };
         const getCurrentProject = deps?.getCurrentProject || (() => null);
 
-        const fs = (() => {
+        const fs = deps?.fs || (() => {
             try {
                 return require("fs");
             } catch (_) {
                 return null;
             }
         })();
-        const path = (() => {
+        const path = deps?.path || (() => {
             try {
                 return require("path");
             } catch (_) {
@@ -21,6 +21,8 @@
         })();
 
         const STORAGE_KEY = "ahmadIDE:gitRepoStateByProject";
+        const GLOBAL_REPO_ROOT_KEY = "ahmadIDE:gitRepoRootGlobal";
+        const VISTA_REPO_ROOT_KEY = "ahmadIDE:vistaRoutinesRepoPath";
 
         const listeners = new Set();
         const watches = [];
@@ -591,6 +593,10 @@
             }
 
             update({ repoRootOverride: resolved });
+            try {
+                localStorage.setItem(GLOBAL_REPO_ROOT_KEY, resolved);
+                localStorage.setItem(VISTA_REPO_ROOT_KEY, resolved);
+            } catch (_) { }
             await reconnect({ reason: "connect-existing" });
             return { ok: true, repoRoot: resolved };
         };

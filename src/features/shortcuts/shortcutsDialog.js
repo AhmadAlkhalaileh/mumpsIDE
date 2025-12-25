@@ -2,7 +2,7 @@
     /**
      * Shortcuts Dialog
      * Two-panel layout for viewing and editing keyboard shortcuts
-     * Matches PhpStorm 2025.3 New UI Keymap settings
+     * Matches  2025.3 New UI Keymap settings
      *
      * Checklist: SHO-001 to SHO-009
      */

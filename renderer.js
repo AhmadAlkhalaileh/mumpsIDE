@@ -28,7 +28,7 @@
     // Theme presets (IDE shell + Monaco code themes)
     const ideThemes = {
         'jb-light': {
-            name: 'PhpStorm Light',
+            name: ' Light',
             vars: {
                 '--bg': '#f5f7fb',
                 '--glass': 'rgba(255, 255, 255, 0.7)',
@@ -66,39 +66,39 @@
             }
         },
         earth: {
-            name: 'Earth Dark',
+            name: 'Storm Dark',
             vars: {
-                '--bg': '#1b120e',
-                '--glass': 'rgba(255,255,255,0.04)',
-                '--panel': 'rgba(37, 25, 19, 0.9)',
-                '--panel-2': 'rgba(45, 31, 23, 0.92)',
-                '--panel-strong': '#1b120e',
-                '--panel-soft': '#2a1b14',
-                '--sidebar': '#3c3f41',
-                '--rail-bg': '#313335',
-                '--editor-bg': '#2b2b2b',
-                '--gutter-bg': '#23160f',
-                '--terminal-bg': '#2b2b2b',
-                '--terminal-input-bg': '#313335',
-                '--accent': '#d67f3c',
-                '--accent-2': '#f0c27b',
-                '--accent-blue': '#4a9fe8',
-                '--accent-green': '#5fb865',
-                '--accent-orange': '#cc7832',
-                '--accent-soft': 'rgba(214,127,60,0.20)',
-                '--accent-soft-border': 'rgba(214,127,60,0.32)',
-                '--text': '#f5ede4',
-                '--text-bright': '#ffc66d',
-                '--muted': '#b8a99a',
-                '--border': 'rgba(255,255,255,0.08)',
-                '--tree-selected': '#2f4554',
-                '--tree-selected-text': '#ffffff',
-                '--selection-bg': '#214283',
-                '--hover-bg': '#393b3d',
-                '--glow-1': 'rgba(214,127,60,0.08)',
-                '--glow-2': 'rgba(240,194,123,0.06)',
+                '--bg': '#282a36',
+                '--glass': 'rgba(40, 42, 54, 0.92)',
+                '--panel': '#2f3141',
+                '--panel-2': '#2b2d3a',
+                '--panel-strong': '#343746',
+                '--panel-soft': '#242631',
+                '--sidebar': '#2b2d3a',
+                '--rail-bg': '#2b2d3a',
+                '--editor-bg': '#282a36',
+                '--gutter-bg': '#282a36',
+                '--terminal-bg': '#282a36',
+                '--terminal-input-bg': '#2f3141',
+                '--accent': '#bd93f9',
+                '--accent-2': '#ff79c6',
+                '--accent-blue': '#8be9fd',
+                '--accent-green': '#50fa7b',
+                '--accent-orange': '#ffb86c',
+                '--accent-soft': 'rgba(189, 147, 249, 0.15)',
+                '--accent-soft-border': 'rgba(189, 147, 249, 0.35)',
+                '--text': '#f8f8f2',
+                '--text-bright': '#ffffff',
+                '--muted': '#6272a4',
+                '--border': '#44475a',
+                '--tree-selected': '#44475a',
+                '--tree-selected-text': '#f8f8f2',
+                '--selection-bg': '#44475a',
+                '--hover-bg': '#343746',
+                '--glow-1': 'rgba(189, 147, 249, 0.05)',
+                '--glow-2': 'rgba(139, 233, 253, 0.03)',
                 '--font-ui': 'Inter, \"Segoe UI\", \"SF Pro Display\", system-ui, sans-serif',
-                '--font-code': 'ui-monospace, \"SFMono-Regular\", \"Menlo\", \"Monaco\", \"Consolas\", \"Liberation Mono\", \"Courier New\", monospace',
+                '--font-code': '\"ains Mono\", \"Fira Code\", ui-monospace, \"SFMono-Regular\", monospace',
                 '--font-size-ui': '13px',
                 '--font-size-code': '13px'
             }
@@ -160,7 +160,8 @@
     const terminalConfig = {
         shellPath: null, // Default: system shell
         startDir: null, // Default: project root
-        overrideIdeShortcuts: false, // If true, terminal keeps IDE shortcuts from firing while focused
+        // Match JetBrains Terminal: terminal input wins while focused (except a few toolwindow shortcuts).
+        overrideIdeShortcuts: true,
         escapeToEditor: true // If true and shortcuts are not overridden, Esc returns focus to editor
     };
     let envInfoCache = null;
@@ -367,10 +368,28 @@
             case 'toggle-terminal':
                 toggleTerminal();
                 return;
-            case 'terminal':
-                if (terminalState && !terminalState.tabs.length) {
-                    await addTerminalTab(terminalState, true);
+            case 'terminal-new-tab':
+                if (terminalToolApi?.openTerminalToolWindow) {
+                    terminalToolApi.openTerminalToolWindow({ source: 'shortcut:terminal-new-tab' });
+                    await terminalToolApi.newTab?.();
+                    return;
                 }
+                // Fallback: open legacy Run Output panel and add a new tab.
+                if (terminalState && !terminalState.tabs.length) await addTerminalTab(terminalState, true);
+                await addTerminalTab(terminalState);
+                toggleToolWindowPanel('terminalPanel', 'bottom');
+                setTimeout(() => {
+                    if (terminalState) refreshTerminalLayout(terminalState);
+                    focusTerminal();
+                }, 50);
+                return;
+            case 'terminal':
+                if (terminalToolApi?.openTerminalToolWindow) {
+                    terminalToolApi.openTerminalToolWindow({ source: 'menu:terminal' });
+                    return;
+                }
+                // Fallback: open legacy Run Output panel.
+                if (terminalState && !terminalState.tabs.length) await addTerminalTab(terminalState, true);
                 toggleToolWindowPanel('terminalPanel', 'bottom');
                 setTimeout(() => {
                     if (terminalState) refreshTerminalLayout(terminalState);
@@ -478,6 +497,7 @@
         'ctrl+w': { label: 'Expand Selection', action: 'expand-selection' },
         'ctrl+shift+w': { label: 'Shrink Selection', action: 'shrink-selection' },
         'ctrl+tab': { label: 'Next Tab', action: 'tab-next' },
+        'ctrl+shift+t': { label: 'New Terminal Tab', action: 'terminal-new-tab' },
         'alt+f12': { label: 'Toggle Terminal', action: 'toggle-terminal' }
     };
     const findReplaceState = {
@@ -923,6 +943,10 @@
 
         if (tab) {
             tab.diffAnchors = computeDiffAnchors(diffText);
+            // If this diff tab was already active, the tab system won't re-fire activation;
+            // keep the diff toolbar + split viewer in sync anyway.
+            try { syncDiffToolbar(tab); } catch (_) { }
+            try { syncDiffTabViewer(tab); } catch (_) { }
             return { ok: true, tabId: tab.id };
         }
 
@@ -942,6 +966,7 @@
         deps: {
             logger,
             terminalConfig,
+            mode: 'run-output',
             getCurrentProject: () => currentProject,
             getEnvInfoCache: () => envInfoCache,
             getGlobalTerminalState: () => globalTerminalState,
@@ -968,6 +993,29 @@
         sendCtrlC,
         applyFontSettings
     } = terminalManager;
+
+    // New PhpStorm-like Terminal tool window (real shell via node-pty in main).
+    let terminalToolApi = null;
+    try {
+        const createTerminalToolWindowManager = window.AhmadIDEModules?.terminalTool?.createTerminalToolWindowManager;
+        if (typeof createTerminalToolWindowManager === 'function') {
+            terminalToolApi = createTerminalToolWindowManager({
+                deps: {
+                    logger,
+                    terminalConfig,
+                    getCurrentProject: () => currentProject,
+                    getEnvInfoCache: () => envInfoCache,
+                    getActiveEditor: () => activeEditor,
+                    showToast,
+                    toggleToolWindowPanel
+                }
+            });
+        } else {
+            logger.warn('TERMINAL_TOOL_MODULE_MISSING', { path: './src/editor/terminal/renderer-terminal-toolwindow.js' });
+        }
+    } catch (err) {
+        logger.error('TERMINAL_TOOL_INIT_ERROR', { message: err?.message, stack: err?.stack });
+    }
 
     let __lastFontSettingsKey = '';
     function applyFontSettingsToRuntime(settings) {
@@ -1019,7 +1067,7 @@
     const mumpsFileIconSvg = `<svg width="16" height="16" viewBox="0 0 16 16"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f0a35c"/><stop offset="100%" stop-color="#d67f3c"/></linearGradient></defs><rect width="16" height="16" rx="3" fill="url(#mg)"/><text x="4" y="12" font-size="10" font-weight="bold" fill="#19100c" font-family="monospace">M</text></svg>`;
 
     // ============================================
-    // PhpStorm-style Tab Management
+    // -style Tab Management
     // ============================================
     // Tab state: { id, name, path, folder, content, isDirty, state, model }
     // - path: normalized unique routine key (folder/name)
@@ -1105,6 +1153,99 @@
     let diffToolbarEl = null;
     let diffToolbarWired = false;
 
+    // Split diff viewer overlay (replaces plain-text diff tabs rendering).
+    let diffTabViewerEl = null;
+    let diffTabRenderer = null;
+    let diffTabScrollSyncing = false;
+
+    function ensureDiffTabRenderer() {
+        if (diffTabRenderer?.render) return diffTabRenderer;
+        try {
+            const perfUi = window.AhmadIDEModules?.features?.git?.perfUi;
+            if (perfUi?.createDiffRenderer) {
+                diffTabRenderer = perfUi.createDiffRenderer({
+                    leftId: 'diffTabLeft',
+                    rightId: 'diffTabRight',
+                    maxLines: 12000
+                });
+            }
+        } catch (_) { }
+        return diffTabRenderer;
+    }
+
+    function ensureDiffTabViewer() {
+        if (diffTabViewerEl) return diffTabViewerEl;
+        const frame = document.querySelector('.editor-frame');
+        if (!frame) return null;
+
+        diffTabViewerEl = document.createElement('div');
+        diffTabViewerEl.id = 'diffTabViewer';
+        diffTabViewerEl.className = 'diff-tab-viewer hidden';
+        diffTabViewerEl.innerHTML = `
+            <div class="git-diff-grid" role="region" aria-label="Diff view">
+                <div class="git-diff-pane" id="diffTabLeft" aria-label="Original"></div>
+                <div class="git-diff-pane" id="diffTabRight" aria-label="Modified"></div>
+            </div>
+        `;
+        frame.appendChild(diffTabViewerEl);
+
+        // Keep both panes scrolled together (IntelliJ-style)
+        const left = diffTabViewerEl.querySelector('#diffTabLeft');
+        const right = diffTabViewerEl.querySelector('#diffTabRight');
+        if (left && right) {
+            const sync = (src, dst) => () => {
+                if (diffTabScrollSyncing) return;
+                diffTabScrollSyncing = true;
+                try {
+                    dst.scrollTop = src.scrollTop;
+                    dst.scrollLeft = src.scrollLeft;
+                } finally {
+                    diffTabScrollSyncing = false;
+                }
+            };
+            left.addEventListener('scroll', sync(left, right), { passive: true });
+            right.addEventListener('scroll', sync(right, left), { passive: true });
+        }
+
+        // Reuse the Git perf diff renderer (two-column, colored).
+        ensureDiffTabRenderer();
+
+        return diffTabViewerEl;
+    }
+
+    function syncDiffTabViewer(tab) {
+        const viewer = ensureDiffTabViewer();
+        const editorHost = document.getElementById('editor');
+        if (!viewer || !editorHost) return;
+
+        const show = isDiffTab(tab);
+        viewer.classList.toggle('hidden', !show);
+        editorHost.classList.toggle('hidden', show);
+
+        if (!show) {
+            // Editor was hidden; force layout once visible.
+            try { activeEditor?.layout?.(); } catch (_) { }
+            return;
+        }
+
+        const left = document.getElementById('diffTabLeft');
+        const right = document.getElementById('diffTabRight');
+        const text = String(tab?.content || '');
+
+        const renderer = ensureDiffTabRenderer();
+        if (renderer?.render) {
+            renderer.render(text);
+        } else {
+            // Fallback: show unified diff as plain text in both panes.
+            if (left) left.textContent = text || 'No changes.\n';
+            if (right) right.textContent = text || 'No changes.\n';
+        }
+
+        // Reset scroll on activation (keeps panes aligned).
+        if (left) left.scrollTop = 0;
+        if (right) right.scrollTop = 0;
+    }
+
     function computeDiffAnchors(diffText) {
         const anchors = [];
         const lines = String(diffText || '').split('\n');
@@ -1189,6 +1330,35 @@
     function navigateDiffChange(direction) {
         const tab = getActiveTab();
         if (!isDiffTab(tab)) return;
+
+        // If the split diff viewer is active, scroll it to the next/prev hunk.
+        const viewer = diffTabViewerEl;
+        const leftPane = document.getElementById('diffTabLeft');
+        const rightPane = document.getElementById('diffTabRight');
+        if (viewer && !viewer.classList.contains('hidden') && leftPane && rightPane) {
+            const anchors = Array.from(leftPane.querySelectorAll('.diff-hunk'));
+            if (!anchors.length) return;
+            const cur = leftPane.scrollTop;
+            let targetEl = null;
+            if (direction > 0) {
+                targetEl = anchors.find((el) => el.offsetTop > cur + 2) || anchors[0];
+            } else {
+                for (let i = anchors.length - 1; i >= 0; i -= 1) {
+                    if (anchors[i].offsetTop < cur - 2) {
+                        targetEl = anchors[i];
+                        break;
+                    }
+                }
+                if (!targetEl) targetEl = anchors[anchors.length - 1];
+            }
+            if (!targetEl) return;
+            const top = Math.max(0, targetEl.offsetTop - 12);
+            leftPane.scrollTop = top;
+            rightPane.scrollTop = top;
+            return;
+        }
+
+        // Fallback: plain-text diff in Monaco editor.
         const editor = activeEditor;
         if (!editor) return;
         const anchors = Array.isArray(tab.diffAnchors) ? tab.diffAnchors : [];
@@ -1222,54 +1392,85 @@
 
     function handleEditorTabActivated(tab) {
         syncDiffToolbar(tab);
+        syncDiffTabViewer(tab);
     }
 
     function handleEditorTabClosed(_tab) {
-        // No-op for now; the active tab change will hide the toolbar as needed.
+        // When the last tab closes there is no "tab activated" event,
+        // so ensure diff UI is reset (hide split viewer + diff toolbar).
+        try {
+            const active = getActiveTab();
+            syncDiffToolbar(active);
+            syncDiffTabViewer(active);
+        } catch (_) { }
     }
 
     // Breakpoints / Debugger moved to src/editor/debug/renderer-debug.js
     const createDebugManager = window.AhmadIDEModules?.debug?.createDebugManager;
-    if (!createDebugManager) {
-        logger.error('DEBUG_MODULE_MISSING', { path: './src/editor/debug/renderer-debug.js' });
-        throw new Error('Debug module missing: ./src/editor/debug/renderer-debug.js');
-    }
+    const createDebugStub = () => ({
+        parseBpKey: (_key) => ({ routine: '', line: null }),
+        getActiveRoutine: () => '',
+        toggleBreakpoint: () => { },
+        renderBreakpoints: () => { },
+        decorateBreakpoints: () => { },
+        renderLocals: () => { },
+        renderStack: () => { },
+        renderDebugConsole: () => { },
+        updateDebugButtonState: () => { },
+        resetDebugUI: () => { },
+        setDebugButtons: () => { },
+        scheduleDebugUiBindings: () => { },
+        registerMumpsHover: () => { },
+        startDebugSession: async () => ({ ok: false, error: 'Debug unavailable' }),
+        debugContinue: async () => ({ ok: false, error: 'Debug unavailable' }),
+        debugStop: async () => ({ ok: false, error: 'Debug unavailable' })
+    });
 
     const currentDebugSessionRef = {
         get value() { return currentDebugSession; },
         set value(v) { currentDebugSession = v; }
     };
 
-    debugManager = createDebugManager({
-        state: { currentDebugSessionRef },
-        deps: {
-            logger,
-            dbgLog,
-            showToast,
-            highlightLine,
-            ensureBottomPanel,
-            getToolWindowState: () => toolWindowState,
-            getMonaco: () => (typeof monaco !== 'undefined' ? monaco : null),
-            getActiveEditor: () => activeEditor,
-            getActiveRoutineName: () => activeRoutineName,
-            getOpenTabs: () => openTabs,
-            getActiveTabId: () => activeTabId,
-            getDbgStateRef: () => dbgStateRef,
-            getRoutineStateRef: () => routineStateRef,
-            getRoutinesCache: () => routinesCache,
-            normalizeRoutineTarget,
-            findOpenTab,
-            createTab,
-            switchTab,
-            loadRoutineByName,
-            getGlobalTerminalState: () => globalTerminalState,
-            appendOutput,
-            clearOutput,
-            ensureTerminalListeners,
-            getTerminalCwd,
-            terminalConfig
+    if (!createDebugManager) {
+        logger.error('DEBUG_MODULE_MISSING', { path: './src/editor/debug/renderer-debug.js' });
+        debugManager = createDebugStub();
+    } else {
+        try {
+            debugManager = createDebugManager({
+                state: { currentDebugSessionRef },
+                deps: {
+                    logger,
+                    dbgLog,
+                    showToast,
+                    highlightLine,
+                    ensureBottomPanel,
+                    getToolWindowState: () => toolWindowState,
+                    getMonaco: () => (typeof monaco !== 'undefined' ? monaco : null),
+                    getActiveEditor: () => activeEditor,
+                    getActiveRoutineName: () => activeRoutineName,
+                    getOpenTabs: () => openTabs,
+                    getActiveTabId: () => activeTabId,
+                    getDbgStateRef: () => dbgStateRef,
+                    getRoutineStateRef: () => routineStateRef,
+                    getRoutinesCache: () => routinesCache,
+                    normalizeRoutineTarget,
+                    findOpenTab,
+                    createTab,
+                    switchTab,
+                    loadRoutineByName,
+                    getGlobalTerminalState: () => globalTerminalState,
+                    appendOutput,
+                    clearOutput,
+                    ensureTerminalListeners,
+                    getTerminalCwd,
+                    terminalConfig
+                }
+            });
+        } catch (err) {
+            logger.error('DEBUG_MODULE_INIT_ERROR', { message: err?.message, stack: err?.stack });
+            debugManager = createDebugStub();
         }
-    });
+    }
 
     // Problems UI moved to src/editor/problems/renderer-problems.js
     const createProblemsManager = window.AhmadIDEModules?.problems?.createProblemsManager;
@@ -1352,7 +1553,9 @@
         deps: {
             showToast,
             logger,
-            getCurrentProject: () => currentProject
+            getCurrentProject: () => currentProject,
+            fs: null,
+            path: null
         }
     });
     try {
@@ -1458,23 +1661,20 @@
     Object.assign(window.AhmadIDE, {
         scanFontsDir: async () => {
             try {
+                if (typeof require === 'undefined') return [];
                 const fs = require('fs');
                 const path = require('path');
                 const fontsDir = path.join(__dirname, 'assets', 'fonts');
                 if (!fs.existsSync(fontsDir)) return [];
 
                 const files = await fs.promises.readdir(fontsDir);
-                // Filter likely font extensions
                 const fontFiles = files.filter(f => /\.(ttf|otf|woff|woff2)$/i.test(f));
-
-                // Return objects with name and full path or relative URL
                 return fontFiles.map(f => ({
                     fileName: f,
-                    // Create a file:// URL for the frontend to use
                     url: `file://${path.join(fontsDir, f)}`
                 }));
-            } catch (e) {
-                console.error('Failed to scan fonts dir:', e);
+            } catch (err) {
+                console.error('Failed to scan fonts dir:', err);
                 return [];
             }
         }
@@ -1623,7 +1823,7 @@
 
 
     // ============================================
-    // PhpStorm-style Project Tree Context Menu
+    // -style Project Tree Context Menu
     // ============================================
 
     function showProjectContextMenu(x, y, options = {}) {
@@ -1638,7 +1838,7 @@
         const ext = filename.split('.').pop().toLowerCase();
         const name = filename.toLowerCase();
 
-        // Special files (PhpStorm style)
+        // Special files ( style)
         if (name === '.gitignore') return { icon: '◉', cls: 'special' };
         if (name === '.env') return { icon: '⚙', cls: 'special' };
         if (name === 'package.json') return { icon: '📦', cls: 'special' };
@@ -1647,7 +1847,7 @@
         if (name === '.gitkeep') return { icon: '◉', cls: 'special' };
         if (name === 'readme.md' || name === 'readme.txt') return { icon: '📖', cls: 'special' };
 
-        // File type icons (PhpStorm style)
+        // File type icons ( style)
         const iconMap = {
             // Code files
             'php': { icon: 'Φ', cls: 'php' },
@@ -2062,10 +2262,14 @@
         toggleToolWindowPanel('gitToolPanel', 'bottom');
     };
 
-    let openCommitToolWindow = () => {
-        openGitToolWindow();
-        const msg = document.getElementById('gitCommitMessage');
-        msg?.focus();
+    let openCommitToolWindow = (opts = {}) => {
+        // Open commit panel in left sidebar (IntelliJ-style)
+        toggleToolWindowPanel('commitPanel', 'left');
+        // Focus commit message input after panel is shown
+        setTimeout(() => {
+            const msg = document.getElementById('commitMessageInput');
+            msg?.focus();
+        }, 50);
     };
 
     function openGitPanel() {
@@ -2074,7 +2278,7 @@
 
     function closeGitPanel() {
         // Switch back to terminal in bottom panel
-        toggleToolWindowPanel('terminalPanel', 'bottom');
+        toggleToolWindowPanel('terminalToolPanel', 'bottom');
     }
 
     const gitOutputGlobal = (text) => {
@@ -2155,15 +2359,17 @@
     }
 
     function toggleSidebar() {
-        // Toggle the left tool window (Project panel) using new PhpStorm-style layout
+        // Toggle the left tool window (Project panel) using new -style layout
         toggleToolWindowPanel('projectPanel', 'left');
     }
 
     function toggleTerminal() {
-        if (globalTerminalState && !globalTerminalState.tabs.length) {
-            addTerminalTab(globalTerminalState, true);
+        if (terminalToolApi?.openTerminalToolWindow) {
+            terminalToolApi.openTerminalToolWindow({ source: 'toggle-terminal' });
+            return;
         }
-        // Toggle the bottom tool window (Terminal panel) using new PhpStorm-style layout
+        // Fallback: legacy terminal panel (now Run Output)
+        if (globalTerminalState && !globalTerminalState.tabs.length) addTerminalTab(globalTerminalState, true);
         toggleToolWindowPanel('terminalPanel', 'bottom');
         setTimeout(() => {
             if (globalTerminalState) refreshTerminalLayout(globalTerminalState);
@@ -2293,7 +2499,27 @@
                 case 'toggle-terminal':
                     toggleTerminal();
                     return;
+                case 'terminal-new-tab':
+                    if (terminalToolApi?.openTerminalToolWindow) {
+                        terminalToolApi.openTerminalToolWindow({ source: 'menubar:terminal-new-tab' });
+                        await terminalToolApi.newTab?.();
+                        return;
+                    }
+                    if (!terminalState.tabs.length) {
+                        await addTerminalTab(terminalState, true);
+                    }
+                    await addTerminalTab(terminalState);
+                    toggleToolWindowPanel('terminalPanel', 'bottom');
+                    setTimeout(() => {
+                        refreshTerminalLayout(terminalState);
+                        focusTerminal();
+                    }, 50);
+                    return;
                 case 'terminal':
+                    if (terminalToolApi?.openTerminalToolWindow) {
+                        terminalToolApi.openTerminalToolWindow({ source: 'menubar:terminal' });
+                        return;
+                    }
                     if (!terminalState.tabs.length) {
                         await addTerminalTab(terminalState, true);
                     }
@@ -2450,10 +2676,15 @@
             return parts.join('+');
         };
 
+        const isTerminalTarget = (el) => {
+            if (!el) return false;
+            return !!el.closest?.('#terminalToolViewport')
+                || !!el.closest?.('#terminalViewport')
+                || !!el.closest?.('.xterm');
+        };
+
         const isEditableTarget = (el) => {
             if (!el) return false;
-            const inTerminal = !!el.closest?.('#terminalViewport') || !!el.closest?.('.xterm');
-            if (inTerminal) return terminalConfig.overrideIdeShortcuts;
             const tag = (el.tagName || '').toLowerCase();
             const editable = el.isContentEditable;
             return editable || tag === 'input' || tag === 'textarea' || tag === 'select';
@@ -2463,10 +2694,18 @@
             const combo = normalizeCombo(e);
             const match = coreShortcutMap[combo];
             if (!match) return;
-            if (isEditableTarget(e.target) && combo !== 'ctrl+s' && combo !== 'ctrl+shift+s') return;
+            const isSave = combo === 'ctrl+s' || combo === 'ctrl+shift+s';
+
+            // When terminal is focused, prefer terminal input like JetBrains (but keep toolwindow toggles).
+            if (isTerminalTarget(e.target) && terminalConfig.overrideIdeShortcuts) {
+                const allowInTerminal = combo === 'alt+f12' || combo === 'ctrl+shift+t';
+                if (!isSave && !allowInTerminal) return;
+            }
+
+            if (isEditableTarget(e.target) && !isSave) return;
 
             // Handle Ctrl+S directly to avoid conflicts with Monaco
-            if (combo === 'ctrl+s' || combo === 'ctrl+shift+s') {
+            if (isSave) {
                 e.preventDefault();
                 e.stopPropagation();
                 if (globalRoutineState && globalTerminalState && activeEditor) {
@@ -2513,11 +2752,11 @@
         }
     }
 
-    // PhpStorm-style tool window management
+    // -style tool window management
     const toolWindowState = {
         left: { visible: true, activePanel: 'projectPanel' },
         right: { visible: false, activePanel: null },
-        bottom: { visible: true, activePanel: 'terminalPanel' }
+        bottom: { visible: true, activePanel: 'terminalToolPanel' }
     };
 
     function ensureBottomPanel(panelId) {
@@ -2550,7 +2789,7 @@
             state.activePanel = null;
             if (position === 'bottom') {
                 if (contentArea) contentArea.classList.add('hidden'); // Use hidden to collapse fully
-                const bottomPanels = ['terminalPanel', 'debugPanel', 'problemsPanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel'];
+                const bottomPanels = ['terminalToolPanel', 'terminalPanel', 'debugPanel', 'problemsPanel', 'comparePanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel', 'patchTrackingPanel'];
                 bottomPanels.forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.classList.add('hidden');
@@ -2595,7 +2834,7 @@
 
         // Handle bottom panels specially (they're in bottom-panels-container)
         if (position === 'bottom') {
-            const bottomPanels = ['terminalPanel', 'debugPanel', 'problemsPanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel'];
+            const bottomPanels = ['terminalToolPanel', 'terminalPanel', 'debugPanel', 'problemsPanel', 'comparePanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel', 'patchTrackingPanel'];
             bottomPanels.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.toggle('hidden', id !== panelId);
@@ -2613,6 +2852,12 @@
             refreshTerminalLayout(globalTerminalState);
             setTimeout(() => focusTerminal(), 10);
         }
+        if (panelId === 'terminalToolPanel' && state.visible) {
+            setTimeout(() => {
+                try { terminalToolApi?.fit?.(); } catch (_) { }
+                try { terminalToolApi?.focus?.(); } catch (_) { }
+            }, 10);
+        }
 
         try {
             window.dispatchEvent(new CustomEvent('ahmadIDE:toolwindow-activated', { detail: { panelId, position } }));
@@ -2620,14 +2865,26 @@
     }
 
     function bindToolWindows() {
-        // Bind new PhpStorm-style tool window stripe buttons
+        // Bind new -style tool window stripe buttons
         const stripeButtons = document.querySelectorAll('.tool-window-stripe-btn');
         stripeButtons.forEach(btn => {
             btn.addEventListener('click', () => {
                 const panelId = btn.getAttribute('data-panel');
                 const position = btn.getAttribute('data-position');
+                if (panelId === 'terminalToolPanel') {
+                    if (terminalToolApi?.openTerminalToolWindow) {
+                        terminalToolApi.openTerminalToolWindow({ source: 'stripe' });
+                    } else {
+                        toggleToolWindowPanel('terminalToolPanel', 'bottom');
+                    }
+                    return;
+                }
                 if (panelId === 'gitToolPanel') {
                     openGitToolWindow({ source: 'stripe' });
+                    return;
+                }
+                if (panelId === 'commitPanel') {
+                    openCommitToolWindow({ source: 'stripe' });
                     return;
                 }
                 toggleToolWindowPanel(panelId, position);
@@ -2653,7 +2910,7 @@
         toolWindowState.left.visible = true;
         toolWindowState.left.activePanel = 'projectPanel';
         toolWindowState.bottom.visible = true;
-        toolWindowState.bottom.activePanel = 'terminalPanel';
+        toolWindowState.bottom.activePanel = 'terminalToolPanel';
         toolWindowState.right.visible = false;
 
         // Set initial UI state
@@ -2662,10 +2919,15 @@
         document.getElementById('bottomToolWindow')?.classList.remove('hidden');
 
         // Hide non-active bottom panels
-        ['debugPanel', 'problemsPanel', 'servicesPanel', 'gitToolPanel'].forEach(id => {
+        ['terminalPanel', 'debugPanel', 'problemsPanel', 'comparePanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.classList.add('hidden');
         });
+        document.getElementById('terminalToolPanel')?.classList.remove('hidden');
+
+        // Ensure default bottom panel is mounted (Terminal is default).
+        try { window.AhmadIDEModules?.app?.featureRegistry?.ensureById?.('terminalToolPanel'); } catch (_) { }
+        try { window.dispatchEvent(new CustomEvent('ahmadIDE:toolwindow-activated', { detail: { panelId: 'terminalToolPanel', position: 'bottom' } })); } catch (_) { }
 
         // Legacy binding for old toolwindow-btn (if any still exist)
         const legacyButtons = document.querySelectorAll('.toolwindow-btn');
@@ -2871,7 +3133,7 @@
             globalTerminalState = terminalState;
             updateTerminalStatusPill();
 
-            // Add PhpStorm-style context menu actions
+            // Add -style context menu actions
             editor.addAction({
                 id: 'cut',
                 label: 'Cut',
@@ -3017,30 +3279,30 @@
                 'toggle-terminal': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyJ,
                 'new-terminal': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyT,
 
-                // PhpStorm Navigation shortcuts
+                //  Navigation shortcuts
                 'goto-file': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyN,
                 'goto-line': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyG,
                 'recent-files': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyE,
 
-                // PhpStorm Editing shortcuts
+                //  Editing shortcuts
                 'delete-line': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyY,
                 'comment-line': monaco.KeyMod.CtrlCmd | monaco.KeyCode.Slash,
                 'extend-selection': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyW,
 
-                // PhpStorm Search shortcuts
+                //  Search shortcuts
                 'find': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF,
                 'replace': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR,
                 'find-in-folder': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF,
                 'replace-in-folder': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyR,
 
-                // PhpStorm Code shortcuts
+                //  Code shortcuts
                 'format-code': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyL,
                 'optimize-imports': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyO,
 
-                // PhpStorm Refactoring
+                //  Refactoring
                 'rename': monaco.KeyCode.F2,
 
-                // PhpStorm Tool Windows (Alt+Number)
+                //  Tool Windows (Alt+Number)
                 'tool-project': monaco.KeyMod.Alt | monaco.KeyCode.Digit1,
                 'tool-favorites': monaco.KeyMod.Alt | monaco.KeyCode.Digit2,
                 'tool-find': monaco.KeyMod.Alt | monaco.KeyCode.Digit3,
@@ -3050,6 +3312,7 @@
                 'tool-structure': monaco.KeyMod.Alt | monaco.KeyCode.Digit7,
                 'tool-services': monaco.KeyMod.Alt | monaco.KeyCode.Digit8,
                 'tool-git': monaco.KeyMod.Alt | monaco.KeyCode.Digit9,
+                'tool-commit': monaco.KeyMod.Alt | monaco.KeyCode.Digit0,
                 'tool-terminal': monaco.KeyMod.Alt | monaco.KeyCode.F12
             };
             const dupBinding = shortcutPrefs['duplicate-line'] || shortcutDefaults['duplicate-line'];
@@ -3060,32 +3323,35 @@
             registerKeybinding(editor, 'Lint', 'lint-code', () => clickEl('lintBtn'), shortcutDefaults['lint-code']);
             registerKeybinding(editor, 'Toggle Sidebar', 'toggle-sidebar', () => toggleSidebar(), shortcutDefaults['toggle-sidebar']);
             registerKeybinding(editor, 'Toggle Terminal', 'toggle-terminal', () => toggleTerminal(), shortcutDefaults['toggle-terminal']);
-            registerKeybinding(editor, 'New Terminal', 'new-terminal', () => document.getElementById('terminalNewTabBtn')?.click(), shortcutDefaults['new-terminal']);
+            registerKeybinding(editor, 'New Terminal', 'new-terminal', () => {
+                terminalToolApi?.openTerminalToolWindow?.({ source: 'shortcut:new-terminal' });
+                terminalToolApi?.newTab?.().catch?.(() => { });
+            }, shortcutDefaults['new-terminal']);
 
-            // PhpStorm Navigation shortcuts
+            //  Navigation shortcuts
             registerKeybinding(editor, 'Go to File', 'goto-file', () => openSearchEverywhere(''), shortcutDefaults['goto-file']);
             registerKeybinding(editor, 'Go to Line', 'goto-line', () => editor.trigger('keyboard', 'editor.action.gotoLine', null), shortcutDefaults['goto-line']);
             registerKeybinding(editor, 'Recent Files', 'recent-files', () => showToast('info', 'Recent Files', 'Feature coming soon'), shortcutDefaults['recent-files']);
 
-            // PhpStorm Editing shortcuts
+            //  Editing shortcuts
             registerKeybinding(editor, 'Delete Line', 'delete-line', () => editor.trigger('keyboard', 'editor.action.deleteLines', null), shortcutDefaults['delete-line']);
             registerKeybinding(editor, 'Comment Line', 'comment-line', () => editor.trigger('keyboard', 'editor.action.commentLine', null), shortcutDefaults['comment-line']);
             registerKeybinding(editor, 'Extend Selection', 'extend-selection', () => editor.trigger('keyboard', 'editor.action.smartSelect.expand', null), shortcutDefaults['extend-selection']);
 
-            // PhpStorm Search shortcuts
+            //  Search shortcuts
             registerKeybinding(editor, 'Find', 'find', () => editor.trigger('keyboard', 'actions.find', null), shortcutDefaults['find']);
             registerKeybinding(editor, 'Replace', 'replace', () => editor.trigger('keyboard', 'editor.action.startFindReplaceAction', null), shortcutDefaults['replace']);
             registerKeybinding(editor, 'Find in Files', 'find-in-folder', () => openFindReplaceDialog('find', getSelectedText()), shortcutDefaults['find-in-folder']);
             registerKeybinding(editor, 'Replace in Files', 'replace-in-folder', () => openFindReplaceDialog('replace', getSelectedText()), shortcutDefaults['replace-in-folder']);
 
-            // PhpStorm Code shortcuts
+            //  Code shortcuts
             registerKeybinding(editor, 'Format Code', 'format-code', () => editor.trigger('keyboard', 'editor.action.formatDocument', null), shortcutDefaults['format-code']);
             registerKeybinding(editor, 'Optimize Imports', 'optimize-imports', () => showToast('info', 'Optimize Imports', 'Feature coming soon'), shortcutDefaults['optimize-imports']);
 
-            // PhpStorm Refactoring
+            //  Refactoring
             registerKeybinding(editor, 'Rename', 'rename', () => editor.trigger('keyboard', 'editor.action.rename', null), shortcutDefaults['rename']);
 
-            // PhpStorm Tool Windows (Alt+Number to toggle panels)
+            //  Tool Windows (Alt+Number to toggle panels)
             registerKeybinding(editor, 'Tool: Project', 'tool-project', () => toggleToolWindowPanel('projectPanel', 'left'), shortcutDefaults['tool-project']);
             registerKeybinding(editor, 'Tool: Find', 'tool-find', () => openFindReplaceDialog('find', ''), shortcutDefaults['tool-find']);
             registerKeybinding(editor, 'Tool: Run', 'tool-run', () => toggleToolWindowPanel('terminalPanel', 'bottom'), shortcutDefaults['tool-run']);
@@ -3094,13 +3360,14 @@
             registerKeybinding(editor, 'Tool: Structure', 'tool-structure', () => toggleToolWindowPanel('structurePanel', 'left'), shortcutDefaults['tool-structure']);
             registerKeybinding(editor, 'Tool: Services', 'tool-services', () => toggleToolWindowPanel('servicesPanel', 'bottom'), shortcutDefaults['tool-services']);
             registerKeybinding(editor, 'Tool: Git', 'tool-git', () => openGitToolWindow({ source: 'shortcut' }), shortcutDefaults['tool-git']);
-            registerKeybinding(editor, 'Tool: Terminal', 'tool-terminal', () => toggleToolWindowPanel('terminalPanel', 'bottom'), shortcutDefaults['tool-terminal']);
+            registerKeybinding(editor, 'Tool: Commit', 'tool-commit', () => openCommitToolWindow({ source: 'shortcut' }), shortcutDefaults['tool-commit']);
+            registerKeybinding(editor, 'Tool: Terminal', 'tool-terminal', () => toggleTerminal(), shortcutDefaults['tool-terminal']);
 
             renderProjectTree([], routineState, editor);
             // Initialize empty tab bar
             renderTabs();
             bindTabKeyboardShortcuts();
-            // PhpStorm-like editor context menu
+            // -like editor context menu
             bindEditorContextMenu(editor);
             bindSettingsPanelThemes();
             bindGitSettingsPanel();
@@ -3122,7 +3389,7 @@
             } catch (_) { }
             initExtensionsView();
 
-            // PhpStorm-style search bindings
+            // -style search bindings
             updateFindScopeLabels();
             document.getElementById('findReplaceToggleBtn')?.addEventListener('click', () => {
                 const nextMode = findReplaceState.mode === 'replace' ? 'find' : 'replace';
@@ -3298,9 +3565,14 @@
                 }
                 const vcsToggle = document.getElementById('vcsWidgetBtn');
                 if (vcsToggle) {
-                    const hint = label === 'Git' ? 'Git' : `Git (${label})`;
+                    const hint = label === 'Git' ? 'Git' : `Git: ${label}`;
                     vcsToggle.title = hint;
                     vcsToggle.setAttribute('aria-label', hint);
+                    vcsToggle.dataset.branch = label;
+                }
+                const vcsLabel = document.getElementById('vcsWidgetLabel');
+                if (vcsLabel) {
+                    vcsLabel.textContent = label;
                 }
             };
 
@@ -3347,7 +3619,9 @@
             envInfoCache = envInfo;
             document.getElementById('envInfo').textContent =
                 `${envInfo.platform} | electron ${envInfo.versions.electron}`;
-            setConnStatus('Docker (local)', 'info');
+            // Default to "Ready" until the user connects (or auto-connect succeeds).
+            // Avoid showing Docker as "connected" when no container is selected.
+            setConnStatus('Ready', 'subtle');
             wireMenuBar(editor, routineState, terminalState);
 
             // --- Run & Debug buttons ---
@@ -3362,8 +3636,17 @@
             const runConfigMenu = document.getElementById('runConfigMenu');
             if (runConfigMenu) runConfigMenu.remove();
             const runConfigBtn = document.getElementById('runConfigBtn');
+            const runConfigTitleEl = document.getElementById('runConfigTitle');
             const runBtnEl = document.getElementById('runBtn');
             const debugStartBtnEl = document.getElementById('debugStartBtn');
+
+            const formatRunConfigTitle = (label) => {
+                const raw = String(label || '').trim();
+                if (!raw) return raw;
+                // "Current file (Run)" -> "Current file" (PhpStorm-style config label)
+                const noParen = raw.replace(/\s*\([^)]*\)\s*$/, '').trim();
+                return noParen || raw;
+            };
 
             const setRunConfig = (id) => {
                 if (!runConfigState.labels[id]) return;
@@ -3372,6 +3655,9 @@
                 if (runConfigBtn) {
                     runConfigBtn.title = label;
                     runConfigBtn.setAttribute('aria-label', label);
+                }
+                if (runConfigTitleEl) {
+                    runConfigTitleEl.textContent = formatRunConfigTitle(label);
                 }
                 if (runBtnEl) {
                     runBtnEl.title = `${label} (Ctrl+Enter)`;
@@ -3497,12 +3783,79 @@
                 });
             }
 
-            const clearBtn = document.getElementById('terminalClearBtn');
-            const newTabBtn = document.getElementById('terminalNewTabBtn');
-            const hideBtn = document.getElementById('terminalHideBtn');
-            clearBtn?.addEventListener('click', () => clearOutput(terminalState));
-            newTabBtn?.addEventListener('click', async () => await addTerminalTab(terminalState));
-            hideBtn?.addEventListener('click', () => toggleToolWindowPanel('terminalPanel', 'bottom'));
+            const wireRunOutputHeader = () => {
+                const panelEl = document.getElementById('terminalPanel');
+                if (!panelEl || panelEl.dataset.runOutputWired === '1') return;
+
+                const clearBtn = document.getElementById('terminalClearBtn');
+                const newTabBtn = document.getElementById('terminalNewTabBtn');
+                const hideBtn = document.getElementById('terminalHideBtn');
+                const menuBtn = document.getElementById('terminalMenuBtn');
+                const dropdownBtn = document.getElementById('terminalDropdownBtn');
+
+                // Not mounted yet.
+                if (!clearBtn && !newTabBtn && !hideBtn && !menuBtn && !dropdownBtn) return;
+                panelEl.dataset.runOutputWired = '1';
+
+                clearBtn?.addEventListener('click', () => clearOutput(terminalState));
+                newTabBtn?.addEventListener('click', () => addTerminalTab(terminalState).catch(() => { }));
+                hideBtn?.addEventListener('click', () => toggleToolWindowPanel('terminalPanel', 'bottom'));
+
+                const openRunMenu = (anchorEl) => {
+                    const menu = window.AhmadIDEModules?.ui?.menu;
+                    const controller = menu?.controller || menu?.createMenuController?.({});
+                    if (!controller?.openAtElement) return;
+                    controller.openAtElement({
+                        anchorEl,
+                        items: [
+                            { id: 'run.new', label: 'New Run Tab', action: 'run:new-tab' },
+                            { id: 'run.clear', label: 'Clear Output', action: 'run:clear' },
+                            { type: 'separator' },
+                            { id: 'run.hide', label: 'Hide', action: 'run:hide' }
+                        ],
+                        ctx: {},
+                        onAction: async (action) => {
+                            switch (action) {
+                                case 'run:new-tab':
+                                    await addTerminalTab(terminalState);
+                                    return;
+                                case 'run:clear':
+                                    clearOutput(terminalState);
+                                    return;
+                                case 'run:hide':
+                                    toggleToolWindowPanel('terminalPanel', 'bottom');
+                                    return;
+                            }
+                        }
+                    });
+                };
+
+                const bindMenuBtn = (btn) => {
+                    if (!btn) return;
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openRunMenu(btn);
+                    });
+                };
+
+                bindMenuBtn(menuBtn);
+                bindMenuBtn(dropdownBtn);
+            };
+
+            wireRunOutputHeader();
+            try {
+                window.AhmadIDEModules?.app?.featureRegistry?.onMounted?.('terminalPanel', () => wireRunOutputHeader());
+            } catch (_) { }
+
+            // Initialize -style terminal header
+            const initTerminalHeader = window.AhmadIDEModules?.terminal?.initTerminalHeader;
+            if (initTerminalHeader) {
+                const headerCtrl = initTerminalHeader();
+                if (window.AhmadIDEModules?.terminal) {
+                    window.AhmadIDEModules.terminal.terminalHeaderCtrl = headerCtrl;
+                }
+            }
 
             $('#saveRoutineBtn').on('click', async () => {
                 if (!canSaveActiveTab()) {
@@ -3548,8 +3901,24 @@
                 }
             });
 
-            // --- SSH / Docker handling ---
             connectionsManager.wireConnectionsPanel({ editor, routineState, terminalState });
+
+            // Auto-connect check (Docker default)
+            setTimeout(() => {
+                connectionsManager.checkForAutoConnect?.({ editor, routineState, terminalState }, {
+                    appendOutput,
+                    setConnStatus,
+                    closeConnectionsPanel: () => {
+                        const panel = document.getElementById('connectionsPanel');
+                        if (panel) panel.classList.add('hidden');
+                        const overlay = document.getElementById('connectionsOverlay');
+                        if (overlay) overlay.classList.add('hidden');
+                    },
+                    loadRoutineList: async (rs, ed) => {
+                        await loadRoutineList(rs, ed, document.getElementById('routineSearch')?.value || '', null);
+                    }
+                });
+            }, 500);
 
             document.getElementById('closeShortcutsBtn')?.addEventListener('click', closeShortcutsPanel);
             // Legacy overlay removed - dialog handles backdrop clicks
@@ -3601,10 +3970,9 @@
                 renderProjectTree([], routineState, editor);
                 showToast('error', 'Routines', err?.message || 'Failed to load routines');
             });
-            // Make terminal init non-blocking to prevent freeze if xterm fails
-            addTerminalTab(terminalState, true).catch(err => {
-                console.warn('Terminal init failed (non-fatal):', err);
-            });
+            // Run Output (legacy terminal) is lazy: only create tabs when Run is triggered
+            // or when the Run tool window is opened. Avoid early init because the panel
+            // template isn't mounted while hidden, which can cause "Missing terminal container".
             renderBreakpoints(dbgState);
             renderLocals({});
             renderStack([]);
@@ -3661,10 +4029,52 @@
             host.textContent = 'No running containers.';
             return;
         }
+        // Load saved Docker config once
+        let dockerConfig = {};
+        try {
+            dockerConfig = JSON.parse(localStorage.getItem('ahmadIDE:dockerConfig') || '{}');
+        } catch (e) {
+            dockerConfig = {};
+        }
+
         containers.forEach(c => {
             const div = document.createElement('div');
             div.className = 'docker-item';
-            div.textContent = `${c.name} (${c.id}) :: ${c.status}`;
+            div.style.display = 'flex';
+            div.style.justifyContent = 'space-between';
+            div.style.alignItems = 'center';
+
+            const infoSpan = document.createElement('span');
+            infoSpan.textContent = `${c.name} (${c.id}) :: ${c.status}`;
+            div.appendChild(infoSpan);
+
+            // Default Toggle (Star)
+            const isDefault = dockerConfig.defaultContainerId === c.id;
+            const star = document.createElement('span');
+            star.textContent = isDefault ? '★' : '☆';
+            star.className = 'docker-default-star'; // Add class for potential styling
+            star.style.marginLeft = '8px';
+            star.style.cursor = 'pointer';
+            star.style.fontSize = '1.2em';
+            star.style.color = isDefault ? '#f0a35c' : '#6a7280'; // accent-orange vs muted
+            star.title = isDefault ? 'Unset Default' : 'Set as Default (Auto-Connect)';
+
+            star.onclick = (e) => {
+                e.stopPropagation();
+                // Toggle default
+                if (isDefault) {
+                    delete dockerConfig.defaultContainerId;
+                } else {
+                    dockerConfig.defaultContainerId = c.id;
+                    dockerConfig.defaultContainerName = c.name; // Store name for UI status
+                }
+                localStorage.setItem('ahmadIDE:dockerConfig', JSON.stringify(dockerConfig));
+                // Re-render to update stars
+                renderDocker(containers, routineState, editor, opts);
+            };
+
+            div.appendChild(star);
+
             div.onclick = async () => {
                 appendOutput(`🐳 Using container ${c.name} (${c.id})`);
                 // Save this container ID for later use
@@ -3673,16 +4083,15 @@
                 } catch (e) {
                     // ignore
                 }
-                // Load saved Docker config if available
-                let dockerConfig = {};
+
+                // Use latest config (reload to be safe, or use modified object)
+                let currentConfig = {};
                 try {
-                    const raw = localStorage.getItem('ahmadIDE:dockerConfig');
-                    dockerConfig = raw ? JSON.parse(raw) : {};
-                } catch (e) {
-                    dockerConfig = {};
-                }
-                await window.ahmadIDE.setConnection('docker', { docker: { containerId: c.id, ...dockerConfig } });
-                const modeLabel = dockerConfig.ydbPath ? 'configured' : 'universal';
+                    currentConfig = JSON.parse(localStorage.getItem('ahmadIDE:dockerConfig') || '{}');
+                } catch (e) { }
+
+                await window.ahmadIDE.setConnection('docker', { docker: { containerId: c.id, ...currentConfig } });
+                const modeLabel = currentConfig.ydbPath ? 'Docker (configured)' : 'Docker (universal)';
                 setConnStatus(`Docker: ${c.name} (${modeLabel})`, 'success');
                 await loadRoutineList(
                     routineState,
@@ -3696,19 +4105,24 @@
             };
             host.appendChild(div);
         });
-        setConnStatus('Docker (listed)', 'success');
+        // Listing containers does not mean we are connected to one.
     }
 
     function setConnStatus(text, severity) {
         const pill = document.getElementById('connStatus');
         if (!pill) return;
         pill.textContent = text;
+        if (severity === 'subtle') {
+            pill.style.background = '';
+            pill.style.color = '';
+            return;
+        }
         pill.style.background = severity === 'error'
-            ? 'rgba(248,113,113,0.18)'
-            : 'rgba(14,165,233,0.12)';
+            ? 'var(--accent-orange)'
+            : 'var(--accent-soft)';
         pill.style.color = severity === 'error'
-            ? '#fecdd3'
-            : '#38bdf8';
+            ? 'var(--text-bright)'
+            : 'var(--accent-blue)';
     }
 
     function initExtensionsView() {
@@ -3778,6 +4192,13 @@
     }
 
     async function runMumpsCode(editor, terminalState) {
+        // Run Output: auto-open only when running code.
+        try { ensureBottomPanel('terminalPanel'); } catch (_) { }
+        try {
+            if (terminalState && !terminalState.tabs?.length) {
+                await addTerminalTab(terminalState, true);
+            }
+        } catch (_) { }
         const code = editor.getValue();
         appendOutput('🚀 Executing...', terminalState);
         const res = await window.ahmadIDE.execute(code);

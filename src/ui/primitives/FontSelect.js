@@ -1,7 +1,7 @@
 (() => {
     /**
      * FontSelect - Searchable font family dropdown with preview
-     * PhpStorm-like font picker with pinned bundled fonts + system fonts
+     * -like font picker with pinned bundled fonts + system fonts
      */
     function createFontSelect({ value = '', onChange, showImport = false } = {}) {
         const container = document.createElement('div');
@@ -25,7 +25,7 @@
             right:0;
             max-height:320px;
             overflow-y:auto;
-            background:rgba(60, 63, 65, 0.98);
+            background:var(--glass);
             border:1px solid var(--ui-border-strong);
             border-radius:var(--ui-radius-2);
             box-shadow:0 8px 24px rgba(0,0,0,0.45);
@@ -57,7 +57,7 @@
 
             if (filteredFonts.length === 0) {
                 const empty = document.createElement('div');
-                empty.style.cssText = 'padding:var(--ui-space-4);text-align:center;color:rgba(255,255,255,0.5);font-size:12px;';
+                empty.style.cssText = 'padding:var(--ui-space-4);text-align:center;color:var(--muted);font-size:12px;';
                 empty.textContent = 'No fonts found';
                 dropdown.appendChild(empty);
                 return;
@@ -68,7 +68,7 @@
                 // Add section header
                 if (font.type !== lastType) {
                     const header = document.createElement('div');
-                    header.style.cssText = 'padding:6px 10px;font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:0.5px;';
+                    header.style.cssText = 'padding:6px 10px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;';
                     header.textContent = font.type === 'bundled' ? 'Bundled' : font.type === 'custom' ? 'Custom' : 'System';
                     dropdown.appendChild(header);
                     lastType = font.type;
@@ -92,7 +92,7 @@
                 item.style.fontFamily = font.type === 'bundled' || font.type === 'custom' ? font.family : 'inherit';
 
                 item.addEventListener('mouseenter', () => {
-                    item.style.background = 'rgba(74, 158, 255, 0.12)';
+                    item.style.background = 'var(--hover-bg)';
                 });
                 item.addEventListener('mouseleave', () => {
                     item.style.background = 'transparent';
@@ -108,20 +108,20 @@
             });
 
             // Add import option
-            if (showImport) {
-                const importBtn = document.createElement('button');
-                importBtn.type = 'button';
-                importBtn.style.cssText = `
-                    width:100%;
-                    text-align:left;
-                    padding:8px 12px;
-                    border-top:1px solid var(--ui-border-subtle);
-                    background:transparent;
-                    color:rgba(74, 158, 255, 0.9);
-                    cursor:pointer;
-                    font-size:12px;
-                    font-weight:500;
-                `;
+                if (showImport) {
+                    const importBtn = document.createElement('button');
+                    importBtn.type = 'button';
+                    importBtn.style.cssText = `
+                        width:100%;
+                        text-align:left;
+                        padding:8px 12px;
+                        border-top:1px solid var(--ui-border-subtle);
+                        background:transparent;
+                        color:var(--accent);
+                        cursor:pointer;
+                        font-size:12px;
+                        font-weight:500;
+                    `;
                 importBtn.textContent = '+ Import Font File...';
                 importBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();

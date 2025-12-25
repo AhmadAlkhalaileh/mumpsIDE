@@ -1,43 +1,43 @@
 :root {
     --bottom-toolwindow-height: 320px;
-    /* PhpStorm Darcula (Dark) palette */
-    --bg: #2b2b2b;
-    --glass: rgba(60, 63, 65, 0.9);
-    --panel: #3c3f41;
-    --panel-2: #313335;
-    --panel-strong: #3c3f41;
-    --panel-soft: #2d2f30;
-    --sidebar: #3c3f41;
-    --rail-bg: #313335;
-    --editor-bg: #2b2b2b;
-    --gutter-bg: #313335;
-    --terminal-bg: #2b2b2b;
-    --terminal-input-bg: #313335;
+    /* Dark palette (Dracula-inspired) */
+    --bg: #282a36;
+    --glass: rgba(40, 42, 54, 0.92);
+    --panel: #2f3141;
+    --panel-2: #2b2d3a;
+    --panel-strong: #343746;
+    --panel-soft: #242631;
+    --sidebar: #2b2d3a;
+    --rail-bg: #2b2d3a;
+    --editor-bg: #282a36;
+    --gutter-bg: #282a36;
+    --terminal-bg: #282a36;
+    --terminal-input-bg: #2f3141;
 
     /* Accents */
-    --accent: #4a9eff;
-    --accent-2: #6db0ff;
-    --accent-blue: #4a9eff;
-    --accent-green: #6a8759;
-    --accent-orange: #cc7832;
-    --accent-soft: rgba(74, 158, 255, 0.15);
-    --accent-soft-border: rgba(74, 158, 255, 0.35);
+    --accent: #bd93f9;
+    --accent-2: #ff79c6;
+    --accent-blue: #8be9fd;
+    --accent-green: #50fa7b;
+    --accent-orange: #ffb86c;
+    --accent-soft: rgba(189, 147, 249, 0.15);
+    --accent-soft-border: rgba(189, 147, 249, 0.35);
 
     /* Text */
-    --text: #bbbbbb;
+    --text: #f8f8f2;
     --text-bright: #ffffff;
-    --muted: #808080;
-    --border: #323232;
+    --muted: #6272a4;
+    --border: #44475a;
 
     /* Selection / hover */
-    --tree-selected: #214283;
-    --tree-selected-text: #ffffff;
-    --selection-bg: #214283;
-    --hover-bg: #2d2f30;
+    --tree-selected: #44475a;
+    --tree-selected-text: #f8f8f2;
+    --selection-bg: #44475a;
+    --hover-bg: #343746;
 
     /* Soft glows */
-    --glow-1: rgba(53, 116, 240, 0.08);
-    --glow-2: rgba(91, 141, 239, 0.06);
+    --glow-1: rgba(189, 147, 249, 0.05);
+    --glow-2: rgba(139, 233, 253, 0.03);
 
     /* Typography */
     --font-ui: 'Inter', 'Segoe UI', 'SF Pro Display', system-ui, sans-serif;
@@ -89,8 +89,8 @@
     --ui-text-muted: var(--muted);
 
     /* Focus */
-    --ui-focus-ring: 0 0 0 2px rgba(74, 158, 255, 0.35);
-    --ui-focus-outline: rgba(74, 158, 255, 0.55);
+    --ui-focus-ring: 0 0 0 2px rgba(189, 147, 249, 0.35);
+    --ui-focus-outline: rgba(189, 147, 249, 0.55);
 
     /* Shadows */
     --ui-shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.18);
@@ -119,7 +119,7 @@
        Parity Spec Sheet Metrics (Phase 3A-0)
        ============================================ */
     --ui-menubar-row-h: 40px;
-    --ui-toolbar-row-h: 48px;
+    --ui-toolbar-row-h: 40px;
     --ui-statusbar-h: 24px;
 
     /* Menus / Context menus */
@@ -162,11 +162,11 @@
        All menus/context menus use these tokens.
        ============================================ */
     /* Menu surfaces */
-    --ui-menu-bg: #26282b;
-    --ui-menu-border: rgba(255, 255, 255, 0.08);
-    --ui-menu-hover: rgba(255, 255, 255, 0.04);
-    --ui-menu-active: rgba(74, 158, 255, 0.14);
-    --ui-menu-active-border: rgba(74, 158, 255, 0.26);
+    --ui-menu-bg: #2f3141;
+    --ui-menu-border: #44475a;
+    --ui-menu-hover: #44475a;
+    --ui-menu-active: #44475a;
+    --ui-menu-active-border: #bd93f9;
 }
 
 /* ============================================
@@ -199,6 +199,40 @@
     box-sizing: border-box;
 }
 
+/* ============================================
+   Global Scrollbar Styling (ains Darcula)
+   ============================================ */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #44475a;
+    border-radius: 5px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #6272a4;
+    background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* Firefox scrollbar */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #44475a transparent;
+}
+
 html,
 body {
     height: 100%;
@@ -211,10 +245,11 @@ body {
     padding: 0;
     font-family: var(--ui-font-ui);
     font-size: var(--ui-font-ui-size);
-    background: #2b2b2b;
+    background: var(--bg);
     color: var(--text);
     overflow: hidden;
 }
+
 
 button,
 input,
@@ -250,16 +285,17 @@ textarea {
     height: var(--ui-icon-20);
 }
 
+
 .app-shell {
     position: relative;
     display: grid;
-    /* PhpStorm layout: menu | toolbar | body+bottom | statusbar */
+    /*  layout: menu | toolbar | body+bottom | statusbar */
     grid-template-rows: var(--ui-menubar-row-h) var(--ui-toolbar-row-h) 1fr auto var(--ui-statusbar-h);
     height: 100vh;
     margin: 0;
     padding: 0;
     gap: 0;
-    background: #2b2b2b;
+    background: var(--bg);
 }
 
 /* Bottom bar wrapper - spans full width below project and editor */
@@ -269,8 +305,8 @@ textarea {
     flex-direction: row;
     align-items: stretch;
     /* Ensure children fill height */
-    background: #2b2b2b;
-    border-top: 1px solid #515151;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
     min-height: 0;
     height: auto !important;
     /* Allow shrinking */
@@ -292,13 +328,14 @@ textarea {
     order: -1;
     /* VISUAL: Force to Left side */
     border-top: none;
-    border-right: 1px solid #323232;
+    border-right: 1px solid var(--border);
     padding: 4px 0;
     align-items: center;
-    background: #313335;
+    background: var(--panel-2);
     z-index: 20;
     /* Ensure icons sit above content if overlap occurs */
 }
+
 
 .bottom-bar-wrapper .tool-window-bar-bottom .tool-window-stripe-btn.horizontal {
     padding: 8px 6px;
@@ -322,6 +359,7 @@ textarea {
     width: auto;
     position: relative;
     z-index: 10;
+    background: var(--panel);
 }
 
 /* Ambient glow */
@@ -376,6 +414,7 @@ body.perf-mode .btn:hover {
     box-shadow: none !important;
 }
 
+
 .menu-bar {
     display: flex;
     align-items: center;
@@ -383,8 +422,8 @@ body.perf-mode .btn:hover {
     justify-content: space-between;
     padding: 0 14px;
     height: var(--ui-menubar-row-h);
-    border-bottom: 1px solid #323232;
-    background: #3c3f41 !important;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel) !important;
     position: relative;
     z-index: var(--ui-z-menubar);
 }
@@ -429,13 +468,13 @@ body.perf-mode .btn:hover {
 }
 
 .ui-menubar-item:focus-visible {
-    outline: 2px solid var(--ui-focus-outline, rgba(74, 158, 255, 0.55));
+    outline: 2px solid var(--ui-focus-outline);
     outline-offset: 2px;
 }
 
 .ui-menubar--focused .ui-menubar-item.focused {
-    background: rgba(74, 158, 255, 0.14);
-    border-color: rgba(74, 158, 255, 0.22);
+    background: var(--accent-soft);
+    border-color: var(--accent-soft-border);
     color: var(--text-bright);
 }
 
@@ -512,12 +551,12 @@ body.perf-mode .btn:hover {
     display: flex;
     align-items: center;
     gap: 6px;
-    background: #2d2f30 !important;
-    border: 1px solid #323232;
+    background: var(--panel-soft) !important;
+    border: 1px solid var(--border);
     padding: 6px 8px;
     border-radius: 10px;
     font-size: 12px;
-    color: #808080 !important;
+    color: var(--muted) !important;
 }
 
 .theme-switcher select {

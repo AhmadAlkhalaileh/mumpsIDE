@@ -23,7 +23,7 @@
         const collapsedTreeNodes = state.collapsedTreeNodes;
 
         // ============================================
-        // PhpStorm-style SVG Icons for Project Tree
+        // -style SVG Icons for Project Tree
         // ============================================
         const treeIcons = {
             folder: `<svg width="16" height="16" viewBox="0 0 16 16" fill="#8c7a65"><path d="M2 3h5l1 1h6v9H2V3zm1 1v8h10V5H7.5L6.5 4H3z"/></svg>`,
@@ -67,7 +67,7 @@
             lastSelectedTreeItem = null;
             const routineFilterTerm = getRoutineFilterTerm();
 
-            // PhpStorm-style tree item builder
+            // -style tree item builder
             const createTreeItem = (label, options = {}) => {
                 const { icon, isFolder, hasChildren, expanded, depth = 0, togglePath, onClick, onContext, isActive, isDisabled } = options;
 
@@ -79,7 +79,7 @@
                 // Indentation based on depth
                 item.css('padding-left', `${4 + depth * 16}px`);
 
-                // Expand/collapse arrow (PhpStorm style)
+                // Expand/collapse arrow ( style)
                 if (hasChildren) {
                     const arrow = $('<span class="tree-arrow"></span>');
                     arrow.html(treeIcons.arrow);

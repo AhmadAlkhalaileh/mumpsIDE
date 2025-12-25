@@ -13,17 +13,23 @@
             }
 
             // xterm is UMD and will register as AMD if `define.amd` exists (Monaco),
-            // which prevents `window.Terminal` from being populated. Temporarily disable AMD.
+            // which prevents `window.Terminal` from being populated.
+            //
+            // IMPORTANT: Do NOT remove `window.define` entirely because Monaco's AMD modules
+            // depend on it while loading. Instead, temporarily disable only the AMD flag.
             const shouldDisableAmd = /\/xterm(?:\.min)?\.js$/i.test(src) || /\/xterm\.js(\?|#|$)/i.test(src);
             const originalDefine = shouldDisableAmd ? window.define : undefined;
-            if (shouldDisableAmd && originalDefine && originalDefine.amd) {
-                try { window.define = undefined; } catch (_) { }
+            const originalAmdFlag = shouldDisableAmd && originalDefine ? originalDefine.amd : undefined;
+            if (shouldDisableAmd && originalDefine && originalAmdFlag) {
+                try { originalDefine.amd = undefined; } catch (_) { }
             }
             const restoreAmd = () => {
                 if (!shouldDisableAmd) return;
                 if (!originalDefine) return;
                 try {
-                    if (window.define === undefined) window.define = originalDefine;
+                    if (typeof originalAmdFlag !== 'undefined') {
+                        originalDefine.amd = originalAmdFlag;
+                    }
                 } catch (_) { }
             };
 

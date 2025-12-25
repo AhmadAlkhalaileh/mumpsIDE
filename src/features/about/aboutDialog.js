@@ -2,7 +2,6 @@
     /**
      * About Dialog
      * Simple centered dialog with app info
-     * Matches PhpStorm 2025.3 New UI About dialog
      *
      * Checklist: ABT-001 to ABT-007
      */
@@ -30,14 +29,14 @@
                     width: 80px;
                     height: 80px;
                     margin: 0 auto var(--ui-space-5);
-                    background: linear-gradient(135deg, rgba(74, 158, 255, 0.25), rgba(74, 158, 255, 0.1));
+                    background: linear-gradient(135deg, var(--accent-soft-border), var(--accent-soft));
                     border-radius: var(--ui-radius-3);
                     display: flex;
                     align-items: center;
                     justify-content: center;
                     font-size: 36px;
                     font-weight: 700;
-                    color: rgba(74, 158, 255, 0.9);
+                    color: var(--accent);
                 }
                 .about-dialog-content__title {
                     font-size: 24px;

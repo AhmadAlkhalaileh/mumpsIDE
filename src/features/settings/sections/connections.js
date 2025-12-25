@@ -125,8 +125,10 @@
         };
         const sshSelect = createSelect({
             options: buildSshOptions(sshProfiles), value: activeIndex >= 0 ? String(activeIndex) : NEW_VALUE,
-            onChange: () => { const val = sshSelect.value; if (val === NEW_VALUE) { activeIndex = -1; fillSshForm({ port: 22 }); return; }
-                const idx = parseInt(val, 10); activeIndex = Number.isFinite(idx) ? idx : -1; fillSshForm(sshProfiles[activeIndex] || {}); }
+            onChange: () => {
+                const val = sshSelect.value; if (val === NEW_VALUE) { activeIndex = -1; fillSshForm({ port: 22 }); return; }
+                const idx = parseInt(val, 10); activeIndex = Number.isFinite(idx) ? idx : -1; fillSshForm(sshProfiles[activeIndex] || {});
+            }
         });
         const envKeyInput = createInput({ value: '', placeholder: 'cc' });
         const hostInput = createInput({ value: '', placeholder: '192.168.1.100' });
@@ -232,14 +234,46 @@
         const dockerSelect = createSelect({ options: [{ value: '', label: 'Select container...' }], value: '' });
         const dockerListStatus = document.createElement('div'); dockerListStatus.className = 'ui-settings-group__hint';
         const dockerConnectStatus = document.createElement('div'); dockerConnectStatus.className = 'ui-settings-group__hint'; dockerConnectStatus.style.marginTop = '6px';
+        // [NEW] Default Container Logic
+        const defaultContainerSelect = createSelect({ options: [{ value: '', label: 'None' }], value: '' });
+
         const fillDockerSelect = (list) => {
-            dockerSelect.innerHTML = ''; const opts = (list && list.length) ? list : [];
-            if (!opts.length) { const o = document.createElement('option'); o.value = ''; o.textContent = 'No containers found'; dockerSelect.appendChild(o); dockerListStatus.textContent = 'No Docker containers available.'; return; }
-            opts.forEach((c) => { const o = document.createElement('option'); o.value = c.id || c.containerId || ''; o.textContent = c.name || c.id || 'Container'; dockerSelect.appendChild(o); });
+            dockerSelect.innerHTML = '';
+            defaultContainerSelect.innerHTML = '';
+
+            const opts = (list && list.length) ? list : [];
+            const noneOpt = document.createElement('option'); noneOpt.value = ''; noneOpt.textContent = 'None';
+            defaultContainerSelect.appendChild(noneOpt);
+
+            if (!opts.length) {
+                const o = document.createElement('option'); o.value = ''; o.textContent = 'No containers found'; dockerSelect.appendChild(o);
+                dockerListStatus.textContent = 'No Docker containers available.';
+                return;
+            }
+
+            opts.forEach((c) => {
+                const o = document.createElement('option');
+                o.value = c.id || c.containerId || '';
+                o.textContent = c.name || c.id || 'Container';
+                dockerSelect.appendChild(o);
+
+                const d = document.createElement('option');
+                d.value = c.id || c.containerId || '';
+                d.textContent = c.name || c.id || 'Container';
+                defaultContainerSelect.appendChild(d);
+            });
+
             dockerListStatus.textContent = `${opts.length} container${opts.length === 1 ? '' : 's'} found.`;
+
+            // Set current values
+            if (dockerConfig.defaultContainerId) {
+                defaultContainerSelect.value = dockerConfig.defaultContainerId;
+            }
         };
+
         fillDockerSelect(dockerContainers);
         dockerGroup.appendChild(makeRow('Containers', dockerSelect, 'docker containers list'));
+        dockerGroup.appendChild(makeRow('Default Container', defaultContainerSelect, 'docker default container'));
         dockerGroup.appendChild(makeRow('List Status', dockerListStatus, 'docker containers status'));
         let dockerRefreshBtn, dockerConnectBtn, dockerDisconnectBtn;
         const refreshDockerList = async () => {
@@ -249,7 +283,7 @@
             if (dockerRefreshBtn) dockerRefreshBtn.disabled = true;
             if (btnLabel) btnLabel.textContent = 'Loading...';
             dockerListStatus.textContent = 'Loading containers...';
-            try { await window.ahmadIDE.setConnection('docker');
+            try {
                 const res = await window.ahmadIDE.listDocker(); if (!res?.ok) throw new Error(res?.error || 'Docker list failed');
                 dockerContainers = res.containers || []; saveDockerCache(dockerContainers); fillDockerSelect(dockerContainers);
             } catch (err) { dockerListStatus.textContent = 'Failed to load containers.'; notify('error', 'Docker', String(err?.message || err || 'Docker list failed')); }
@@ -267,6 +301,21 @@
             dockerConnectBtn.disabled = true;
             if (btnLabel) btnLabel.textContent = 'Connecting...';
             try {
+                // Validate the container is running (prevents "connected" UI when Docker isn't reachable).
+                const listRes = await window.ahmadIDE.listDocker();
+                if (!listRes?.ok) {
+                    const msg = listRes?.message || listRes?.error || listRes?.stderr || 'Docker is not available';
+                    throw new Error(msg);
+                }
+                const isRunning = (listRes.containers || []).some((c) => {
+                    const id = String(c?.id || c?.containerId || '').trim();
+                    if (!id) return false;
+                    return id === containerId || id.startsWith(containerId) || containerId.startsWith(id);
+                });
+                if (!isRunning) {
+                    throw new Error('Selected container is not running. Refresh the list and try again.');
+                }
+
                 await window.ahmadIDE.setConnection('docker', { docker: { containerId, ...config } });
                 localStorage.setItem('ahmadIDE:lastContainerId', String(containerId)); saveDockerConfig(config);
                 const name = dockerContainers.find((c) => (c.id || c.containerId) === containerId)?.name || containerId;
@@ -289,14 +338,309 @@
         const dockerSaveBtn = createButton({
             label: 'Save Docker Defaults', variant: 'ghost',
             onClick: () => {
-                const next = { envKey: dockerEnvKeyInput.value.trim() || 'cc', ydbPath: dockerYdbPathInput.value.trim() || '', gldPath: dockerGldPathInput.value.trim() || '', routinesPath: dockerRoutinesPathInput.value.trim() || '' };
-                saveDockerConfig(next); notify('success', 'Docker Defaults', 'Defaults saved.');
+                onClick: () => {
+                    const next = {
+                        envKey: dockerEnvKeyInput.value.trim() || 'cc',
+                        ydbPath: dockerYdbPathInput.value.trim() || '',
+                        gldPath: dockerGldPathInput.value.trim() || '',
+                        routinesPath: dockerRoutinesPathInput.value.trim() || '',
+                        defaultContainerId: defaultContainerSelect.value || null,
+                        defaultContainerName: defaultContainerSelect.options[defaultContainerSelect.selectedIndex]?.textContent || ''
+                    };
+                    saveDockerConfig(next); notify('success', 'Docker Defaults', 'Defaults saved.');
+                }
             }
         });
         dockerActionsRow.appendChild(dockerRefreshBtn); dockerActionsRow.appendChild(dockerConnectBtn); dockerActionsRow.appendChild(dockerDisconnectBtn); dockerActionsRow.appendChild(dockerSaveBtn);
         dockerActionsWrap.appendChild(dockerActionsRow); dockerActionsWrap.appendChild(dockerConnectStatus);
         dockerGroup.appendChild(makeRow('Actions', dockerActionsWrap, 'docker save defaults refresh connect'));
         root.appendChild(dockerGroup);
+
+        // Release Connection (for Compare with Release feature)
+        const releaseGroup = document.createElement('div');
+        releaseGroup.className = 'ui-settings-group';
+        releaseGroup.dataset.filterText = 'release connection ssh compare routines';
+        const releaseTitle = document.createElement('div');
+        releaseTitle.className = 'ui-settings-group__title';
+        releaseTitle.textContent = 'Release Connection';
+        const releaseHint = document.createElement('div');
+        releaseHint.className = 'ui-settings-group__hint';
+        releaseHint.textContent = 'SSH connection to release server for comparing routines. Independent from main SSH connection.';
+        releaseGroup.appendChild(releaseTitle);
+        releaseGroup.appendChild(releaseHint);
+
+        const releaseApi = window.AhmadIDEModules?.features?.releaseConnection;
+        const releaseConfig = releaseApi?.loadConnection?.() || {};
+
+        const releaseHostInput = createInput({ value: String(releaseConfig?.host || ''), placeholder: '192.168.1.100' });
+        const releasePortInput = createInput({ value: String(releaseConfig?.port || 22), type: 'number', placeholder: '22' });
+        const releaseUserInput = createInput({ value: String(releaseConfig?.username || ''), placeholder: 'username' });
+        const releasePassInput = createInput({ value: '', type: 'password', placeholder: 'Password (stored in keychain)' });
+        const releaseStatus = document.createElement('div');
+        releaseStatus.className = 'ui-settings-group__hint';
+        releaseStatus.style.marginTop = '6px';
+        releaseStatus.textContent = releaseConfig?.host ? 'Configured' : 'Not configured';
+
+        releaseGroup.appendChild(makeRow('Host', releaseHostInput, 'release host ip address'));
+        releaseGroup.appendChild(makeRow('Port', releasePortInput, 'release port'));
+        releaseGroup.appendChild(makeRow('Username', releaseUserInput, 'release username'));
+        releaseGroup.appendChild(makeRow('Password', releasePassInput, 'release password keychain'));
+
+        const releaseActionsRow = document.createElement('div');
+        releaseActionsRow.style.display = 'flex';
+        releaseActionsRow.style.flexWrap = 'wrap';
+        releaseActionsRow.style.gap = '8px';
+
+        let releaseConnectBtn, releaseDisconnectBtn;
+
+        const releaseTestBtn = createButton({
+            label: 'Test Connection',
+            variant: 'ghost',
+            onClick: async () => {
+                const config = {
+                    host: releaseHostInput.value.trim(),
+                    port: parseInt(releasePortInput.value, 10) || 22,
+                    username: releaseUserInput.value.trim(),
+                    password: releasePassInput.value
+                };
+
+                if (!config.host || !config.username) {
+                    notify('info', 'Release Connection', 'Host and username are required');
+                    return;
+                }
+
+                if (!config.password && !releaseConfig?.host) {
+                    notify('info', 'Release Connection', 'Password is required for first connection');
+                    return;
+                }
+
+                if (!config.password && releaseConfig?.host) {
+                    config.password = await releaseApi?.getPasswordSecurely?.();
+                }
+
+                const btnLabel = releaseTestBtn.querySelector('.ui-btn__label');
+                const originalLabel = btnLabel?.textContent || 'Test Connection';
+                releaseTestBtn.disabled = true;
+                if (btnLabel) btnLabel.textContent = 'Testing...';
+                releaseStatus.textContent = 'Testing connection...';
+
+                try {
+                    const result = await releaseApi?.testConnection?.(config);
+                    if (result?.success) {
+                        releaseStatus.textContent = '✓ ' + (result.message || 'Connection successful');
+                        notify('success', 'Release Connection', 'Connection successful');
+                    } else {
+                        releaseStatus.textContent = '✗ ' + (result?.message || 'Connection failed');
+                        notify('error', 'Release Connection', result?.message || 'Connection failed');
+                    }
+                } catch (err) {
+                    releaseStatus.textContent = '✗ ' + String(err?.message || err || 'Connection failed');
+                    notify('error', 'Release Connection', String(err?.message || err || 'Connection failed'));
+                } finally {
+                    releaseTestBtn.disabled = false;
+                    if (btnLabel) btnLabel.textContent = originalLabel;
+                }
+            }
+        });
+
+        const releaseSaveBtn = createButton({
+            label: 'Save',
+            variant: 'primary',
+            onClick: async () => {
+                const config = {
+                    id: 'release',
+                    name: 'Release Connection',
+                    host: releaseHostInput.value.trim(),
+                    port: parseInt(releasePortInput.value, 10) || 22,
+                    username: releaseUserInput.value.trim(),
+                    password: releasePassInput.value
+                };
+
+                if (!config.host || !config.username) {
+                    notify('info', 'Release Connection', 'Host and username are required');
+                    return;
+                }
+
+                try {
+                    const saved = await releaseApi?.saveConnection?.(config);
+                    if (saved) {
+                        releaseStatus.textContent = 'Saved successfully';
+                        notify('success', 'Release Connection', 'Connection settings saved');
+                        releasePassInput.value = '';
+                    } else {
+                        throw new Error('Failed to save');
+                    }
+                } catch (err) {
+                    releaseStatus.textContent = '✗ Failed to save';
+                    notify('error', 'Release Connection', String(err?.message || err || 'Failed to save'));
+                }
+            }
+        });
+
+        const releaseDeleteBtn = createButton({
+            label: 'Delete',
+            variant: 'danger',
+            onClick: async () => {
+                if (!releaseConfig?.host) {
+                    notify('info', 'Release Connection', 'No connection to delete');
+                    return;
+                }
+
+                if (!confirm('Delete release connection settings?')) return;
+
+                try {
+                    await releaseApi?.deleteConnection?.();
+                    releaseHostInput.value = '';
+                    releasePortInput.value = '22';
+                    releaseUserInput.value = '';
+                    releasePassInput.value = '';
+                    releaseStatus.textContent = 'Not configured';
+
+                    // Disconnect if connected
+                    const sessionId = localStorage.getItem('ahmadIDE:releaseSessionId');
+                    if (sessionId) {
+                        disconnectRelease();
+                    }
+
+                    notify('success', 'Release Connection', 'Connection deleted');
+                } catch (err) {
+                    notify('error', 'Release Connection', String(err?.message || err || 'Failed to delete'));
+                }
+            }
+        });
+
+        // [NEW] Latency Check
+        const checkLatency = async (sessionId) => {
+            if (!sessionId) return null;
+            const start = performance.now();
+            try {
+                // Execute a simple echo command
+                await window.bridge?.invoke('ssh:exec', { sessionId, command: 'echo 1' });
+                const end = performance.now();
+                return Math.round(end - start);
+            } catch (e) {
+                return null;
+            }
+        };
+
+        const toggleReleaseConnection = async () => {
+            const btnLabel = releaseConnectBtn.querySelector('.ui-btn__label');
+            // Check if currently connected
+            const currentSessionId = localStorage.getItem('ahmadIDE:releaseSessionId');
+
+            if (currentSessionId) {
+                // DISCONNECT LOGIC
+                if (btnLabel) btnLabel.textContent = 'Disconnecting...';
+                releaseConnectBtn.disabled = true;
+
+                try {
+                    await window.bridge?.invoke('ssh:disconnect', { sessionId: currentSessionId });
+                } catch (e) {
+                    console.error('Failed to disconnect release:', e);
+                }
+
+                localStorage.removeItem('ahmadIDE:releaseSessionId');
+                releaseStatus.innerHTML = 'Disconnected'; // Use innerHTML to reset properly
+                notify('info', 'Release Connection', 'Disconnected');
+
+                if (btnLabel) btnLabel.textContent = 'Connect Release';
+                releaseConnectBtn.classList.remove('ui-btn--danger');
+                releaseConnectBtn.classList.add('ui-btn--primary');
+                releaseConnectBtn.disabled = false;
+
+            } else {
+                // CONNECT LOGIC
+                const config = {
+                    host: releaseHostInput.value.trim(),
+                    port: parseInt(releasePortInput.value, 10) || 22,
+                    username: releaseUserInput.value.trim(),
+                    password: releasePassInput.value
+                };
+
+                if (!config.host || !config.username) {
+                    notify('info', 'Release Connection', 'Host and username are required');
+                    return;
+                }
+
+                if (!config.password && !releaseConfig?.host) {
+                    notify('info', 'Release Connection', 'Password required for first connection');
+                    return;
+                }
+
+                if (!config.password && releaseConfig?.host) {
+                    config.password = await releaseApi?.getPasswordSecurely?.();
+                }
+
+                if (btnLabel) btnLabel.textContent = 'Connecting...';
+                releaseConnectBtn.disabled = true;
+                releaseStatus.textContent = 'Connecting to release server...';
+
+                try {
+                    const response = await window.bridge?.invoke('ssh:connect', {
+                        host: config.host,
+                        port: config.port,
+                        username: config.username,
+                        password: config.password
+                    });
+
+                    if (!response || !response.ok || !response.sessionId) {
+                        throw new Error(response?.error || 'Connection failed');
+                    }
+
+                    localStorage.setItem('ahmadIDE:releaseSessionId', response.sessionId);
+
+                    // Check latency immediately
+                    const latency = await checkLatency(response.sessionId);
+                    const latencyText = latency !== null ? ` (${latency}ms)` : '';
+
+                    releaseStatus.innerHTML = `✓ Connected to release server <span style="color:var(--text-secondary);font-size:0.9em;margin-left:6px;">${latencyText}</span>`;
+                    notify('success', 'Release Connection', 'Connected successfully' + latencyText);
+
+                    if (btnLabel) btnLabel.textContent = 'Disconnect Release';
+                    releaseConnectBtn.classList.remove('ui-btn--primary');
+                    releaseConnectBtn.classList.add('ui-btn--danger');
+
+                } catch (err) {
+                    releaseStatus.textContent = '✗ ' + String(err?.message || err || 'Connection failed');
+                    notify('error', 'Release Connection', String(err?.message || err || 'Connection failed'));
+                    if (btnLabel) btnLabel.textContent = 'Connect Release';
+                } finally {
+                    releaseConnectBtn.disabled = false;
+                }
+            }
+        };
+
+        // Initialize button state based on existing session
+        const initSessionId = localStorage.getItem('ahmadIDE:releaseSessionId');
+        const initLabel = initSessionId ? 'Disconnect Release' : 'Connect Release';
+        const initVariant = initSessionId ? 'danger' : 'primary';
+
+        releaseConnectBtn = createButton({ label: initLabel, variant: initVariant, onClick: toggleReleaseConnection });
+
+        // If already connected, maybe check latency again or just show connected
+        if (initSessionId) {
+            releaseStatus.textContent = '✓ Connected (session active)';
+        }
+
+        releaseActionsRow.appendChild(releaseTestBtn);
+        releaseActionsRow.appendChild(releaseSaveBtn);
+        if (releaseConfig?.host) {
+            releaseActionsRow.appendChild(releaseDeleteBtn);
+        }
+        releaseActionsRow.appendChild(releaseConnectBtn);
+        // releaseDisconnectBtn removed (consolidated)
+
+        const releaseActionsWrap = document.createElement('div');
+
+        releaseActionsWrap.style.display = 'flex';
+        releaseActionsWrap.style.flexDirection = 'column';
+        releaseActionsWrap.style.gap = '6px';
+        releaseActionsWrap.appendChild(releaseActionsRow);
+        releaseActionsWrap.appendChild(releaseStatus);
+
+        releaseGroup.appendChild(makeRow('Actions', releaseActionsWrap, 'release test save delete'));
+        root.appendChild(releaseGroup);
+
         const updateConnectionUi = () => {
             const state = parseConnectionState(readStatusText()); statusPill.textContent = state.raw || 'Ready';
             const isSsh = state.connected && state.type === 'ssh'; const isDocker = state.connected && state.type === 'docker';

@@ -43,7 +43,7 @@
             const label = document.getElementById('currentRoutineLabel');
             if (label) label.textContent = normalized.base || 'None';
 
-            // Update PhpStorm-style breadcrumbs
+
             const breadcrumbsContainer = document.getElementById('breadcrumbs');
             if (breadcrumbsContainer) {
                 breadcrumbsContainer.innerHTML = '';
@@ -158,6 +158,7 @@
             name = name.trim();
             if (!name) {
                 appendOutput('✗ Save cancelled (no name).', termState);
+                showToast('info', 'Save', 'Cancelled (no name).');
                 return;
             }
             if (mumpsValidator) {
@@ -165,7 +166,9 @@
                 const routineNameOnly = name.includes('/') ? name.split('/').pop() : name;
                 const check = mumpsValidator.validateRoutineName(routineNameOnly.toUpperCase());
                 if (!check.valid) {
-                    appendOutput(`✗ Invalid routine: ${check.errors.join('; ')}`, termState);
+                    const msg = check.errors.join('; ') || 'Invalid routine name';
+                    appendOutput(`✗ Invalid routine: ${msg}`, termState);
+                    showToast('error', 'Save', msg);
                     return;
                 }
                 // Convert full path to uppercase
@@ -185,22 +188,26 @@
                     code: i.ruleId || i.code || null
                 })));
                 const summary = lintResult.summary || { errors: 0, warnings: 0, info: 0 };
-                if (summary.errors > 0) {
-                    appendOutput(
-                        `✗ Cannot save: ${summary.errors} error(s) found. Warnings and info are allowed.`,
-                        termState
-                    );
-                    return;
-                }
+                // Save should not be blocked by lint errors; keep markers/problems visible and proceed.
             }
 
             logger.debug('FILE_SAVE', { routine: name });
-            const res = await window.ahmadIDE.saveRoutine(name, code);
+            let res = null;
+            try {
+                res = await window.ahmadIDE.saveRoutine(name, code);
+            } catch (err) {
+                const msg = String(err?.message || err || 'Save failed').trim();
+                appendOutput(`✗ Save failed: ${msg}`, termState);
+                showToast('error', 'Save', msg);
+                logger.error('FILE_SAVE_FAIL', { routine: name, error: msg });
+                return;
+            }
             if (res.ok) {
                 const savedPath = res.folder ? `${res.folder}/${res.routine}` : (res.routine || name);
                 state.current = savedPath;
                 setCurrentRoutine(state.current);
                 appendOutput(`✓ Saved routine ${state.current}`, termState);
+                showToast('success', 'Save', `Saved ${state.current}`);
                 await window.ahmadIDE.zlinkRoutine(state.current);
                 appendOutput(`✓ ZLINK ${state.current}`, termState);
                 await loadRoutineList(state, editor, '', termState);
@@ -222,8 +229,10 @@
                     }
                 }
             } else {
-                appendOutput(`✗ Save failed: ${res.error || res.stderr}`, termState);
-                logger.error('FILE_SAVE_FAIL', { routine: name, error: res.error || res.stderr });
+                const msg = String(res.error || res.stderr || 'Save failed').trim();
+                appendOutput(`✗ Save failed: ${msg}`, termState);
+                showToast('error', 'Save', msg);
+                logger.error('FILE_SAVE_FAIL', { routine: name, error: msg });
             }
         }
 

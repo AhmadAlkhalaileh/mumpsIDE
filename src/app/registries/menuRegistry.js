@@ -1,18 +1,18 @@
 (() => {
     function createMenuRegistry() {
-        const menus = new Map(); // id -> (ctx) => items
+        const menus = Object.create(null); // id -> (ctx) => items
 
         const register = (id, provider) => {
             const key = String(id || '').trim();
             if (!key) return false;
             if (typeof provider !== 'function') return false;
-            menus.set(key, provider);
+            menus[key] = provider;
             return true;
         };
 
         const get = (id, ctx) => {
             const key = String(id || '').trim();
-            const provider = menus.get(key);
+            const provider = menus[key];
             if (!provider) return [];
             try {
                 const res = provider(ctx || {});
@@ -22,9 +22,10 @@
             }
         };
 
-        const list = () => Array.from(menus.keys()).sort();
+        const list = () => Object.keys(menus).sort();
 
-        return { register, get, list };
+        // Expose internal registry for extensions that decorate menus.
+        return { register, get, list, _registry: menus };
     }
 
     const withSeparatorCleanup = (items) => {

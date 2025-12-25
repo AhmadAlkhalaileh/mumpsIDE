@@ -1,15 +1,13 @@
-/* PhpStorm-style bottom panel with tool windows */
-.bottom-stack {
-    display: none;
-    /* Legacy - using new layout */
-}
+/* ============================================
+   -style Terminal Panel (New UI 2025)
+   ============================================ */
 
 body.hide-terminal #terminalPanel {
     display: none;
 }
 
 .panel {
-    background: var(--panel-2);
+    background: var(--panel-2, #2B2D30);
     padding: 0;
     min-height: 0;
     flex: 1;
@@ -18,71 +16,191 @@ body.hide-terminal #terminalPanel {
     overflow: hidden;
 }
 
-/* PhpStorm-style terminal panel */
+/* Terminal panel container */
 .panel.terminal {
     display: flex;
     flex-direction: column;
     gap: 0;
     overflow: hidden;
-    background: #2b2b2b !important;
+    background: var(--terminal-bg, #1E1F22) !important;
     flex: 1;
     position: relative;
 }
 
-.panel.terminal .pane-header {
-    background: #3c3f41 !important;
-    border-bottom: 1px solid #323232;
-    padding: 8px 12px;
-    flex-shrink: 0;
-}
-
-.terminal-header .pane-title {
-    font-size: 13px;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-}
-
-.terminal-tabbar {
+/* ============================================
+   Terminal Header -  Style (Single Row)
+   Layout: [Terminal] [+] [v] | [Local x] [Local(2) x] | [...] [-]
+   ============================================ */
+.pane-header.terminal-header,
+.terminal-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    padding: 6px 12px;
-    border-bottom: 1px solid #323232;
-    background: #3c3f41 !important;
+    padding: 0 8px;
+    background: var(--panel, #2B2D30) !important;
+    border-bottom: 1px solid var(--border, #393B40);
+    flex-shrink: 0;
+    height: 28px;
+    min-height: 28px;
+    gap: 0;
+}
+
+/* Left section: Terminal label + icons */
+.terminal-header-left {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+    padding-right: 8px;
+    border-right: 1px solid var(--border, #393B40);
+    margin-right: 8px;
+}
+
+/* "Terminal" label */
+.terminal-header .pane-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text, #BCBEC4);
+    white-space: nowrap;
+    margin: 0;
+    padding: 0 4px 0 0;
+}
+
+/* Icon buttons in header */
+.terminal-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: var(--muted, #6F737A);
+    cursor: pointer;
+}
+
+.terminal-icon-btn:hover {
+    background: var(--hover-bg, #35383E);
+    color: var(--text, #BCBEC4);
+}
+
+/* Right section: menu button + hide button */
+.terminal-header-right {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+}
+
+/* ============================================
+   Terminal Tabs (inline in header)
+   ============================================ */
+.terminal-tabs {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1;
+    scrollbar-width: none;
+    min-width: 0;
+}
+
+.terminal-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+/* Individual tab with close button */
+.terminal-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    height: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--muted, #6F737A);
+    cursor: pointer;
+    white-space: nowrap;
     flex-shrink: 0;
 }
 
-.terminal-tab-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
+.terminal-tab:hover {
+    background: var(--hover-bg, #35383E);
+    color: var(--text, #BCBEC4);
 }
 
+/* Active tab - blue highlight */
+.terminal-tab.active {
+    background: var(--selection-bg, #2F4778);
+    border-color: var(--accent, #3574F0);
+    color: var(--text-bright, #FFFFFF);
+}
+
+.terminal-tab.exited {
+    color: #F07178;
+    opacity: 0.8;
+}
+
+/* Close button (X) inside each tab */
+.terminal-tab .tab-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    font-size: 14px;
+    line-height: 1;
+    border-radius: 3px;
+    color: var(--muted, #6F737A);
+    cursor: pointer;
+    margin-left: 4px;
+}
+
+.terminal-tab:hover .tab-close,
+.terminal-tab.active .tab-close {
+    opacity: 1;
+}
+
+.terminal-tab .tab-close:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--text, #BCBEC4);
+}
+
+.terminal-tab .tab-name {
+    flex-shrink: 0;
+}
+
+/* ============================================
+   Terminal Content Area
+   ============================================ */
 .terminal-surface {
     position: relative;
     flex: 1;
-    padding: 10px 12px;
-    background: #2b2b2b !important;
-    border-top: 1px solid #323232;
+    padding: 0;
+    background: var(--terminal-bg, #1E1F22) !important;
+    min-height: 0;
 }
 
 .terminal-viewport {
     position: relative;
-    border: 1px solid #323232;
-    border-radius: 12px;
-    background: #2b2b2b !important;
+    border: none;
+    background: var(--terminal-bg, #1E1F22) !important;
     height: 100%;
     width: 100%;
     overflow: auto;
     overscroll-behavior: contain;
-    box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.02);
+    -webkit-font-smoothing: antialiased;
 }
 
 .terminal-instance {
     position: absolute;
     inset: 0;
-    padding: 8px;
+    padding: 0;
     display: none;
     overflow: auto;
 }
@@ -92,23 +210,95 @@ body.hide-terminal #terminalPanel {
 }
 
 .terminal-instance.plain-terminal {
-    padding: 10px;
+    padding: 8px;
+}
+
+/* ============================================
+   Terminal Tool Window (Real Shell) - Split UI
+   ============================================ */
+.terminal-tool-surface {
+    background: var(--terminal-bg, #1E1F22) !important;
+}
+
+.terminal-tool-viewport {
+    overflow: hidden;
+}
+
+.terminal-split {
+    height: 100%;
+    width: 100%;
+    display: grid;
+    overflow: hidden;
+}
+
+.terminal-split--single {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+}
+
+.terminal-split--vertical {
+    grid-template-columns: minmax(120px, var(--split-a, 1fr)) 6px minmax(120px, var(--split-b, 1fr));
+    grid-template-rows: 1fr;
+}
+
+.terminal-split--horizontal {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(80px, var(--split-a, 1fr)) 6px minmax(80px, var(--split-b, 1fr));
+}
+
+.terminal-split-divider {
+    background: var(--border, #393B40);
+    position: relative;
+}
+
+.terminal-split--vertical .terminal-split-divider {
+    cursor: col-resize;
+}
+
+.terminal-split--horizontal .terminal-split-divider {
+    cursor: row-resize;
+}
+
+.terminal-split-divider:hover {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.terminal-pane {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.terminal-pane.active::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.terminal-pane .terminal-pane-host {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
 }
 
 .plain-terminal-output {
     margin: 0;
     height: 100%;
     width: 100%;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--terminal-bg);
-    color: var(--text);
+    border: none;
+    border-radius: 0;
+    background: var(--terminal-bg, #1E1F22);
+    color: var(--text, #BCBEC4);
     font-family: var(--font-code);
     font-size: 13px;
     overflow: auto;
-    padding: 10px;
+    padding: 8px 12px;
     white-space: pre-wrap;
-    box-shadow: inset 0 1px 0 rgba(0, 0, 0, 0.02);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
 }
 
 .plain-terminal-input-hidden {
@@ -120,14 +310,23 @@ body.hide-terminal #terminalPanel {
 
 .terminal-error {
     position: absolute;
-    inset: 10px 12px;
-    border: 1px solid var(--accent-orange);
-    background: rgba(240, 163, 92, 0.12);
+    inset: 8px;
+    border: 1px solid var(--accent-orange, #C9721D);
+    background: rgba(201, 114, 29, 0.12);
     color: var(--text);
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-weight: 600;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-weight: 500;
     pointer-events: none;
     z-index: 3;
 }
 
+/* Hide legacy */
+.bottom-stack {
+    display: none;
+}
+
+.terminal-tabbar {
+    display: none;
+    /* Merged into terminal-header */
+}

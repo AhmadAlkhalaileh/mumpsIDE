@@ -1,0 +1,13 @@
+{
+  "environments": [
+    {
+      "name": "docker",
+      "paths": {
+        "localr": "/var/worldvista/prod/hakeem/localr",
+        "routines": "/var/worldvista/prod/hakeem/routines"
+      },
+      "connectionId": "8c21cf79fb67",
+      "lastScanned": "2025-12-25T13:55:10.754Z"
+    }
+  ]
+}

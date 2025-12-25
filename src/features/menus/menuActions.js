@@ -138,19 +138,19 @@ async function runMenuAction(action, ctx = {}) {
             try { await createNewFile?.(); } catch (_) { }
             return;
         case 'git':
-            try { openGitToolWindow?.(); } catch (_) { }
+            try { openGitToolWindow?.({ tab: 'log', source: 'menu' }); } catch (_) { }
             return;
         case 'git-status':
-            try { openGitToolWindow?.(); } catch (_) { }
-            try { document.getElementById('gitStatusBtn')?.click?.(); } catch (_) { }
+            // Status = Local Changes / Commit tool window (PhpStorm-style)
+            try { openCommitToolWindow?.({ source: 'menu' }); } catch (_) { }
             return;
         case 'git-diff':
-            try { openGitToolWindow?.(); } catch (_) { }
-            try { document.getElementById('gitDiffBtn')?.click?.(); } catch (_) { }
+            // Open Commit tool window and trigger diff for the selected (or single) file.
+            try { openCommitToolWindow?.({ source: 'menu' }); } catch (_) { }
+            try { document.getElementById('commitDiffBtn')?.click?.(); } catch (_) { }
             return;
         case 'git-history':
-            try { openGitToolWindow?.(); } catch (_) { }
-            try { document.getElementById('gitLogBtn')?.click?.(); } catch (_) { }
+            try { openGitToolWindow?.({ tab: 'log', source: 'menu' }); } catch (_) { }
             return;
         case 'goto-declaration': {
             const pos = ed?.getPosition?.();
@@ -178,8 +178,7 @@ async function runMenuAction(action, ctx = {}) {
             try { openCommitToolWindow?.(); } catch (_) { }
             return;
         case 'vcs:history':
-            try { openGitToolWindow?.(); } catch (_) { }
-            try { document.getElementById('gitLogBtn')?.click?.(); } catch (_) { }
+            try { openGitToolWindow?.({ tab: 'log', source: 'vcs-menu' }); } catch (_) { }
             return;
         case 'vcs:push': {
             const btn = document.getElementById('gitPushBtn');

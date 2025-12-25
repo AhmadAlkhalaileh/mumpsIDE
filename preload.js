@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('ahmadIDE', {
 
     // Connection Management
     setConnection: (type, config) => ipcRenderer.invoke('connection:set', { type, config }),
+    getConnection: () => ipcRenderer.invoke('connection:get'),
 
     // Debugging (ZSTEP/JSON Engine Only)
     debugStart: (code, breakpoints, startLine) =>
@@ -67,10 +68,33 @@ contextBridge.exposeInMainWorld('ahmadIDE', {
     toggleDevTools: () => ipcRenderer.invoke('devtools:toggle'),
     exitApp: () => ipcRenderer.invoke('app:exit'),
 
+    // Patch Tracking
+    patchTracking: {
+        uploadPatch: (content) => ipcRenderer.invoke('patchTracking:uploadPatch', { content }),
+        scanEnvironment: (options) => ipcRenderer.invoke('patchTracking:scanEnvironment', options),
+        correlate: (patchId, changeId) => ipcRenderer.invoke('patchTracking:correlate', { patchId, changeId }),
+        prepareCommit: (patchId, correlation) => ipcRenderer.invoke('patchTracking:prepareCommit', { patchId, correlation }),
+        executeCommit: () => ipcRenderer.invoke('patchTracking:executeCommit'),
+        cancelCommit: () => ipcRenderer.invoke('patchTracking:cancelCommit'),
+        getStatistics: () => ipcRenderer.invoke('patchTracking:getStatistics'),
+        setRepoPath: (repoPath) => ipcRenderer.invoke('patchTracking:setRepoPath', { repoPath })
+    },
+
+    // Git Blame
+    gitBlame: {
+        getBlame: (filePath) => ipcRenderer.invoke('gitBlame:getBlame', { filePath }),
+        getBlameForLine: (filePath, lineNumber) => ipcRenderer.invoke('gitBlame:getBlameForLine', { filePath, lineNumber }),
+        clearCache: (filePath) => ipcRenderer.invoke('gitBlame:clearCache', { filePath }),
+        setRepoPath: (repoPath) => ipcRenderer.invoke('gitBlame:setRepoPath', { repoPath })
+    },
+
     // Integrated Terminal (Pty)
     terminalCreate: (options) => ipcRenderer.invoke('terminal:create', options),
     terminalWrite: (id, data) => ipcRenderer.invoke('terminal:write', { id, data }),
+    // High-frequency path for xterm input (fire-and-forget; avoids invoke overhead).
+    terminalWriteFast: (id, data) => ipcRenderer.send('terminal:writeFast', { id, data }),
     terminalResize: (id, cols, rows) => ipcRenderer.invoke('terminal:resize', { id, cols, rows }),
+    terminalResizeFast: (id, cols, rows) => ipcRenderer.send('terminal:resizeFast', { id, cols, rows }),
     terminalClose: (id) => ipcRenderer.invoke('terminal:close', { id }),
     onTerminalData: (callback) => {
         ipcRenderer.on('terminal:data', (_event, payload) => callback(payload));
@@ -78,4 +102,9 @@ contextBridge.exposeInMainWorld('ahmadIDE', {
     onTerminalExit: (callback) => {
         ipcRenderer.on('terminal:exit', (_event, payload) => callback(payload));
     }
+});
+
+// Generic bridge for IPC invoke (used by extensions)
+contextBridge.exposeInMainWorld('bridge', {
+    invoke: (channel, data) => ipcRenderer.invoke(channel, data)
 });

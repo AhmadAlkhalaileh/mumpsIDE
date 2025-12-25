@@ -27,7 +27,7 @@ Ahmad IDE is a desktop application built on Electron, designed for professional 
 1. **Security First** - Sandboxed renderer, context isolation, minimal Node.js exposure
 2. **Remote Native** - Built for Docker/SSH connections from day one
 3. **Performance** - Optimized for low-end systems, animations disabled
-4. **Developer Experience** - PhpStorm-inspired UI for professional feel
+4. **Developer Experience** - inspired UI for professional feel
 5. **MUMPS Native** - Custom parser, linter, and debugger for M language
 
 ### High-Level Architecture

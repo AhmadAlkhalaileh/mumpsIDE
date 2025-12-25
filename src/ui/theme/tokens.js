@@ -17,22 +17,22 @@
         },
         border: {
             width: '1px',
-            subtle: 'rgba(255,255,255,0.08)',
-            strong: 'rgba(255,255,255,0.14)'
+            subtle: 'rgba(68, 71, 90, 0.5)',
+            strong: 'rgba(68, 71, 90, 0.8)'
         },
         surface: {
             bg: 'var(--bg)',
             panel: 'var(--panel)',
             panel2: 'var(--panel-2)',
             overlay: 'rgba(0,0,0,0.55)',
-            elevated: 'rgba(60, 63, 65, 0.96)'
+            elevated: 'var(--glass)'
         },
         menu: {
-            bg: 'rgba(60, 63, 65, 0.98)',
-            border: 'rgba(255, 255, 255, 0.12)',
-            hover: 'rgba(255, 255, 255, 0.06)',
-            active: 'rgba(74, 158, 255, 0.16)',
-            activeBorder: 'rgba(74, 158, 255, 0.22)'
+            bg: 'var(--panel)',
+            border: 'var(--border)',
+            hover: 'var(--hover-bg)',
+            active: 'var(--selection-bg)',
+            activeBorder: 'var(--accent)'
         },
         text: {
             primary: 'var(--text)',
@@ -40,8 +40,8 @@
             muted: 'var(--muted)'
         },
         focus: {
-            ring: '0 0 0 2px rgba(74, 158, 255, 0.35)',
-            outline: 'rgba(74, 158, 255, 0.55)'
+            ring: '0 0 0 2px var(--accent-soft-border)',
+            outline: 'var(--accent)'
         },
         shadow: {
             xs: '0 1px 3px rgba(0, 0, 0, 0.18)',

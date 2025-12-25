@@ -1,11 +1,10 @@
-/* Splash Screen Styles */
 .splash-screen {
     position: fixed;
     top: 0;
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    background: var(--bg);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -33,7 +32,7 @@
     width: 120px;
     height: 120px;
     margin: 0 auto;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
     border-radius: 24px;
     display: flex;
     align-items: center;
@@ -43,7 +42,7 @@
     color: #ffffff;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     box-shadow:
-        0 20px 60px rgba(102, 126, 234, 0.4),
+        0 20px 60px rgba(189, 147, 249, 0.25),
         0 0 0 1px rgba(255, 255, 255, 0.1) inset;
     letter-spacing: -2px;
 }
@@ -86,18 +85,18 @@
 
 .loader-bar {
     height: 100%;
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+    background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 50%, var(--accent) 100%);
     background-size: 200% 100%;
     border-radius: 3px;
     animation: loading 2s ease-in-out infinite;
-    box-shadow: 0 0 20px rgba(102, 126, 234, 0.6);
+    box-shadow: 0 0 20px rgba(189, 147, 249, 0.35);
 }
 
 /* M Icon in Header */
 .m-icon {
     width: 32px;
     height: 32px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent) 100%);
     border-radius: 6px;
     display: flex;
     align-items: center;
@@ -106,7 +105,7 @@
     font-weight: 900;
     color: #ffffff;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 2px 8px rgba(189, 147, 249, 0.22);
     letter-spacing: -1px;
 }
 
@@ -116,6 +115,7 @@
         opacity: 0;
         transform: translateY(30px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -123,9 +123,12 @@
 }
 
 @keyframes pulse {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: scale(1);
     }
+
     50% {
         transform: scale(1.05);
     }
@@ -135,6 +138,7 @@
     0% {
         background-position: 200% 0;
     }
+
     100% {
         background-position: -200% 0;
     }

@@ -1,0 +1,730 @@
+/**
+ * Compare with Release -  Dracula Theme
+ * Build #PS-253.28294.345 compatible
+ */
+
+/* Container */
+.ps-compare-window {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--ps-bg-main, #2B2B2B);
+    color: var(--ps-text-main, #BABABA);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* Empty state */
+.ps-compare-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--ps-text-muted, #6A6A6A);
+    gap: 16px;
+}
+
+.ps-compare-empty p {
+    font-size: 13px;
+    margin: 0;
+}
+
+/* Toolbar */
+.ps-compare-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--ps-border, #323232);
+    background: var(--ps-bg-secondary, #313335);
+}
+
+.ps-compare-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ps-text-main, #BABABA);
+}
+
+/* Tabs for multiple versions */
+.ps-compare-tabs {
+    display: flex;
+    gap: 2px;
+    margin: 0 8px;
+}
+
+.ps-compare-tab {
+    padding: 4px 12px;
+    font-size: 12px;
+    background: transparent;
+    border: none;
+    border-radius: 3px;
+    color: var(--ps-text-secondary, #8C8C8C);
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.ps-compare-tab:hover {
+    background: var(--ps-bg-hover, #3C3F41);
+}
+
+.ps-compare-tab.active {
+    background: var(--ps-bg-selected, #2D4F6C);
+    color: var(--ps-text-main, #BABABA);
+}
+
+/* Main content */
+.ps-compare-main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Diff view */
+.ps-compare-diff {
+    flex: 1;
+    overflow: auto;
+    background: var(--ps-bg-main, #2B2B2B);
+}
+
+.ps-diff-grid {
+    display: grid;
+    grid-template-columns: 1fr 1px 1fr;
+    min-height: 100%;
+}
+
+.ps-diff-column {
+    overflow-x: auto;
+}
+
+.ps-diff-column:nth-child(2) {
+    background: var(--ps-border, #323232);
+}
+
+.ps-diff-header {
+    position: sticky;
+    top: 0;
+    padding: 8px 12px;
+    background: var(--ps-bg-secondary, #313335);
+    border-bottom: 1px solid var(--ps-border, #323232);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ps-text-main, #BABABA);
+    z-index: 10;
+}
+
+.ps-diff-line {
+    display: flex;
+    align-items: flex-start;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 20px;
+    padding: 0;
+    border-bottom: 1px solid transparent;
+}
+
+.ps-diff-line:hover {
+    background: var(--ps-bg-hover, #3C3F41);
+}
+
+.ps-diff-gutter {
+    flex-shrink: 0;
+    width: 56px;
+    padding: 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    color: var(--ps-text-muted, #6A6A6A);
+    font-size: 11px;
+    background: var(--ps-bg-secondary, #313335);
+    user-select: none;
+}
+
+.ps-diff-gutter-icon {
+    width: 12px;
+    text-align: center;
+    font-weight: 700;
+    opacity: 0.9;
+}
+
+.ps-diff-gutter-line {
+    min-width: 24px;
+    text-align: right;
+}
+
+.ps-diff-added .ps-diff-gutter-icon { color: var(--ps-accent-green, #6A8759); }
+.ps-diff-removed .ps-diff-gutter-icon { color: var(--ps-accent-red, #BC3F3C); }
+.ps-diff-modified .ps-diff-gutter-icon { color: var(--ps-accent-orange, #CC7832); }
+
+.ps-diff-content {
+    flex: 1;
+    padding: 0 12px;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+/* Change highlighting */
+.ps-diff-added {
+    background: rgba(80, 250, 123, 0.12);
+    border-left: 3px solid var(--ps-accent-green, #6A8759);
+}
+
+.ps-diff-added .ps-diff-gutter {
+    background: rgba(80, 250, 123, 0.16);
+}
+
+.ps-diff-removed {
+    background: rgba(255, 85, 85, 0.12);
+    border-left: 3px solid var(--ps-accent-red, #BC3F3C);
+}
+
+.ps-diff-removed .ps-diff-gutter {
+    background: rgba(255, 85, 85, 0.16);
+}
+
+.ps-diff-modified {
+    background: rgba(255, 184, 108, 0.12);
+    border-left: 3px solid var(--ps-accent-orange, #CC7832);
+}
+
+.ps-diff-modified .ps-diff-gutter {
+    background: rgba(255, 184, 108, 0.16);
+}
+
+/* Active selection */
+.ps-diff-selected {
+    box-shadow: inset 0 0 0 1px rgba(139, 233, 253, 0.40);
+    background-image: linear-gradient(0deg, rgba(139, 233, 253, 0.08), rgba(139, 233, 253, 0.08));
+}
+
+/* Whitespace-only change hint */
+.ps-diff-ws .ps-diff-gutter-icon {
+    opacity: 0.65;
+}
+
+/* Whitespace indicators - Enhanced visibility */
+.ps-diff-whitespace-visible .ps-diff-content {
+    tab-size: 4;
+}
+
+.ps-diff-whitespace-visible .ps-diff-content::before {
+    content: '·';
+    color: var(--ps-text-muted, #6A6A6A);
+    position: absolute;
+}
+
+/* Whitespace change highlighting in Monaco */
+#monacoCompareContainer .monaco-diff-editor .char-insert.indent-insert,
+#monacoCompareContainer .monaco-diff-editor .char-delete.indent-delete {
+    background-color: rgba(255, 184, 108, 0.3) !important;
+    border: 1px dashed rgba(255, 184, 108, 0.6) !important;
+}
+
+/* Enhanced space highlighting */
+#monacoCompareContainer .char-insert:empty::after,
+#monacoCompareContainer .char-delete:empty::after {
+    content: '\00B7';
+    color: rgba(139, 233, 253, 0.8);
+    font-weight: bold;
+}
+
+/* Problems sidebar */
+.ps-compare-problems {
+    width: 280px;
+    border-left: 1px solid var(--ps-border, #323232);
+    display: flex;
+    flex-direction: column;
+    background: var(--ps-bg-main, #2B2B2B);
+}
+
+.ps-compare-problems-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--ps-border, #323232);
+    font-size: 12px;
+    font-weight: 600;
+    background: var(--ps-bg-secondary, #313335);
+}
+
+.ps-compare-problems-count {
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: var(--ps-bg-hover, #3C3F41);
+    font-size: 11px;
+    font-weight: normal;
+    color: var(--ps-text-secondary, #8C8C8C);
+}
+
+.ps-compare-problems-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+
+.ps-compare-problem-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-size: 12px;
+}
+
+.ps-compare-problem-item:hover {
+    background: var(--ps-bg-hover, #3C3F41);
+}
+
+.ps-compare-problem-item:active {
+    background: var(--ps-bg-selected, #2D4F6C);
+}
+
+.ps-compare-problem-item.active {
+    background: var(--ps-bg-selected, #2D4F6C);
+}
+
+.ps-compare-problem-line {
+    color: var(--ps-text-secondary, #8C8C8C);
+    font-size: 11px;
+}
+
+.ps-compare-problem-type {
+    flex: 1;
+    color: var(--ps-text-main, #BABABA);
+    text-transform: capitalize;
+}
+
+.ps-compare-problem-side {
+    color: var(--ps-text-secondary, #8C8C8C);
+    font-size: 11px;
+    text-transform: capitalize;
+}
+
+.ps-compare-problem-badge {
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--ps-accent-orange, #CC7832);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.ps-compare-empty-problems {
+    padding: 16px;
+    text-align: center;
+    color: var(--ps-text-muted, #6A6A6A);
+    font-size: 12px;
+}
+
+/* Minimap */
+.ps-compare-minimap {
+    position: absolute;
+    right: 280px;
+    top: 40px;
+    width: 12px;
+    height: calc(100% - 40px);
+    background: var(--ps-bg-secondary, #313335);
+    border-left: 1px solid var(--ps-border, #323232);
+}
+
+.ps-minimap-marker {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+}
+
+.ps-minimap-marker:hover {
+    opacity: 0.8;
+}
+
+.ps-minimap-added {
+    background: var(--ps-accent-green, #6A8759);
+}
+
+.ps-minimap-removed {
+    background: var(--ps-accent-red, #BC3F3C);
+}
+
+.ps-minimap-modified {
+    background: var(--ps-accent-orange, #CC7832);
+}
+
+/* Path selection dialog */
+.release-path-selection {
+    padding: 12px;
+}
+
+.release-path-list {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.release-path-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--ps-border, #323232);
+    transition: background 0.15s ease;
+}
+
+.release-path-item:hover {
+    background: var(--ps-bg-hover, #3C3F41);
+}
+
+.release-path-item:last-child {
+    border-bottom: none;
+}
+
+.release-path-item input[type="checkbox"] {
+    margin-right: 8px;
+    cursor: pointer;
+}
+
+/* Scrollbar styling */
+.ps-compare-diff::-webkit-scrollbar,
+.ps-compare-problems-list::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+
+.ps-compare-diff::-webkit-scrollbar-track,
+.ps-compare-problems-list::-webkit-scrollbar-track {
+    background: var(--ps-bg-secondary, #313335);
+}
+
+.ps-compare-diff::-webkit-scrollbar-thumb,
+.ps-compare-problems-list::-webkit-scrollbar-thumb {
+    background: var(--ps-bg-hover, #3C3F41);
+    border-radius: 6px;
+}
+
+.ps-compare-diff::-webkit-scrollbar-thumb:hover,
+.ps-compare-problems-list::-webkit-scrollbar-thumb:hover {
+    background: var(--ps-text-muted, #6A6A6A);
+}
+
+/* Animation for loading */
+@keyframes ps-pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.ps-compare-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 32px;
+    color: var(--ps-text-secondary, #8C8C8C);
+    font-size: 13px;
+    min-height: 200px;
+}
+
+/* Toolbar toggle */
+.ps-icon-btn.active {
+    background: var(--ps-bg-selected, #2D4F6C);
+    color: var(--ps-text-main, #BABABA);
+}
+
+/* Container positioning */
+.ps-compare-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+}
+
+/* Monaco Diff Editor - Better Colors for Eyes */
+#monacoCompareContainer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    background: var(--ps-bg-main, var(--bg)) !important;
+}
+
+/* Diff signs (+/-) styling */
+#monacoCompareContainer .monaco-diff-editor .insert-sign,
+#monacoCompareContainer .monaco-diff-editor .delete-sign {
+    opacity: 0.8;
+    font-weight: bold;
+}
+
+#monacoCompareContainer .monaco-diff-editor .insert-sign::before {
+    content: '+';
+    color: #50fa7b;
+    font-size: 14px;
+}
+
+#monacoCompareContainer .monaco-diff-editor .delete-sign::before {
+    content: '-';
+    color: #ff5555;
+    font-size: 14px;
+}
+
+/* Hover effects for diff lines */
+#monacoCompareContainer .monaco-diff-editor .view-line:hover {
+    background-color: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Line-by-line diff coloring - VimDiff inspired with better enhancement */
+
+/* DELETED LINES - Red background with left border */
+#monacoCompareContainer .line-delete,
+#monacoCompareContainer .monaco-diff-editor .delete-sign {
+    background-color: rgba(255, 85, 85, 0.20) !important;
+    border-left: 3px solid #ff5555 !important;
+}
+
+/* ADDED LINES - Green background with left border */
+#monacoCompareContainer .line-insert,
+#monacoCompareContainer .monaco-diff-editor .insert-sign {
+    background-color: rgba(80, 250, 123, 0.20) !important;
+    border-left: 3px solid #50fa7b !important;
+}
+
+/* MODIFIED LINES (character changes) - Character-level highlighting */
+#monacoCompareContainer .char-delete {
+    background-color: rgba(255, 121, 198, 0.40) !important;
+    border-bottom: 2px solid #ff79c6 !important;
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
+#monacoCompareContainer .char-insert {
+    background-color: rgba(139, 233, 253, 0.40) !important;
+    border-bottom: 2px solid #8be9fd !important;
+    border-radius: 3px;
+    padding: 0 2px;
+}
+
+/* Line number gutter styling for deleted/added lines */
+#monacoCompareContainer .monaco-diff-editor .margin-view-overlays .line-delete {
+    background-color: rgba(255, 85, 85, 0.25) !important;
+}
+
+#monacoCompareContainer .monaco-diff-editor .margin-view-overlays .line-insert {
+    background-color: rgba(80, 250, 123, 0.25) !important;
+}
+
+/* Entire line highlighting */
+#monacoCompareContainer .monaco-diff-editor .view-overlays .line-delete {
+    background-color: rgba(255, 85, 85, 0.15) !important;
+}
+
+#monacoCompareContainer .monaco-diff-editor .view-overlays .line-insert {
+    background-color: rgba(80, 250, 123, 0.15) !important;
+}
+
+/* Empty/whitespace-only changes - Yellow/Orange indicator */
+#monacoCompareContainer .monaco-diff-editor .char-delete[data-empty="true"],
+#monacoCompareContainer .monaco-diff-editor .char-insert[data-empty="true"] {
+    background-color: rgba(241, 250, 140, 0.30) !important;
+    border-bottom: 2px dashed #f1fa8c !important;
+}
+
+/* Diagonal fill for removed content area */
+#monacoCompareContainer .diagonal-fill {
+    opacity: 0.25 !important;
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(255, 85, 85, 0.1),
+        rgba(255, 85, 85, 0.1) 10px,
+        rgba(255, 85, 85, 0.15) 10px,
+        rgba(255, 85, 85, 0.15) 20px
+    ) !important;
+}
+
+/* Close button styling */
+#monacoCompareContainer .ps-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 101;
+    padding: 6px 12px;
+    background: var(--ps-bg-secondary, var(--panel));
+    color: var(--ps-text-main, var(--text));
+    border: 1px solid var(--ps-border, var(--border));
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+#monacoCompareContainer .ps-btn:hover {
+    background: var(--ps-bg-hover, var(--hover-bg));
+}
+
+/* Better scrollbar colors in diff editor */
+#monacoCompareContainer .monaco-scrollable-element > .scrollbar > .slider {
+    background: rgba(140, 140, 140, 0.4) !important;
+}
+
+#monacoCompareContainer .monaco-scrollable-element > .scrollbar > .slider:hover {
+    background: rgba(140, 140, 140, 0.6) !important;
+}
+
+/* Environment Headers - Prominent Display */
+#monacoCompareHeaders {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Segoe UI Variable', sans-serif;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(8px);
+}
+
+#monacoCompareHeaders > div {
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+#monacoCompareHeaders > div::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+}
+
+#monacoCompareHeaders > div::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: currentColor;
+    opacity: 0.3;
+    filter: blur(2px);
+}
+
+/* Glow effect for environment labels */
+#monacoCompareHeaders svg {
+    filter: drop-shadow(0 0 4px currentColor);
+}
+
+/* Changes list scrollbar */
+.ps-compare-diff > div > div:last-child::-webkit-scrollbar {
+    width: 10px;
+}
+
+.ps-compare-diff > div > div:last-child::-webkit-scrollbar-track {
+    background: var(--ps-bg-main, var(--bg));
+}
+
+.ps-compare-diff > div > div:last-child::-webkit-scrollbar-thumb {
+    background: var(--ps-border, var(--border));
+    border-radius: 5px;
+}
+
+.ps-compare-diff > div > div:last-child::-webkit-scrollbar-thumb:hover {
+    background: var(--ps-text-muted, var(--muted));
+}
+
+/* Change item animations */
+.change-item {
+    animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/*
+ * ========================================
+ * DIFF COLOR SPECIFICATION (VimDiff Style)
+ * ========================================
+ *
+ * DELETED LINES (Removed from release):
+ *   - Background: rgba(255, 85, 85, 0.20) - Light red
+ *   - Border-left: 3px solid #ff5555 - Solid red
+ *   - Line numbers: rgba(255, 85, 85, 0.25) - Red tint
+ *
+ * ADDED LINES (New in local):
+ *   - Background: rgba(80, 250, 123, 0.20) - Light green
+ *   - Border-left: 3px solid #50fa7b - Solid green
+ *   - Line numbers: rgba(80, 250, 123, 0.25) - Green tint
+ *
+ * MODIFIED CHARACTERS (Deleted):
+ *   - Background: rgba(255, 121, 198, 0.40) - Pink
+ *   - Border-bottom: 2px solid #ff79c6 - Solid pink underline
+ *
+ * MODIFIED CHARACTERS (Added):
+ *   - Background: rgba(139, 233, 253, 0.40) - Cyan
+ *   - Border-bottom: 2px solid #8be9fd - Solid cyan underline
+ *
+ * WHITESPACE CHANGES:
+ *   - Background: rgba(241, 250, 140, 0.30) - Light yellow
+ *   - Border-bottom: 2px dashed #f1fa8c - Dashed yellow
+ *
+ * ========================================
+ */
+
+/* Multi-column editor diff styling */
+#multiColumnEditors .monaco-editor .line-delete,
+#multiColumnEditors .monaco-editor .delete-sign {
+    background-color: rgba(255, 85, 85, 0.20) !important;
+    border-left: 3px solid #ff5555 !important;
+}
+
+#multiColumnEditors .monaco-editor .line-insert,
+#multiColumnEditors .monaco-editor .insert-sign {
+    background-color: rgba(80, 250, 123, 0.20) !important;
+    border-left: 3px solid #50fa7b !important;
+}
+
+#multiColumnEditors .monaco-editor .char-delete {
+    background-color: rgba(255, 121, 198, 0.40) !important;
+    border-bottom: 2px solid #ff79c6 !important;
+}
+
+#multiColumnEditors .monaco-editor .char-insert {
+    background-color: rgba(139, 233, 253, 0.40) !important;
+    border-bottom: 2px solid #8be9fd !important;
+}
+
+/* Unchanged lines - Subtle indicator for context */
+#monacoCompareContainer .monaco-diff-editor .view-line:not(.line-insert):not(.line-delete) {
+    opacity: 0.85;
+}
+
+/* Current line highlight in diff */
+#monacoCompareContainer .monaco-diff-editor .current-line {
+    border: 1px solid rgba(68, 71, 90, 0.5) !important;
+    background-color: rgba(68, 71, 90, 0.15) !important;
+}
+
+/* Selected text in diff */
+#monacoCompareContainer .monaco-diff-editor .selected-text {
+    background-color: rgba(98, 114, 164, 0.3) !important;
+}
+
+/* Line decoration indicators */
+#monacoCompareContainer .monaco-diff-editor .line-numbers .line-delete {
+    color: #ff5555 !important;
+    font-weight: bold;
+}
+
+#monacoCompareContainer .monaco-diff-editor .line-numbers .line-insert {
+    color: #50fa7b !important;
+    font-weight: bold;
+}

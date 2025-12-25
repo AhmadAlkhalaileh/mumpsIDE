@@ -52,8 +52,11 @@
         // Lazy-mount heavy panels on first show (or immediately if already visible).
         [
             'terminalPanel',
+            'terminalToolPanel',
             'debugPanel',
             'problemsPanel',
+            'comparePanel',
+            'commitPanel',
             'gitToolPanel',
             'extensionsPanel',
             'servicesPanel',
@@ -61,7 +64,8 @@
             'connectionsPanel',
             'newProjectPanel',
             'findDialog',
-            'searchEverywhereDialog'
+            'searchEverywhereDialog',
+            'patchTrackingPanel'
         ].forEach((id) => mountOnFirstShow(featureRegistry, id));
     }
 

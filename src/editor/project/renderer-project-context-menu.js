@@ -166,6 +166,24 @@
             if (action === 'gitctx:history') return runGitAction('history', resolvedPath || '.');
             if (action === 'gitctx:compare') return runGitAction('compare', resolvedPath || '.');
             if (action === 'gitctx:rollback') return runGitAction('rollback', resolvedPath || '.');
+            if (action === 'compare-with-release') {
+                // Handle Compare with Release from project tree
+                const handler = window.AhmadIDEModules?.extensions?.compareWithRelease?.handleCompareWithRelease;
+                if (handler) {
+                    // Open the file first if not already open
+                    if (fullPath && fullPath.endsWith('.m')) {
+                        try {
+                            await loadRoutineByName(fullPath);
+                        } catch (e) {
+                            console.error('[Project Context Menu] Failed to load routine:', e);
+                        }
+                    }
+                    await handler(ctx);
+                } else {
+                    showToast('error', 'Compare with Release', 'Extension not available');
+                }
+                return;
+            }
             if (typeof runMenuAction === 'function') await runMenuAction(action, ctx || {});
         };
 

@@ -64,6 +64,9 @@ mumps-studio
 # Install dependencies
 npm install --include=dev
 
+# Rebuild node-pty for Electron (required for interactive Terminal)
+npm run rebuild:pty
+
 # Build snap
 ./build-snap.sh
 ```

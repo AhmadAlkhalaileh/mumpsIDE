@@ -23,13 +23,13 @@
 
 ## Overview
 
-Mumps Studio is a modern, PhpStorm-inspired Integrated Development Environment built specifically for **MUMPS (M)** language development. It provides a complete development workflow including code editing, debugging, execution, version control, and remote connection management through Docker and SSH.
+Mumps Studio is a modern, inspired Integrated Development Environment built specifically for **MUMPS (M)** language development. It provides a complete development workflow including code editing, debugging, execution, version control, and remote connection management through Docker and SSH.
 
 ### Key Highlights
 
 - **Desktop Application**: Built with Electron for cross-platform support (Linux, macOS, Windows)
 - **MUMPS-First**: Native support for MUMPS/M language with custom parser, linter, and debugger
-- **Modern UI**: PhpStorm-style dark theme interface with professional developer experience
+- **Modern UI**: style dark theme interface with professional developer experience
 - **Remote Development**: Connect to YottaDB/GT.M instances via Docker or SSH
 - **Integrated Debugger**: Advanced JSON-based debugger (AHMDBG) with breakpoints, stepping, and variable inspection
 - **Git Integration**: Built-in version control with visual diff, commit, push/pull workflows
@@ -94,7 +94,7 @@ Mumps Studio is a modern, PhpStorm-inspired Integrated Development Environment b
 │  └─ Renderer Process (Browser)                      │
 │      ├─ renderer.js     - UI logic & state          │
 │      ├─ index.html      - Main UI layout            │
-│      ├─ styles.css      - PhpStorm-style theme      │
+│      ├─ styles.css      - style theme      │
 │      └─ assets/mumps/   - MUMPS language support    │
 │                                                      │
 ├─────────────────────────────────────────────────────┤
@@ -217,7 +217,7 @@ Mumps Studio is a modern, PhpStorm-inspired Integrated Development Environment b
 
 ![Main Window](screenshots/01-main-window.png)
 
-The IDE follows a PhpStorm-inspired layout with these major sections:
+The IDE follows a inspired layout with these major sections:
 
 1. **Menu Bar** (Top) - Application menu and branding
 2. **Toolbar** (Below menu) - Save, Run, Debug, Lint, Git controls
@@ -236,7 +236,7 @@ The IDE follows a PhpStorm-inspired layout with these major sections:
 
 **Location:** Top of window
 **Components:**
-- **Brand Icon** 🛰️ "Mumps Studio - PhpStorm Brown"
+- **Brand Icon** 🛰️ "Mumps Studio -  Brown"
 - **Main Menu** - File, Edit, View, Tools, Git, Help (dynamically populated)
 
 #### Toolbar
@@ -505,7 +505,7 @@ Access via: Press `Shift` twice quickly
 - Global search across all files
 - Type filename to find quickly
 - Navigate to files instantly
-- Similar to PhpStorm's "Search Everywhere"
+- Similar to 's "Search Everywhere"
 
 ---
 
@@ -963,7 +963,7 @@ Mumps Studio/
 ├── preload.js             # IPC security layer
 ├── renderer.js            # Main UI controller
 ├── index.html             # Main UI layout
-├── styles.css             # PhpStorm-inspired theme (2000+ lines)
+├── styles.css             # -inspired theme (2000+ lines)
 ├── AHMDDG.m               # MUMPS debugger backend (JSON-based)
 ├── package.json           # NPM dependencies
 ├── package-lock.json      # Locked dependency versions
@@ -1156,7 +1156,7 @@ monaco.editor.create(container, {
   language: 'mumps',
   theme: 'mumps-earth',
   fontSize: 13,
-  fontFamily: 'JetBrains Mono',
+  fontFamily: 'ains Mono',
   minimap: { enabled: true },
   lineNumbers: 'on',
   rulers: [80, 120],
@@ -1783,7 +1783,7 @@ Below is a complete list of all screenshots that should be captured and placed i
 | `Shift+Shift` | Search Everywhere | Global file search |
 | `Ctrl+/` | Comment | Toggle line comment |
 
-### Color Palette (PhpStorm Brown/Earth Theme)
+### Color Palette ( Brown/Earth Theme)
 
 ```css
 --bg: #2b2b2b              /* Main background */
@@ -1847,7 +1847,7 @@ This project is licensed under **ISC License** (see package.json).
 - YottaDB - MUMPS database engine
 
 **Inspired by:**
-- JetBrains PhpStorm - UI/UX design
+- ains  - UI/UX design
 - VS Code - Editor experience
 - mumps-debug (vscode extension) - Debugging protocol
 

@@ -36,6 +36,12 @@ fi
 echo "✓ Dependencies found"
 echo ""
 
+# Ensure native modules are rebuilt for Electron (node-pty is required for interactive terminal).
+echo "Rebuilding node-pty for Electron..."
+npm run rebuild:pty
+echo "✓ node-pty rebuilt"
+echo ""
+
 # Clean old build artifacts (requires sudo)
 echo "Cleaning old build artifacts..."
 if [ -d "parts" ] || [ -d "prime" ] || [ -d "stage" ]; then

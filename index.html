@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" style="background: #2b2b2b;">
+<html lang="en" style="background: var(--bg, #282a36);">
 
 <head>
     <meta charset="UTF-8">
@@ -27,9 +27,12 @@
     <link rel="stylesheet" href="./styles/connections.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/git.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/extensions.css?v=20251209-performance">
+    <link rel="stylesheet" href="./styles/compare-with-release.css?v=20251223">
     <link rel="stylesheet" href="./styles/services.css?v=20251220">
     <link rel="stylesheet" href="./styles/dialogs.css?v=20251219">
     <link rel="stylesheet" href="./styles/splash.css?v=20251213">
+    <link rel="stylesheet" href="./styles/patch-tracking.css">
+    <link rel="stylesheet" href="./styles/git-blame.css">
 
     <link rel="stylesheet" href="./node_modules/xterm/css/xterm.css">
 </head>
@@ -67,42 +70,29 @@
             <div class="toolbar-section toolbar-left">
                 <div class="toolbar-group">
                     <button class="btn ghost icon-btn toolbar-btn" id="saveRoutineBtn" title="Save (Ctrl+S)">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path
-                                d="M13.5 1h-11C1.7 1 1 1.7 1 2.5v11c0 .8.7 1.5 1.5 1.5h11c.8 0 1.5-.7 1.5-1.5v-11c0-.8-.7-1.5-1.5-1.5zM11 2v4H5V2h6zm2 11.5c0 .3-.2.5-.5.5h-9c-.3 0-.5-.2-.5-.5v-9c0-.3.2-.5.5-.5H4v5h8V4h.5c.3 0 .5.2.5.5v9z" />
-                            <circle cx="8" cy="10" r="1.5" />
-                        </svg>
-                        <span class="btn-label">Save</span>
+                        <span data-ui-icon="save" data-ui-icon-size="16" aria-hidden="true"></span>
                     </button>
                 </div>
+                <div class="toolbar-separator" aria-hidden="true"></div>
                 <div class="toolbar-group run-debug-widget">
                     <button class="btn ghost icon-btn toolbar-btn" id="lintBtn" title="Lint Code">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path
-                                d="M8 1l-1.5 1.5L8 4 9.5 2.5 8 1zM3.5 3.5L2 5l1.5 1.5L5 5 3.5 3.5zm9 0L11 5l1.5 1.5L14 5l-1.5-1.5zM8 5c-1.7 0-3 1.3-3 3v5h6V8c0-1.7-1.3-3-3-3zm0 2c.6 0 1 .4 1 1v3H7V8c0-.6.4-1 1-1z" />
-                        </svg>
+                        <span data-ui-icon="check" data-ui-icon-size="16" aria-hidden="true"></span>
                     </button>
-                    <button class="btn primary icon-btn toolbar-btn run-btn" id="runBtn" title="Run (Ctrl+Enter)">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path d="M4 2v12l10-6L4 2z" />
-                        </svg>
-                        <span class="btn-label">Run</span>
+                    <div class="toolbar-separator" aria-hidden="true"></div>
+                    <button class="btn ghost icon-btn toolbar-btn run-config-btn" id="runConfigBtn"
+                        title="Run/Debug configurations" aria-label="Run/Debug configurations">
+                        <span data-ui-icon="run" data-ui-icon-size="16" aria-hidden="true"></span>
+                        <span class="run-config-title" id="runConfigTitle">Current file</span>
+                        <span data-ui-icon="chevron-down" data-ui-icon-size="12" aria-hidden="true"></span>
                     </button>
-                    <button class="btn ghost icon-btn toolbar-btn" id="debugStartBtn" title="Debug (Shift+F9)">
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                            <path
-                                d="M8 2C6.3 2 5 3.3 5 5v1H3v2h2v1c0 .7.2 1.3.6 1.9L4 12.5l1.4 1.4L7 12.3c.6.4 1.3.7 2 .7s1.4-.2 2-.7l1.6 1.6 1.4-1.4-1.6-1.6c.4-.5.6-1.2.6-1.9V8h2V6h-2V5c0-1.7-1.3-3-3-3zm0 2c.6 0 1 .4 1 1v5c0 .6-.4 1-1 1s-1-.4-1-1V5c0-.6.4-1 1-1z" />
-                        </svg>
-                        <span class="btn-label">Debug</span>
+                    <button class="btn ghost icon-btn toolbar-btn run-btn" id="runBtn" title="Run (Ctrl+Enter)"
+                        aria-label="Run (Ctrl+Enter)">
+                        <span data-ui-icon="run" data-ui-icon-size="16" aria-hidden="true"></span>
                     </button>
-                    <div class="run-config-control">
-                        <button class="btn ghost icon-btn toolbar-btn dropdown-btn" id="runConfigBtn"
-                            title="Run/Debug configurations" aria-label="Run/Debug configurations">
-                            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-                                <path d="M4 6l4 4 4-4H4z" />
-                            </svg>
-                        </button>
-                    </div>
+                    <button class="btn ghost icon-btn toolbar-btn" id="debugStartBtn" title="Debug (Shift+F9)"
+                        aria-label="Debug (Shift+F9)">
+                        <span data-ui-icon="debug" data-ui-icon-size="16" aria-hidden="true"></span>
+                    </button>
                 </div>
             </div>
             <div class="toolbar-section toolbar-right">
@@ -110,27 +100,9 @@
                     <button class="btn ghost icon-btn toolbar-btn vcs-toggle" id="vcsWidgetBtn" title="Git"
                         aria-label="Git">
                         <span data-ui-icon="git" data-ui-icon-size="16" aria-hidden="true"></span>
-                        <svg class="chevron-icon" width="12" height="12" viewBox="0 0 16 16" fill="none"
-                            stroke="currentColor" stroke-width="1.4">
-                            <path d="M4 6l4 4 4-4" />
-                        </svg>
+                        <span class="vcs-widget-label" id="vcsWidgetLabel">Git</span>
+                        <span data-ui-icon="chevron-down" data-ui-icon-size="12" aria-hidden="true"></span>
                     </button>
-                    <div class="vcs-menu hidden" id="vcsWidgetMenu" role="menu" aria-label="Git">
-                        <button class="vcs-menu-item" type="button" data-action="commit" role="menuitem">Commit…</button>
-                        <button class="vcs-menu-item" type="button" data-action="history" role="menuitem">Show History</button>
-                        <div class="vcs-menu-separator" role="separator"></div>
-                        <button class="vcs-menu-item" type="button" data-action="pull" role="menuitem">Pull / Fetch</button>
-                        <button class="vcs-menu-item" type="button" data-action="push" role="menuitem">Push</button>
-                        <div class="vcs-menu-separator" role="separator"></div>
-                        <button class="vcs-menu-item" type="button" data-action="open-git" role="menuitem">Open Git Tool Window</button>
-                        <div class="vcs-menu-separator" role="separator"></div>
-                        <button class="vcs-menu-item" type="button" data-action="reconnect" role="menuitem">Reconnect</button>
-                        <button class="vcs-menu-item" type="button" data-action="choose-root" role="menuitem">Choose Repo Root…</button>
-                        <button class="vcs-menu-item" type="button" data-action="connect-existing" role="menuitem">Connect Existing…</button>
-                        <button class="vcs-menu-item" type="button" data-action="init" role="menuitem">Initialize Repo</button>
-                        <button class="vcs-menu-item" type="button" data-action="disable-git" role="menuitem">Disable Git</button>
-                        <button class="vcs-menu-item hidden" type="button" data-action="enable-git" role="menuitem">Enable Git</button>
-                    </div>
                 </div>
             </div>
         </div>
@@ -150,6 +122,14 @@
                         <path d="M2 3h12v2H2zM4 7h10v2H4zM4 11h10v2H4z" />
                     </svg>
                     <span class="stripe-text">Structure</span>
+                </button>
+                <button class="tool-window-stripe-btn" data-panel="commitPanel" data-position="left"
+                    title="Commit (Alt+0)">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M10.5 7.5A2.5 2.5 0 0 1 8 10a2.5 2.5 0 0 1-2.5-2.5A2.5 2.5 0 0 1 8 5a2.5 2.5 0 0 1 2.5 2.5z"/>
+                        <path d="M0 7.5h3.5a4.5 4.5 0 0 0 9 0H16v1h-3.5a4.5 4.5 0 0 1-9 0H0v-1z"/>
+                    </svg>
+                    <span class="stripe-text">Commit</span>
                 </button>
                 <div class="stripe-spacer"></div>
             </div>
@@ -189,6 +169,9 @@
                         <div class="placeholder-content">TODO: Structure tool window content</div>
                     </div>
                 </div>
+                <div class="tool-window-panel hidden" id="commitPanel">
+                    <!-- Commit panel content will be loaded dynamically -->
+                </div>
             </aside>
 
             <div class="ide-center">
@@ -207,18 +190,38 @@
                     </div>
                 </main>
             </div>
+
+            <!-- Right sidebar for Settings panel -->
+            <aside class="tool-window-content tool-window-right hidden" id="rightToolWindow">
+                <div class="tool-window-panel hidden" id="settingsPanel">
+                    <div class="tool-window-header">
+                        <span class="tool-window-title">Settings</span>
+                        <div class="tool-window-actions">
+                            <button class="tool-window-action-btn hide-panel-btn" title="Hide">
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" fill="none" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="tool-window-body" id="settingsPanelContent">
+                        <!-- Settings content will be injected here -->
+                    </div>
+                </div>
+            </aside>
         </div>
 
         <div class="bottom-bar-wrapper" id="bottomBarWrapper">
             <div class="tool-window-bar tool-window-bar-bottom">
-                <button class="tool-window-stripe-btn horizontal active" data-panel="terminalPanel"
+                <button class="tool-window-stripe-btn horizontal active" data-panel="terminalToolPanel"
                     data-position="bottom" title="Terminal (Alt+F12)">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M2 3v10h12V3H2zm10 8H4V5h8v6z" />
-                        <path d="M5 7l2 1.5L5 10" stroke="currentColor" fill="none" stroke-width="1.2" />
-                        <path d="M8 9h2" stroke="currentColor" stroke-width="1.2" />
-                    </svg>
+                    <span data-ui-icon="terminal" data-ui-icon-size="16" aria-hidden="true"></span>
                     <span class="stripe-text">Terminal</span>
+                </button>
+                <button class="tool-window-stripe-btn horizontal" data-panel="terminalPanel" data-position="bottom"
+                    title="Run (Alt+4)">
+                    <span data-ui-icon="run" data-ui-icon-size="16" aria-hidden="true"></span>
+                    <span class="stripe-text">Run</span>
                 </button>
                 <button class="tool-window-stripe-btn horizontal" data-panel="debugPanel" data-position="bottom"
                     title="Debug (Alt+5)">
@@ -232,10 +235,18 @@
                     title="Problems (Alt+6)">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                         <path d="M8 2l6 12H2L8 2z" />
-                        <path d="M8 6v4" stroke="#2b2b2b" stroke-width="1.2" />
-                        <circle cx="8" cy="12" r="0.8" fill="#2b2b2b" />
+                        <path d="M8 6v4" stroke="var(--bg, #282a36)" stroke-width="1.2" />
+                        <circle cx="8" cy="12" r="0.8" fill="var(--bg, #282a36)" />
                     </svg>
                     <span class="stripe-text">Problems</span>
+                </button>
+                <button class="tool-window-stripe-btn horizontal hidden" data-panel="comparePanel" data-position="bottom"
+                    title="Compare (Alt+7)">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                        <path d="M2 2h5v12H2zM9 2h5v12H9z" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                        <path d="M4.5 6L6 7.5 4.5 9M11.5 6L10 7.5 11.5 9" stroke="currentColor" stroke-width="1.2" fill="none"/>
+                    </svg>
+                    <span class="stripe-text">Compare</span>
                 </button>
                 <button class="tool-window-stripe-btn horizontal" data-panel="gitToolPanel" data-position="bottom"
                     title="Git (Alt+9)">
@@ -255,7 +266,8 @@
                 <button class="tool-window-stripe-btn horizontal" data-panel="servicesPanel" data-position="bottom"
                     title="Services (Alt+8)">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M6.4 5.2h3.2c1 0 1.8.8 1.8 1.8v2c0 1-.8 1.8-1.8 1.8H6.4c-1 0-1.8-.8-1.8-1.8V7c0-1 .8-1.8 1.8-1.8z"
+                        <path
+                            d="M6.4 5.2h3.2c1 0 1.8.8 1.8 1.8v2c0 1-.8 1.8-1.8 1.8H6.4c-1 0-1.8-.8-1.8-1.8V7c0-1 .8-1.8 1.8-1.8z"
                             stroke="currentColor" stroke-width="1.4" />
                         <path d="M6.8 5.2v-.6c0-.9.5-1.6 1.2-1.6s1.2.7 1.2 1.6v.6" stroke="currentColor"
                             stroke-width="1.4" stroke-linecap="round" />
@@ -266,15 +278,26 @@
                     </svg>
                     <span class="stripe-text">Services</span>
                 </button>
+                <button class="tool-window-stripe-btn horizontal" data-panel="patchTrackingPanel" data-position="bottom"
+                    title="Patch Tracking">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
+                        <path d="M9 2H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7" stroke-width="1.4"/>
+                        <path d="M11 2l3 3M13 3l-7 7-3 1 1-3 7-7z" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span class="stripe-text">Patches</span>
+                </button>
             </div>
             <div class="tool-window-content tool-window-bottom" id="bottomToolWindow">
                 <div class="bottom-panels-container">
-                    <section class="panel terminal" id="terminalPanel"></section>
+                    <section class="panel terminal terminal-tool" id="terminalToolPanel"></section>
+                    <section class="panel terminal run-output hidden" id="terminalPanel"></section>
                     <section class="panel debug-panel hidden" id="debugPanel"></section>
                     <section class="panel debug-panel hidden" id="problemsPanel"></section>
+                    <section class="panel debug-panel hidden" id="comparePanel"></section>
                     <section class="panel debug-panel hidden" id="gitToolPanel"></section>
                     <section class="panel debug-panel hidden" id="extensionsPanel"></section>
                     <section class="panel services-panel hidden" id="servicesPanel"></section>
+                    <section class="panel debug-panel hidden" id="patchTrackingPanel"></section>
                 </div>
             </div>
         </div>
@@ -390,12 +413,18 @@
     <script src="./src/features/projects/openProjectDialog.js"></script>
     <script src="./src/features/search/findReplaceDialog.js"></script>
     <script src="./src/features/search/searchEverywhereDialog.js"></script>
-    <script src="./src/features/extensions/extensionsToolWindow.js"></script>
-    <script src="./src/extensions/bundled/git.js"></script>
-    <script src="./src/extensions/bundled/mumps-tools.js"></script>
+	    <script src="./src/features/extensions/extensionsToolWindow.js"></script>
+	    <script src="./src/extensions/bundled/git.js"></script>
+	    <script src="./src/extensions/bundled/mumps-tools.js"></script>
+	    <script src="./src/extensions/compare-with-release/compareWithReleaseUtils.js"></script>
+	    <script src="./src/extensions/bundled/compare-with-release.js"></script>
+	    <script src="./src/features/connections/releaseConnection.js"></script>
+    <script src="./src/editor/patchTracking/renderer-patch-tracking.js"></script>
     <script src="./src/editor/mumps/mumps-local-tags.js"></script>
     <script src="./src/editor/tabs/renderer-tabs.js"></script>
     <script src="./src/editor/terminal/renderer-terminal.js"></script>
+    <script src="./src/editor/terminal/terminal-header.js"></script>
+    <script src="./src/editor/terminal/renderer-terminal-toolwindow.js"></script>
     <script src="./src/features/terminal/engine-loader.js"></script>
     <script src="./src/features/terminal/layout.js"></script>
     <script src="./src/features/terminal/plain-fallback.js"></script>
@@ -407,6 +436,7 @@
     <script src="./src/editor/git/renderer-git-toolwindow.js"></script>
     <script src="./src/editor/git/renderer-git-settings.js"></script>
     <script src="./src/editor/git/renderer-git-repo-manager.js"></script>
+    <script src="./src/editor/git/renderer-git-blame.js"></script>
     <script src="./src/editor/connections/renderer-connections.js"></script>
     <script src="./src/editor/project/renderer-project-create.js"></script>
     <script src="./src/editor/project/renderer-project-context-menu.js"></script>
@@ -431,6 +461,7 @@
     <script src="./src/ui/menu/menuController.js"></script>
     <script src="./src/ui/menu/menuBar.js"></script>
     <script src="./src/features/menus/menuActions.js"></script>
+    <script src="./src/features/menus/vcsWidgetPopover.js"></script>
     <script src="./src/features/menus/phase3a-menus.js"></script>
     <script src="./src/app/wireDialogs.js"></script>
     <script src="./renderer.js"></script>

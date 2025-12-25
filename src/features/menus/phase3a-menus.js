@@ -69,9 +69,13 @@
             vcsBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopImmediatePropagation();
-                openMenuAt(controller, vcsBtn, 'toolbar.vcs', {
-                    toolWindows: getToolWindowCtx()
-                });
+                const openVcsWidgetPopover = window.AhmadIDEModules?.features?.menus?.openVcsWidgetPopover;
+                const ctxExtra = { toolWindows: getToolWindowCtx() };
+                if (typeof openVcsWidgetPopover === 'function') {
+                    openVcsWidgetPopover({ controller, anchorEl: vcsBtn, ctxExtra });
+                    return;
+                }
+                openMenuAt(controller, vcsBtn, 'toolbar.vcs', ctxExtra);
             }, true);
         }
     };

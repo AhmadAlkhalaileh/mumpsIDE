@@ -1,5 +1,5 @@
 /* ============================================
-   PhpStorm-style Project Tree
+   -style Project Tree
    ============================================ */
 .project-tree {
     flex: 1;
@@ -18,7 +18,7 @@
     flex-shrink: 0;
 }
 
-/* Tree item base styles (PhpStorm) */
+/* Tree item base styles () */
 .tree-item {
     display: flex;
     align-items: center;
@@ -34,7 +34,7 @@
     user-select: none;
 }
 
-/* PhpStorm selection (single clean highlight) */
+/*  selection (single clean highlight) */
 .tree-item.selected {
     background: var(--tree-selected);
     color: var(--tree-selected-text);
@@ -50,7 +50,7 @@
     background: var(--hover-bg);
 }
 
-/* Tree expand/collapse arrow (PhpStorm uses simple triangles) */
+/* Tree expand/collapse arrow ( uses simple triangles) */
 .tree-arrow {
     width: 16px;
     height: 16px;
@@ -103,7 +103,7 @@
     cursor: default;
 }
 
-/* Tree children indentation (PhpStorm uses consistent 16px) */
+/* Tree children indentation ( uses consistent 16px) */
 .tree-children {
     margin-left: 16px;
     display: flex;
@@ -140,7 +140,7 @@
     flex-shrink: 0;
 }
 
-/* PhpStorm-style file type icons */
+/* -style file type icons */
 .tree-item .file-icon {
     display: inline-flex;
     align-items: center;
@@ -153,7 +153,7 @@
     flex-shrink: 0;
 }
 
-/* Language-specific colors (PhpStorm style) */
+/* Language-specific colors ( style) */
 .tree-item .file-icon.php {
     background: #a57bb8;
     color: #fff;
@@ -342,27 +342,26 @@
     padding: 4px 8px;
 }
 
-/* PhpStorm-style filter input */
+/* -style filter input */
 .filter-input {
     width: 100%;
     padding: 6px 8px;
     margin-bottom: 8px;
     border-radius: 4px;
-    border: 1px solid #323232;
-    background: #3c3f41 !important;
-    color: #bbbbbb !important;
+    border: 1px solid var(--border);
+    background: var(--panel) !important;
+    color: var(--text) !important;
     font-size: 12px;
     outline: none;
     transition: all 0.15s ease;
 }
 
 .filter-input:focus {
-    border-color: #4a9eff;
-    background: #2b2b2b !important;
+    border-color: var(--accent);
+    background: var(--bg) !important;
 }
 
 /* Legacy .main - now using .editor-area */
 .main {
     display: none;
 }
-

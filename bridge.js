@@ -2757,6 +2757,19 @@ async function sendZStepEval(sessionId, code = '') {
   return { ok: false, error: 'Unexpected eval response' };
 }
 
+async function detectGitRepo(projectRoot, opts = {}) {
+  try {
+    const res = await runLocalGitCommand(`git -C "${String(projectRoot).replace(/"/g, '\\"')}" rev-parse --show-toplevel`);
+    if (res.ok && res.stdout) {
+      const repoRoot = res.stdout.trim();
+      return { ok: true, repoRoot };
+    }
+    return { ok: false, error: res.error || 'Not a git repository' };
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
 function readGitConfig(projectPath) {
   try {
     const gitConfigPath = path.join(projectPath, '.git', 'config');
@@ -3563,6 +3576,10 @@ module.exports = {
     };
   },
 
+  async detectGitRepo(projectRoot, opts = {}) {
+    return detectGitRepo(projectRoot, opts);
+  },
+
   getGitConfig(projectPath) {
     return readGitConfig(projectPath);
   },
@@ -3576,6 +3593,28 @@ module.exports = {
       connectionConfig.ssh = mergeSshConfig(cfg.ssh || {});
     }
     return { ok: true, type: connectionConfig.type, config: connectionConfig };
+  },
+
+  getConnection() {
+    const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
+    const type = useDocker ? 'docker' : 'ssh';
+    const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
+
+    // Handle null basePath (universal mode) - use default paths
+    const basePath = cfg.basePath || `/var/worldvista/prod/${cfg.envKey || DOCKER_DEFAULT_ENV_KEY}`;
+
+    return {
+      ok: true,
+      type,
+      connectionId: type === 'docker' ? cfg.containerId : null,
+      config: cfg,
+      paths: {
+        localrPath: `${basePath}/localr`,
+        routinesPath: `${basePath}/routines`,
+        basePath: basePath,
+        envKey: cfg.envKey || (useDocker ? DOCKER_DEFAULT_ENV_KEY : DEFAULT_ENV_KEY)
+      }
+    };
   },
 
   // Line-by-line debug execution with real variable capture
@@ -3934,35 +3973,42 @@ module.exports = {
     if (!sshCtor) {
       return { ok: false, error: `SSH not available (missing native module ssh2${sshLoadError ? `: ${sshLoadError.message}` : ''})` };
     }
+    const cfg = config || {};
+    const purpose = String(cfg.purpose || '').trim().toLowerCase();
+    const skipYdbDetect = !!cfg.skipYdbDetect || purpose === 'compare-with-release' || purpose === 'release-compare' || purpose === 'release';
+    const setAsActiveConnection = cfg.setAsActiveConnection !== false;
     return new Promise((resolve) => {
       const conn = new sshCtor();
       const id = `ssh_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
       conn.on('ready', async () => {
-        // Store connection details for execute/ debug over SSH
-        connectionConfig.type = 'ssh';
-        connectionConfig.ssh = mergeSshConfig(config || {});
         sshSessions[id] = conn;
 
-        // Auto-detect YottaDB path if not provided or if default path doesn't exist
-        if (!config.ydbPath || config.ydbPath === '/opt/fis-gtm/YDB136') {
-          const detectedPath = await detectYottaDBPath(conn);
-          if (detectedPath) {
-            connectionConfig.ssh.ydbPath = detectedPath;
-            console.log(`[SSH] Auto-detected YottaDB at: ${detectedPath}`);
-          } else {
-            console.warn('[SSH] Warning: Could not auto-detect YottaDB path. Please configure it in Connection settings.');
+        if (setAsActiveConnection) {
+          // Store connection details for execute/ debug over SSH
+          connectionConfig.type = 'ssh';
+          connectionConfig.ssh = mergeSshConfig(cfg);
+
+          // Auto-detect YottaDB path unless explicitly skipped (used by Compare-with-Release)
+          if (!skipYdbDetect && (!cfg.ydbPath || cfg.ydbPath === '/opt/fis-gtm/YDB136')) {
+            const detectedPath = await detectYottaDBPath(conn);
+            if (detectedPath) {
+              connectionConfig.ssh.ydbPath = detectedPath;
+              console.log(`[SSH] Auto-detected YottaDB at: ${detectedPath}`);
+            } else {
+              console.warn('[SSH] Warning: Could not auto-detect YottaDB path. Please configure it in Connection settings.');
+            }
           }
         }
 
-        resolve({ ok: true, sessionId: id, ydbPath: connectionConfig.ssh.ydbPath });
+        resolve({ ok: true, sessionId: id, ydbPath: setAsActiveConnection ? connectionConfig.ssh.ydbPath : (cfg.ydbPath || null) });
       }).on('error', (err) => {
         resolve({ ok: false, error: err.message });
       }).connect({
-        host: config.host,
-        port: config.port || 22,
-        username: config.username,
-        password: config.password
+        host: cfg.host,
+        port: cfg.port || 22,
+        username: cfg.username,
+        password: cfg.password
       });
     });
   },

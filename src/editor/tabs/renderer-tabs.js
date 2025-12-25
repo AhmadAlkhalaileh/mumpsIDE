@@ -199,7 +199,13 @@
             // Create Monaco model for this tab (for instant switching)
             const monacoRef = getMonaco();
             if (monacoRef) {
-                const model = monacoRef.editor.createModel(content, 'mumps');
+                // Create URI for the model (enables Git blame mapping)
+                // Use Uri.from() to ensure proper formatting
+                const uri = monacoRef.Uri.from({
+                    scheme: 'docker',
+                    path: `/${tabPath}` // Ensure leading slash
+                });
+                const model = monacoRef.editor.createModel(content, 'mumps', uri);
                 state.tabModels.set(id, model);
 
                 // Track changes for dirty state - STORE the disposable!
@@ -297,6 +303,7 @@
         function performCloseTab(tabId) {
             const index = state.openTabs.findIndex(t => t.id === tabId);
             if (index === -1) return;
+            const wasActive = tabId === state.activeTabId;
             const closing = state.openTabs[index];
 
             // Dispose all event listeners for this tab
@@ -316,10 +323,16 @@
 
             const activeEditor = getActiveEditor();
 
-            // Switch to adjacent tab (PhpStorm: activate tab to the left, or right if none)
+            // Only change the active tab if we closed the active tab.
             if (state.openTabs.length > 0) {
-                const newIndex = Math.min(index, state.openTabs.length - 1);
-                switchTab(state.openTabs[newIndex].id);
+                if (wasActive) {
+                    // Switch to adjacent tab (: activate tab to the left, or right if none)
+                    const newIndex = Math.min(index, state.openTabs.length - 1);
+                    switchTab(state.openTabs[newIndex].id);
+                } else {
+                    // Keep current active tab; just re-render tab strip.
+                    renderTabs();
+                }
             } else {
                 state.activeTabId = null;
                 if (activeEditor) {

@@ -2,7 +2,6 @@
     /**
      * Open Project Dialog
      * File browser dialog for opening existing projects
-     * Matches PhpStorm 2025.3 New UI open project dialog
      *
      * Checklist: OPN-001 to OPN-005
      */

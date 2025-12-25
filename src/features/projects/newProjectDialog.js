@@ -2,7 +2,6 @@
     /**
      * New Project Dialog
      * Form-based dialog for creating new MUMPS projects
-     * Matches PhpStorm 2025.3 New UI new project wizard
      *
      * Checklist: NEW-001 to NEW-007
      */
