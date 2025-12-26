@@ -98,14 +98,22 @@
     background: var(--bg) !important;
     padding: 8px;
     min-height: 200px;
+    max-height: 400px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .debug-tabpane {
     display: none;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .debug-tabpane.active {
-    display: block;
+    display: flex;
+    flex-direction: column;
 }
 
 .pane-header {

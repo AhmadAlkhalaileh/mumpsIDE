@@ -5,11 +5,12 @@
 .dbg-timeline {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    height: 100%;
+    gap: 6px;
+    flex: 1;
+    min-height: 0;
     width: 100%;
     overflow: hidden;
-    padding: 12px 14px 10px 14px;
+    padding: 8px 10px;
     background: linear-gradient(135deg, rgba(40, 42, 54, 0.95) 0%, rgba(47, 49, 65, 0.95) 100%);
     box-sizing: border-box;
 }
@@ -19,21 +20,24 @@
    ======================================== */
 
 .dbg-timeline-toolbar {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto auto auto 1fr auto auto;
     align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    padding: 8px 12px;
+    gap: 6px;
+    padding: 5px 8px;
     background: rgba(47, 49, 65, 0.6);
     backdrop-filter: blur(12px);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
+    border-radius: 6px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     flex-shrink: 0;
 }
 
 .dbg-timeline-toolbar button {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 11px;
+    padding: 4px 8px;
+    height: 26px;
 }
 
 .dbg-timeline-toolbar button:not(:disabled):hover {
@@ -46,20 +50,23 @@
 }
 
 .dbg-timeline-spacer {
-    flex: 1;
-    min-width: 12px;
+    min-width: 8px;
 }
 
 .dbg-timeline-inline {
     color: var(--ui-text-muted);
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 500;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
 }
 
 .dbg-timeline-search {
-    min-width: 200px;
-    flex: 0 1 280px;
+    min-width: 120px;
+    max-width: 180px;
+    font-size: 11px;
+    height: 26px;
+    padding: 4px 8px;
 }
 
 /* ========================================
@@ -68,8 +75,8 @@
 
 .dbg-timeline-main {
     display: grid;
-    grid-template-columns: 280px 1fr;
-    gap: 10px;
+    grid-template-columns: 220px 1fr;
+    gap: 6px;
     min-height: 0;
     flex: 1;
     overflow: hidden;
@@ -96,7 +103,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 8px 12px;
+    padding: 4px 8px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     background: linear-gradient(135deg, rgba(52, 55, 70, 0.8) 0%, rgba(43, 45, 58, 0.8) 100%);
     flex-shrink: 0;
@@ -104,18 +111,18 @@
 
 .dbg-timeline-list__title {
     font-weight: 600;
-    font-size: 12px;
+    font-size: 9px;
     color: var(--text-bright);
     letter-spacing: 0.5px;
     text-transform: uppercase;
 }
 
 .dbg-timeline-list__meta {
-    font-size: 10px;
+    font-size: 8px;
     color: var(--accent-blue);
     font-weight: 600;
     background: rgba(139, 233, 253, 0.1);
-    padding: 2px 8px;
+    padding: 1px 6px;
     border-radius: 999px;
     border: 1px solid rgba(139, 233, 253, 0.2);
 }
@@ -123,7 +130,7 @@
 .dbg-timeline-list__body {
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 8px;
+    padding: 5px;
     flex: 1;
     min-height: 0;
     position: relative;
@@ -164,11 +171,11 @@
 .dbg-timeline-item {
     position: relative;
     display: grid;
-    grid-template-columns: 20px 1fr;
-    gap: 10px;
-    padding: 8px 10px;
-    margin-bottom: 6px;
-    border-radius: 6px;
+    grid-template-columns: 16px 1fr;
+    gap: 6px;
+    padding: 4px 6px;
+    margin-bottom: 3px;
+    border-radius: 4px;
     cursor: pointer;
     border: 1px solid transparent;
     background: rgba(40, 42, 54, 0.4);
@@ -213,26 +220,26 @@
 .dbg-timeline-list__body::before {
     content: '';
     position: absolute;
-    left: 21px;
-    top: 20px;
-    bottom: 20px;
-    width: 2px;
+    left: 16px;
+    top: 12px;
+    bottom: 12px;
+    width: 1px;
     background: linear-gradient(180deg,
         rgba(189, 147, 249, 0.2) 0%,
         rgba(139, 233, 253, 0.2) 50%,
         rgba(189, 147, 249, 0.2) 100%
     );
-    border-radius: 2px;
+    border-radius: 1px;
     pointer-events: none;
 }
 
 .dbg-timeline-item__dot {
-    width: 12px;
-    height: 12px;
+    width: 8px;
+    height: 8px;
     border-radius: 999px;
     background: var(--muted);
     border: 2px solid var(--panel);
-    margin-top: 2px;
+    margin-top: 0;
     position: relative;
     z-index: 1;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -266,18 +273,19 @@
 .dbg-timeline-item__main {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     min-width: 0;
 }
 
 .dbg-timeline-item__loc {
     font-family: var(--font-code);
-    font-size: 11px;
+    font-size: 9px;
     font-weight: 500;
     color: var(--text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.3;
 }
 
 .dbg-timeline-item.active .dbg-timeline-item__loc {
@@ -287,11 +295,12 @@
 
 .dbg-timeline-item__meta {
     display: flex;
-    gap: 6px;
-    font-size: 9px;
+    gap: 3px;
+    font-size: 7px;
     color: var(--muted);
     font-weight: 500;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
+    line-height: 1.2;
 }
 
 /* ========================================
@@ -299,7 +308,7 @@
    ======================================== */
 
 .dbg-timeline-details {
-    padding: 10px 12px;
+    padding: 6px 8px;
     overflow-y: auto;
     overflow-x: hidden;
     flex: 1;
@@ -310,56 +319,58 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 10px;
-    padding: 10px 12px;
+    gap: 6px;
+    padding: 5px 8px;
     background: linear-gradient(135deg, rgba(52, 55, 70, 0.6) 0%, rgba(43, 45, 58, 0.6) 100%);
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    margin-bottom: 10px;
+    border-radius: 4px;
+    margin-bottom: 6px;
 }
 
 .dbg-timeline-meta__left {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
     min-width: 0;
     flex: 1;
 }
 
 .dbg-timeline-meta__title {
     font-weight: 600;
-    font-size: 12px;
+    font-size: 10px;
     color: var(--text-bright);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.3;
 }
 
 .dbg-timeline-meta__sub {
-    font-size: 10px;
+    font-size: 8px;
     color: var(--accent-blue);
     font-weight: 500;
+    line-height: 1.2;
 }
 
 .dbg-timeline-meta__right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
 }
 
 .dbg-timeline-badge {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 3px;
     border: 1px solid rgba(189, 147, 249, 0.3);
     background: linear-gradient(135deg, rgba(189, 147, 249, 0.15) 0%, rgba(139, 233, 253, 0.1) 100%);
-    padding: 4px 10px;
+    padding: 2px 6px;
     border-radius: 999px;
-    font-size: 10px;
+    font-size: 8px;
     font-weight: 600;
     color: var(--accent);
     user-select: none;
-    letter-spacing: 0.3px;
+    letter-spacing: 0.2px;
     box-shadow: 0 2px 8px rgba(189, 147, 249, 0.15);
 }
 
@@ -370,26 +381,27 @@
 .dbg-timeline-compare {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-    padding: 8px 10px;
+    gap: 6px;
+    margin-bottom: 6px;
+    padding: 4px 6px;
     background: rgba(43, 45, 58, 0.4);
     border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 6px;
+    border-radius: 4px;
 }
 
 .dbg-timeline-compare__label {
-    font-size: 11px;
+    font-size: 9px;
     color: var(--muted);
     font-weight: 600;
-    min-width: 75px;
-    letter-spacing: 0.3px;
+    white-space: nowrap;
+    letter-spacing: 0.2px;
 }
 
 .dbg-timeline-compare__select {
-    min-width: 160px;
     flex: 1;
-    max-width: 320px;
+    font-size: 10px;
+    height: 24px;
+    padding: 2px 6px;
 }
 
 /* ========================================
@@ -399,18 +411,18 @@
 .dbg-timeline-panels {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 6px;
+    margin-bottom: 6px;
 }
 
 .dbg-timeline-panel {
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
+    border-radius: 4px;
     background: linear-gradient(135deg, rgba(43, 45, 58, 0.5) 0%, rgba(36, 38, 49, 0.5) 100%);
     backdrop-filter: blur(12px);
     overflow: hidden;
-    min-height: 100px;
-    max-height: 140px;
+    min-height: 70px;
+    max-height: 110px;
     display: flex;
     flex-direction: column;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
@@ -423,33 +435,33 @@
 }
 
 .dbg-timeline-panel__title {
-    padding: 7px 10px;
+    padding: 4px 6px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
     background: linear-gradient(135deg, rgba(52, 55, 70, 0.8) 0%, rgba(43, 45, 58, 0.8) 100%);
     font-weight: 600;
     color: var(--text-bright);
-    font-size: 10px;
-    letter-spacing: 0.6px;
+    font-size: 8px;
+    letter-spacing: 0.5px;
     text-transform: uppercase;
     flex-shrink: 0;
 }
 
 .dbg-timeline-panel__body {
-    padding: 8px 10px;
+    padding: 5px 6px;
     overflow-y: auto;
     overflow-x: hidden;
     flex: 1;
     min-height: 0;
     font-family: var(--font-code);
-    font-size: 11px;
-    line-height: 1.5;
+    font-size: 9px;
+    line-height: 1.3;
 }
 
 .dbg-timeline-empty {
     color: var(--muted);
     font-family: var(--ui-font-ui);
-    font-size: 10px;
-    padding: 8px;
+    font-size: 9px;
+    padding: 6px;
     text-align: center;
     font-style: italic;
     opacity: 0.6;
@@ -461,9 +473,9 @@
 
 .dbg-timeline-row {
     display: grid;
-    grid-template-columns: 130px 1fr;
-    gap: 10px;
-    padding: 5px 0;
+    grid-template-columns: 90px 1fr;
+    gap: 6px;
+    padding: 3px 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     align-items: baseline;
     transition: all 0.2s ease;
@@ -475,9 +487,9 @@
 
 .dbg-timeline-row:hover {
     background: rgba(189, 147, 249, 0.05);
-    border-radius: 4px;
-    padding-left: 4px;
-    padding-right: 4px;
+    border-radius: 3px;
+    padding-left: 3px;
+    padding-right: 3px;
 }
 
 .dbg-timeline-row__name {
@@ -485,14 +497,14 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 11px;
+    font-size: 9px;
     font-weight: 600;
 }
 
 .dbg-timeline-row__value {
     display: grid;
-    grid-template-columns: 1fr 14px 1fr;
-    gap: 6px;
+    grid-template-columns: 1fr 10px 1fr;
+    gap: 3px;
     min-width: 0;
 }
 
@@ -503,10 +515,10 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 11px;
-    padding: 3px 6px;
+    font-size: 9px;
+    padding: 1px 4px;
     background: rgba(40, 42, 54, 0.6);
-    border-radius: 4px;
+    border-radius: 2px;
     border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -514,7 +526,7 @@
     color: var(--accent);
     text-align: center;
     font-weight: 600;
-    font-size: 10px;
+    font-size: 8px;
 }
 
 /* Status-based styling */
@@ -562,19 +574,19 @@
 .dbg-timeline-array-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 5px;
 }
 
 .dbg-timeline-array-toggle {
-    width: 20px;
-    height: 20px;
-    border-radius: 6px;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
     border: 1px solid rgba(189, 147, 249, 0.3);
     background: rgba(189, 147, 249, 0.1);
     color: var(--accent);
     cursor: pointer;
     font-weight: 600;
-    font-size: 12px;
+    font-size: 10px;
     transition: all 0.2s ease;
 }
 
@@ -585,10 +597,10 @@
 }
 
 .dbg-timeline-array-children {
-    margin-left: 20px;
-    margin-top: 4px;
-    padding-left: 8px;
-    border-left: 2px solid rgba(139, 233, 253, 0.2);
+    margin-left: 16px;
+    margin-top: 3px;
+    padding-left: 6px;
+    border-left: 1px solid rgba(139, 233, 253, 0.2);
 }
 
 /* ========================================
@@ -596,17 +608,17 @@
    ======================================== */
 
 .dbg-timeline-watches {
-    margin-top: 12px;
+    margin-top: 6px;
     border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 8px;
+    border-radius: 4px;
     overflow: hidden;
     background: rgba(43, 45, 58, 0.3);
 }
 
 .dbg-timeline-watch-row {
     display: flex;
-    gap: 8px;
-    padding: 8px 10px;
+    gap: 6px;
+    padding: 4px 6px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     background: rgba(52, 55, 70, 0.4);
 }
@@ -614,26 +626,29 @@
 .dbg-timeline-watch-input {
     flex: 1;
     min-width: 0;
+    font-size: 10px;
+    height: 24px;
+    padding: 2px 6px;
 }
 
 .dbg-timeline-watch-list {
-    padding: 8px;
+    padding: 6px;
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
-    min-height: 40px;
+    gap: 4px;
+    min-height: 30px;
 }
 
 .dbg-timeline-watch-chip {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     border: 1px solid rgba(139, 233, 253, 0.3);
     background: linear-gradient(135deg, rgba(139, 233, 253, 0.15) 0%, rgba(189, 147, 249, 0.1) 100%);
     border-radius: 999px;
-    padding: 4px 10px;
+    padding: 2px 6px;
     font-family: var(--font-code);
-    font-size: 10px;
+    font-size: 8px;
     font-weight: 600;
     color: var(--accent-blue);
     transition: all 0.2s ease;
@@ -646,15 +661,15 @@
 }
 
 .dbg-timeline-watch-remove {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     border-radius: 999px;
     border: 1px solid transparent;
     background: transparent;
     color: var(--muted);
     cursor: pointer;
     transition: all 0.2s ease;
-    font-size: 10px;
+    font-size: 9px;
 }
 
 .dbg-timeline-watch-remove:hover {
@@ -664,13 +679,13 @@
 }
 
 .dbg-timeline-status {
-    margin-top: 8px;
-    font-size: 10px;
+    margin-top: 6px;
+    font-size: 8px;
     color: var(--muted);
     font-style: italic;
-    padding: 6px 8px;
+    padding: 4px 6px;
     background: rgba(40, 42, 54, 0.4);
-    border-radius: 6px;
+    border-radius: 4px;
     border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
@@ -680,7 +695,7 @@
 
 @media (max-width: 1200px) {
     .dbg-timeline-main {
-        grid-template-columns: 240px 1fr;
+        grid-template-columns: 200px 1fr;
     }
 }
 
@@ -694,22 +709,22 @@
     }
 
     .dbg-timeline-row {
-        grid-template-columns: 100px 1fr;
+        grid-template-columns: 80px 1fr;
     }
 }
 
 @media (max-width: 640px) {
     .dbg-timeline {
-        padding: 8px;
-        gap: 8px;
+        padding: 6px;
+        gap: 5px;
     }
 
     .dbg-timeline-main {
-        gap: 8px;
+        gap: 5px;
     }
 
     .dbg-timeline-toolbar {
-        padding: 8px 10px;
+        padding: 4px 6px;
     }
 }
 
