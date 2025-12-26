@@ -364,6 +364,21 @@
             case 'goto-declaration':
                 try { await goToDeclaration(editor, null, { silentIfMissing: false }); } catch (_) { }
                 return;
+            case 'mumps:find-global-references':
+            case 'mumps:show-global-impact':
+                {
+                    const api = window.AhmadIDEModules?.globalImpact?.manager || null;
+                    if (api?.openFromEditor) {
+                        try { await api.openFromEditor(editor); } catch (_) { }
+                        return;
+                    }
+                    if (api?.openPanel) {
+                        try { await api.openPanel({ focusSearch: true }); } catch (_) { }
+                        return;
+                    }
+                    try { showToast?.('error', 'Global Impact', 'Global Impact is not available'); } catch (_) { }
+                }
+                return;
             case 'expand-selection':
                 editor?.trigger('keyboard', 'editor.action.smartSelect.expand', null);
                 return;
@@ -1713,6 +1728,20 @@
         }
     }
 
+    // Time‑Travel Debugger (Timeline tab) wiring (safe/no-op when disabled).
+    try { debugManager?.wireDebugTimelineEvents?.(); } catch (_) { }
+    try {
+        const createDebugTimelineUiManager = window.AhmadIDEModules?.debugTimeline?.createDebugTimelineUiManager;
+        if (typeof createDebugTimelineUiManager === 'function') {
+            const timelineUi = createDebugTimelineUiManager({ deps: { logger } });
+            timelineUi?.wire?.();
+            window.AhmadIDEModules.debugTimeline = window.AhmadIDEModules.debugTimeline || {};
+            window.AhmadIDEModules.debugTimeline.manager = timelineUi;
+        }
+    } catch (err) {
+        logger.warn('DEBUG_TIMELINE_UI_INIT_FAIL', { message: err?.message, stack: err?.stack });
+    }
+
     // Problems UI moved to src/editor/problems/renderer-problems.js
     const createProblemsManager = window.AhmadIDEModules?.problems?.createProblemsManager;
     if (!createProblemsManager) {
@@ -1827,6 +1856,60 @@
             openDiffTab
         }
     });
+
+    // Global Impact (Globals Where-Used)
+    const createGlobalImpactManager = window.AhmadIDEModules?.globalImpact?.createGlobalImpactManager;
+    if (typeof createGlobalImpactManager === 'function') {
+        try {
+            const globalImpactManager = createGlobalImpactManager({
+                deps: {
+                    logger,
+                    showToast,
+                    ensureBottomPanel,
+                    toggleToolWindowPanel,
+                    getMonaco: () => (typeof monaco !== 'undefined' ? monaco : null),
+                    getActiveEditor: () => activeEditor,
+                    getProjectRoot: () => String(currentProject?.projectPath || '').trim(),
+                    openRoutine: async (routinePath) => {
+                        try {
+                            return await loadRoutineByName(routinePath, routineState, activeEditor, routinesCache, globalTerminalState);
+                        } catch (err) {
+                            return { ok: false, error: String(err?.message || err || 'Open failed') };
+                        }
+                    },
+                    runDirectCommand: async (code, { title } = {}) => {
+                        try { ensureBottomPanel('terminalPanel'); } catch (_) { }
+                        try {
+                            if (globalTerminalState && !globalTerminalState.tabs?.length) {
+                                await addTerminalTab(globalTerminalState, true);
+                            }
+                        } catch (_) { }
+
+                        try {
+                            const label = String(title || '').trim();
+                            if (label) appendOutput(`🔎 ${label}`, globalTerminalState);
+                        } catch (_) { }
+
+                        const res = await window.ahmadIDE.execute(String(code || ''));
+                        if (res?.ok) {
+                            try { appendOutput(res.output || '(no output)', globalTerminalState); } catch (_) { }
+                        } else {
+                            const msg = res?.error || res?.stderr || 'Execution failed';
+                            try { appendOutput(`✗ Execute error: ${msg}`, globalTerminalState); } catch (_) { }
+                        }
+                        return res;
+                    }
+                }
+            });
+            const api = globalImpactManager.wireGlobalImpactPanel();
+            window.AhmadIDEModules = window.AhmadIDEModules || {};
+            window.AhmadIDEModules.globalImpact = window.AhmadIDEModules.globalImpact || {};
+            window.AhmadIDEModules.globalImpact.manager = api;
+            logger.info('GLOBAL_IMPACT_INIT', {});
+        } catch (err) {
+            logger.warn('GLOBAL_IMPACT_INIT_FAIL', { message: err?.message, stack: err?.stack });
+        }
+    }
 
     // Git settings panel moved to src/editor/git/renderer-git-settings.js
     const createGitSettingsManager = window.AhmadIDEModules?.git?.createGitSettingsManager;
@@ -2483,6 +2566,13 @@
         // No-op - handled by dialog close
     }
 
+    function openAboutDialog() {
+        const dialogRegistry = window.AhmadIDEModules?.app?.dialogRegistry;
+        if (dialogRegistry) {
+            dialogRegistry.show('about');
+        }
+    }
+
     function openNewProjectPanel() {
         return projectCreateManager.openNewProjectPanel();
     }
@@ -3034,7 +3124,7 @@
             state.activePanel = null;
             if (position === 'bottom') {
                 if (contentArea) contentArea.classList.add('hidden'); // Use hidden to collapse fully
-                const bottomPanels = ['terminalToolPanel', 'terminalPanel', 'debugPanel', 'problemsPanel', 'comparePanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel', 'patchTrackingPanel'];
+                const bottomPanels = ['terminalToolPanel', 'terminalPanel', 'debugPanel', 'problemsPanel', 'comparePanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel', 'globalImpactPanel', 'patchTrackingPanel'];
                 bottomPanels.forEach(id => {
                     const el = document.getElementById(id);
                     if (el) el.classList.add('hidden');
@@ -3079,7 +3169,7 @@
 
         // Handle bottom panels specially (they're in bottom-panels-container)
         if (position === 'bottom') {
-            const bottomPanels = ['terminalToolPanel', 'terminalPanel', 'debugPanel', 'problemsPanel', 'comparePanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel', 'patchTrackingPanel'];
+            const bottomPanels = ['terminalToolPanel', 'terminalPanel', 'debugPanel', 'problemsPanel', 'comparePanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel', 'globalImpactPanel', 'patchTrackingPanel'];
             bottomPanels.forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.classList.toggle('hidden', id !== panelId);

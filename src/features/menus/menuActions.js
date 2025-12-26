@@ -122,6 +122,9 @@ async function runMenuAction(action, ctx = {}) {
         case 'shortcuts':
             try { openShortcutsPanel?.(); } catch (_) { }
             return;
+        case 'about':
+            try { openAboutDialog?.(); } catch (_) { }
+            return;
         case 'settings':
             try { openSettingsPanel?.(); } catch (_) { }
             return;

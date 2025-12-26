@@ -164,6 +164,11 @@
                 hoverDisposable = monacoRef.languages.registerHoverProvider('mumps', {
                     provideHover: async (model, position) => {
                         if (!enabled) return null;
+                        // While debugging, Monaco hover is used for live variable values; suppress blame hover to avoid mixing.
+                        try {
+                            const paused = !!(window.__ahmadIDE_debugPaused || window.AhmadIDEModules?.debug?.state?.paused);
+                            if (paused) return null;
+                        } catch (_) { }
                         if (!model || !position?.lineNumber) return null;
 
                         const filePath = model.uri?.toString?.() || '';

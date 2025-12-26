@@ -334,6 +334,11 @@ textarea {
     background: var(--panel-2);
     z-index: 20;
     /* Ensure icons sit above content if overlap occurs */
+    height: var(--bottom-toolwindow-height, 320px);
+    max-height: var(--bottom-toolwindow-height, 320px);
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 

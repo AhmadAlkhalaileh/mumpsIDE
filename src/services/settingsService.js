@@ -23,6 +23,15 @@
         },
         extensions: {
             enabled: {}
+        },
+        debugger: {
+            timeline: {
+                enable: true,
+                maxSnapshots: 50,
+                captureOnStop: true,
+                captureGlobals: false,
+                maxValueLength: 200
+            }
         }
     });
 
@@ -62,11 +71,15 @@
     const normalizeSettings = (raw) => {
         const merged = deepMerge(DEFAULT_SETTINGS, raw || {});
         const fonts = merged.fonts || {};
+        const dbg = merged.debugger || {};
+        const tl = dbg.timeline || {};
 
         const uiScale = clamp(Number(fonts?.ui?.scalePercent ?? 100), 70, 150);
         const editorSize = clamp(Number(fonts?.editor?.sizePx ?? 13), 10, 40);
         const editorLineHeight = clamp(Number(fonts?.editor?.lineHeight ?? 1.55), 1.1, 2.2);
         const terminalSize = clamp(Number(fonts?.terminal?.sizePx ?? 13), 10, 40);
+        const tlMaxSnapshots = clamp(Number(tl?.maxSnapshots ?? 50), 1, 500);
+        const tlMaxValueLength = clamp(Number(tl?.maxValueLength ?? 200), 20, 20000);
 
         return {
             ...merged,
@@ -92,6 +105,16 @@
                 enabled: (merged.extensions && merged.extensions.enabled && typeof merged.extensions.enabled === 'object')
                     ? { ...merged.extensions.enabled }
                     : {}
+            },
+            debugger: {
+                ...dbg,
+                timeline: {
+                    enable: !!tl?.enable,
+                    maxSnapshots: Math.round(tlMaxSnapshots),
+                    captureOnStop: tl?.captureOnStop !== false,
+                    captureGlobals: !!tl?.captureGlobals,
+                    maxValueLength: Math.round(tlMaxValueLength)
+                }
             }
         };
     };
@@ -162,4 +185,3 @@
         }
     }
 })();
-

@@ -5,6 +5,9 @@ const fs = require('fs');
 const { logger } = require('./utils/logger');
 const bridge = require('./bridge');
 const patchTrackerService = require('./src/services/patchTracking/patchTrackerService');
+const { createWorkspaceFileService } = require('./src/services/workspaceFileService');
+
+const workspaceFileService = createWorkspaceFileService({ logger });
 
 // Suppress harmless Electron warnings
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
@@ -767,6 +770,33 @@ app.whenReady().then(() => {
 
     ipcHandle('project:open', async (_event, payload) => {
         return bridge.openProject(payload?.path || '');
+    });
+
+    // Workspace filesystem access (safe offline indexing)
+    ipcHandle('workspace:listFiles', async (_event, payload) => {
+        const dir = payload?.dir || payload?.root || '';
+        const pattern = payload?.pattern || payload?.glob || '*';
+        const opts = payload?.opts || {};
+        return workspaceFileService.listFiles(dir, pattern, opts);
+    });
+
+    ipcHandle('workspace:readFile', async (_event, payload) => {
+        const filePath = payload?.filePath || payload?.path || '';
+        const opts = payload?.opts || {};
+        return workspaceFileService.readFile(filePath, opts);
+    });
+
+    ipcHandle('workspace:watch', async (event, payload) => {
+        return workspaceFileService.watch({
+            root: payload?.root || payload?.dir || '',
+            pattern: payload?.pattern || '*.m',
+            sender: event.sender,
+            opts: payload?.opts || {}
+        });
+    });
+
+    ipcHandle('workspace:unwatch', async (_event, payload) => {
+        return workspaceFileService.unwatch(payload?.watchId || '');
     });
 
     // Dialogs

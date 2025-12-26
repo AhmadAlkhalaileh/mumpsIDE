@@ -60,6 +60,7 @@
             'gitToolPanel',
             'extensionsPanel',
             'servicesPanel',
+            'globalImpactPanel',
             'settingsPanel',
             'connectionsPanel',
             'newProjectPanel',

@@ -140,6 +140,8 @@
                     { id: 'nav.line', label: 'Go to Line…', action: 'goto-line', shortcut: 'Ctrl+L' },
                     { type: 'separator' },
                     { id: 'nav.declaration', label: 'Go to Declaration', action: 'goto-declaration' },
+                    { id: 'nav.globalRefs', label: 'MUMPS: Find Global References', action: 'mumps:find-global-references', icon: 'search' },
+                    { id: 'nav.globalImpact', label: 'MUMPS: Show Global Impact', action: 'mumps:show-global-impact', icon: 'graph' },
                     { type: 'separator' },
                     { id: 'nav.nextTab', label: 'Next Tab', action: 'tab-next', shortcut: 'Ctrl+Tab' },
                     { id: 'nav.prevTab', label: 'Previous Tab', action: 'tab-prev', shortcut: 'Ctrl+Shift+Tab' }
@@ -200,9 +202,7 @@
                 id: 'help',
                 label: 'Help',
                 items: withSeparatorCleanup([
-                    { id: 'help.about', label: 'About', action: 'about' },
-                    { type: 'separator' },
-                    { id: 'help.menuSelfTest', label: 'Menu System Self-Test', action: 'menu-self-test' }
+                    { id: 'help.about', label: 'About', action: 'about' }
                 ])
             }
         ]));
@@ -238,7 +238,9 @@
 
         registry.register('context.editor', (ctx) => {
             const hasDecl = !!ctx?.hasDeclaration;
-            const activePath = String(ctx?.activePath || '');
+            const activePath = String(ctx?.activePath || '').trim();
+            const isMumpsFile = activePath && activePath.endsWith('.m');
+            const hasGlobal = !!ctx?.hasGlobalAtCursor;
             return withSeparatorCleanup([
                 { id: 'ed.cut', label: 'Cut', action: 'cut', icon: 'cut', shortcut: 'Ctrl+X' },
                 { id: 'ed.copy', label: 'Copy', action: 'copy', icon: 'copy', shortcut: 'Ctrl+C' },
@@ -247,6 +249,8 @@
                 { id: 'ed.format', label: 'Format Code', action: 'reformat', icon: 'format' },
                 { id: 'ed.decl', label: 'Go to Declaration', action: 'goto-declaration', icon: 'arrow-right', disabled: !hasDecl },
                 { id: 'ed.usages', label: 'Find Usages', action: 'find-usages', icon: 'search', disabled: true },
+                { id: 'ed.globalRefs', label: 'Find Global References', action: 'mumps:find-global-references', icon: 'search', disabled: !hasGlobal },
+                { id: 'ed.globalImpact', label: 'Show Global Impact', action: 'mumps:show-global-impact', icon: 'graph', disabled: !hasGlobal },
                 { type: 'separator' },
                 { id: 'ed.comment', label: 'Toggle Comment', action: 'comment', icon: 'comment' },
                 { type: 'separator' },

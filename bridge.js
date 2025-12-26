@@ -6,6 +6,16 @@ const { logger } = require('./utils/logger');
 const { log: dbgLog } = require('./utils/debug-log');
 const net = require('net');
 const { EventEmitter } = require('events');
+const {
+  DEFAULT_ENV_KEY,
+  DOCKER_DEFAULT_ENV_KEY,
+  shellQuote,
+  deriveEnvKeyFromUsername,
+  buildEnvPaths,
+  buildSshPaths,
+  buildDockerPaths,
+  normalizeRoutineName
+} = require('./src/bridge/config/paths');
 
 // In snap environment, ensure PATH includes snap + system binaries (git/docker live under $SNAP/usr/bin).
 if (process.env.SNAP) {
@@ -32,60 +42,6 @@ function ensureSshClient() {
     sshLoadError = e;
   }
   return SSHClient;
-}
-
-const DEFAULT_ENV_KEY = 'cc';
-const DOCKER_DEFAULT_ENV_KEY = 'hakeem';
-
-function shellQuote(str = '') {
-  return `'${str.replace(/'/g, `'\\''`)}'`;
-}
-
-// envKey is the username suffix after the last dash (user-cc => cc); fallback keeps cc when parsing fails.
-function deriveEnvKeyFromUsername(username, fallback = DEFAULT_ENV_KEY) {
-  const raw = (username || '').trim();
-  if (!raw) return fallback;
-  const lastDash = raw.lastIndexOf('-');
-  if (lastDash === -1) return fallback;
-  const key = raw.slice(lastDash + 1).trim();
-  return key || fallback;
-}
-
-function buildEnvPaths(envKey = DEFAULT_ENV_KEY) {
-  const key = (envKey || DEFAULT_ENV_KEY).trim() || DEFAULT_ENV_KEY;
-  const basePath = `/var/worldvista/prod/${key}`;
-  return {
-    envKey: key,
-    gldPath: `${basePath}/globals/mumps.gld`,
-    routinesPath: `${basePath}/localr`,
-    rpcRoutinesPath: `${basePath}/localr ${basePath}/routines`,
-    basePath
-  };
-}
-
-// Default connection config (from web backend)
-function buildSshPaths(envKey = DEFAULT_ENV_KEY, ydbPath = '/opt/fis-gtm/YDB136') {
-  return {
-    ydbPath,
-    ...buildEnvPaths(envKey)
-  };
-}
-
-function buildDockerPaths(envKey = DOCKER_DEFAULT_ENV_KEY, ydbPath = null) {
-  // In universal mode (no ydbPath), don't set any YottaDB-specific paths
-  if (!ydbPath) {
-    return {
-      ydbPath: null,
-      gldPath: null,
-      routinesPath: null,
-      rpcRoutinesPath: null,
-      basePath: null,
-      envKey: envKey || DOCKER_DEFAULT_ENV_KEY
-    };
-  }
-  // In configured mode, build all the paths
-  const basePaths = buildEnvPaths(envKey);
-  return { ydbPath, ...basePaths };
 }
 
 function mergeSshConfig(cfg = {}) {
@@ -157,12 +113,6 @@ const mdebugStates = {
   waitingForHints: 'waitingForHints',
   waitingForGlobals: 'waitingForGlobals'
 };
-
-function normalizeRoutineName(name = '') {
-  const trimmed = (name || '').trim();
-  if (!trimmed) return '';
-  return trimmed.replace(/\.m$/i, '').toUpperCase();
-}
 
 function defaultRoutinePath(routineName) {
   const cfg = connectionConfig.docker || {};
@@ -3021,6 +2971,38 @@ async function executeYDBDirect(command) {
   const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
   if (useDocker) {
     const cfg = connectionConfig.docker;
+
+    // Check if YottaDB and global directory are configured
+    if (!cfg.ydbPath) {
+      return {
+        ok: false,
+        error: 'YottaDB not configured. Please configure YottaDB path in Connections panel.'
+      };
+    }
+    if (!cfg.gldPath) {
+      return {
+        ok: false,
+        error: 'Global directory not configured. Direct Mode requires a YottaDB global directory. Please configure it in Connections panel.'
+      };
+    }
+
+    // Verify global directory file exists
+    const checkGldCmd = wrapDockerCmd(
+      `docker exec ${cfg.containerId} test -f ${cfg.gldPath}`
+    );
+    const gldCheckResult = await new Promise((resolve) => {
+      exec(checkGldCmd, { timeout: 5000 }, (err) => {
+        resolve({ exists: !err });
+      });
+    });
+
+    if (!gldCheckResult.exists) {
+      return {
+        ok: false,
+        error: `Global directory file not found: ${cfg.gldPath}. Direct Mode requires a valid YottaDB global directory file. Please ensure the file exists or reconfigure in Connections panel.`
+      };
+    }
+
     const writeCmd = wrapDockerCmd(
       `docker exec ${cfg.containerId} bash -lc "echo ${commandsB64} | base64 -d > ${cmdFile}"`
     );
@@ -3030,19 +3012,73 @@ async function executeYDBDirect(command) {
 
     return new Promise((resolve) => {
       exec(`${writeCmd} && ${runCmd}`, { timeout: 30000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-        if (err) return resolve({ ok: false, error: err.message, stdout, stderr });
+        if (err) {
+          const output = stdout || stderr || err.message || '';
+          // Detect ZGBLDIRACC error and provide helpful message
+          if (/ZGBLDIRACC|Cannot access global directory/i.test(output)) {
+            return resolve({
+              ok: false,
+              error: `Global directory file not accessible: ${cfg.gldPath}. The file may not exist or permissions are incorrect. Please check your YottaDB configuration in the Connections panel.`,
+              stdout,
+              stderr
+            });
+          }
+          return resolve({ ok: false, error: err.message, stdout, stderr });
+        }
         resolve({ ok: true, stdout: cleanOutput(stdout || stderr) });
       });
     });
   } else {
     const cfg = connectionConfig.ssh;
+
+    // Check if YottaDB and global directory are configured
+    if (!cfg.ydbPath) {
+      return {
+        ok: false,
+        error: 'YottaDB not configured. Please configure YottaDB path in Connections panel.'
+      };
+    }
+    if (!cfg.gldPath) {
+      return {
+        ok: false,
+        error: 'Global directory not configured. Direct Mode requires a YottaDB global directory. Please configure it in Connections panel.'
+      };
+    }
+
+    // Verify global directory file exists
     const sshPass = cfg.password ? `sshpass -p '${cfg.password}'` : '';
+    const checkGldCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "test -f ${cfg.gldPath}"`;
+    const gldCheckResult = await new Promise((resolve) => {
+      exec(checkGldCmd, { timeout: 5000 }, (err) => {
+        resolve({ exists: !err });
+      });
+    });
+
+    if (!gldCheckResult.exists) {
+      return {
+        ok: false,
+        error: `Global directory file not found: ${cfg.gldPath}. Direct Mode requires a valid YottaDB global directory file. Please ensure the file exists or reconfigure in Connections panel.`
+      };
+    }
+
     const writeCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "echo ${commandsB64} | base64 -d > ${cmdFile}"`;
     const runCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "export gtm_dist=${cfg.ydbPath} && export gtmgbldir=${cfg.gldPath} && export gtmroutines='${(cfg.rpcRoutinesPath || cfg.routinesPath)}(${(cfg.rpcRoutinesPath || cfg.routinesPath)}) ${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}' && export gtm_etrap='' && export gtm_ztrap='' && ${cfg.ydbPath}/mumps -direct < ${cmdFile} 2>&1; rm -f ${cmdFile}"`;
 
     return new Promise((resolve) => {
       exec(`${writeCmd} && ${runCmd}`, { timeout: 30000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
-        if (err) return resolve({ ok: false, error: err.message, stdout, stderr });
+        if (err) {
+          const output = stdout || stderr || err.message || '';
+          // Detect ZGBLDIRACC error and provide helpful message
+          if (/ZGBLDIRACC|Cannot access global directory/i.test(output)) {
+            return resolve({
+              ok: false,
+              error: `Global directory file not accessible: ${cfg.gldPath}. The file may not exist or permissions are incorrect. Please check your YottaDB configuration in the Connections panel.`,
+              stdout,
+              stderr
+            });
+          }
+          return resolve({ ok: false, error: err.message, stdout, stderr });
+        }
         resolve({ ok: true, stdout: cleanOutput(stdout || stderr) });
       });
     });
@@ -3165,7 +3201,7 @@ async function executeYDB(command) {
       : `${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}`;
 
     // Use a default globals dir if not configured
-    const gldPath = cfg.gldPath || '/tmp/mumps.gld';
+    const gldPath = cfg.gldPath || await discoverGldPath();
 
     const writeCmd = wrapDockerCmd(
       `docker exec ${cfg.containerId} bash -lc "echo ${codeB64} | base64 -d > ${routineFile}"`
@@ -3193,7 +3229,7 @@ async function executeYDB(command) {
       : `${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}`;
 
     // Use a default globals dir if not configured
-    const gldPath = cfg.gldPath || '/tmp/mumps.gld';
+    const gldPath = cfg.gldPath || await discoverGldPath();
 
     const writeCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "echo ${codeB64} | base64 -d > ${routineFile}"`;
     const writeRun = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "echo ${runCmdB64} | base64 -d > ${cmdFile}"`;
@@ -3800,7 +3836,25 @@ module.exports = {
       .filter(Boolean);
 
     let codeToExecute = linesToExecute.join('\n');
-    codeToExecute += '\nWRITE "<<<DEBUG_VARS_START>>>",!\nZWRITE\nWRITE "<<<DEBUG_VARS_END>>>",!\n';
+
+    // Extract global variable names from the executed code
+    const globalRx = /\^([A-Za-z%][A-Za-z0-9]*)/g;
+    const globalsUsed = new Set();
+    linesToExecute.forEach(line => {
+      let match;
+      while ((match = globalRx.exec(line))) {
+        globalsUsed.add('^' + match[1]);
+      }
+    });
+
+    // ZWRITE all locals and explicitly ZWRITE each global
+    let zwriteCmd = 'WRITE "<<<DEBUG_VARS_START>>>",!\nZWRITE\n';
+    globalsUsed.forEach(g => {
+      zwriteCmd += `ZWRITE ${g}\n`;
+    });
+    zwriteCmd += 'WRITE "<<<DEBUG_VARS_END>>>",!\n';
+
+    codeToExecute += '\n' + zwriteCmd;
 
     const result = await executeYDBDirect(codeToExecute);
     if (!result.ok) {
@@ -3815,7 +3869,8 @@ module.exports = {
     for (const line of lines) {
       const t = line.trim();
       if (!t) continue;
-      const match = t.match(/^([A-Za-z%][A-Za-z0-9]*)(\([^)]+\))?\s*=\s*(.*)$/);
+      // Updated regex to capture globals (starting with ^)
+      const match = t.match(/^(\^?[A-Za-z%][A-Za-z0-9]*)(\([^)]+\))?\s*=\s*(.*)$/);
       if (match) {
         const varName = match[1].toUpperCase();
         const subscript = match[2];

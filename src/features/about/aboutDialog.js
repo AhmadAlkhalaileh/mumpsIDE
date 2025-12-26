@@ -8,12 +8,27 @@
     function createAboutDialog({ deps } = {}) {
         const createDialog = deps?.createDialog || window.AhmadIDEModules?.ui?.createDialog;
         const primitives = deps?.primitives || window.AhmadIDEModules?.ui?.primitives;
+        const getEnv = deps?.getEnv || (typeof window !== 'undefined' ? window.ahmadIDE?.getEnv : null);
 
         if (!createDialog || !primitives) {
             throw new Error('AboutDialog requires ui primitives');
         }
 
         let dialogApi = null;
+        let cachedEnv = null;
+
+        const loadEnv = async () => {
+            if (cachedEnv) return cachedEnv;
+            if (typeof getEnv !== 'function') return null;
+            try {
+                const res = await getEnv();
+                if (res && typeof res === 'object') {
+                    cachedEnv = res;
+                    return res;
+                }
+            } catch (_) { }
+            return null;
+        };
 
         const buildContent = () => {
             const container = document.createElement('div');
@@ -97,9 +112,9 @@
                 <div class="about-dialog-content__section">
                     <div class="about-dialog-content__section-title">Runtime</div>
                     <div class="about-dialog-content__section-value">
-                        Node.js ${process?.versions?.node || 'Unknown'}<br>
-                        Electron ${process?.versions?.electron || 'Unknown'}<br>
-                        Chrome ${process?.versions?.chrome || 'Unknown'}
+                        Node.js <span id="aboutNodeVersion">Loading…</span><br>
+                        Electron <span id="aboutElectronVersion">Loading…</span><br>
+                        Chrome <span id="aboutChromeVersion">Loading…</span>
                     </div>
                 </div>
 
@@ -109,21 +124,37 @@
             `;
 
             container.querySelector('#aboutCopyBtn')?.addEventListener('click', () => {
-                const info = `
+                loadEnv().then((env) => {
+                    const versions = env?.versions || {};
+                    const info = `
 Mumps Studio v1.1
 Author: Ahmad Alkhalaileh
 Build: MS-1.1.${new Date().toISOString().slice(0, 10).replace(/-/g, '')}
-Node.js: ${process?.versions?.node || 'Unknown'}
-Electron: ${process?.versions?.electron || 'Unknown'}
-Chrome: ${process?.versions?.chrome || 'Unknown'}
-                `.trim();
-                navigator.clipboard?.writeText(info);
-                const btn = container.querySelector('#aboutCopyBtn');
-                if (btn) {
-                    const orig = btn.textContent;
-                    btn.textContent = 'Copied!';
-                    setTimeout(() => { btn.textContent = orig; }, 1500);
-                }
+Node.js: ${versions.node || 'Unknown'}
+Electron: ${versions.electron || 'Unknown'}
+Chrome: ${versions.chrome || 'Unknown'}
+                    `.trim();
+                    navigator.clipboard?.writeText(info).catch(() => { });
+                    const btn = container.querySelector('#aboutCopyBtn');
+                    if (btn) {
+                        const orig = btn.textContent;
+                        btn.textContent = 'Copied!';
+                        setTimeout(() => { btn.textContent = orig; }, 1500);
+                    }
+                }).catch(() => { });
+            });
+
+            // Hydrate versions from IPC (renderer-safe; no Node globals).
+            queueMicrotask(async () => {
+                const env = await loadEnv();
+                const versions = env?.versions || {};
+                const setText = (id, text) => {
+                    const el = container.querySelector(`#${id}`);
+                    if (el) el.textContent = String(text || 'Unknown');
+                };
+                setText('aboutNodeVersion', versions.node);
+                setText('aboutElectronVersion', versions.electron);
+                setText('aboutChromeVersion', versions.chrome);
             });
 
             return container;

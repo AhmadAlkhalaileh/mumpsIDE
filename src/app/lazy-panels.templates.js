@@ -82,6 +82,7 @@
                 <div class="debug-tab" data-tab="tab-variables">Variables</div>
                 <div class="debug-tab" data-tab="tab-watches">Watches</div>
                 <div class="debug-tab" data-tab="tab-stack">Call Stack</div>
+                <div class="debug-tab" data-tab="tab-timeline">Timeline</div>
                 <div class="debug-tab" data-tab="tab-console">Console</div>
                 <div class="debug-tab" data-tab="tab-problems">Problems</div>
             </div>
@@ -100,6 +101,69 @@
                 </div>
                 <div class="debug-tabpane" id="tab-stack">
                     <ul class="problems-list" id="stackList"></ul>
+                </div>
+                <div class="debug-tabpane" id="tab-timeline">
+                    <div class="dbg-timeline" id="dbgTimelineRoot">
+                        <div class="dbg-timeline-toolbar">
+                            <button class="ui-btn ui-btn--sm ui-btn--primary" id="dbgTimelineCaptureBtn" type="button">
+                                <span class="ui-btn__icon" data-ui-icon="clock" data-ui-icon-size="16" aria-hidden="true"></span>
+                                Capture Snapshot
+                            </button>
+                            <button class="ui-btn ui-btn--sm" id="dbgTimelineExportBtn" type="button">
+                                <span class="ui-btn__icon" data-ui-icon="download" data-ui-icon-size="16" aria-hidden="true"></span>
+                                Export JSON
+                            </button>
+                            <button class="ui-btn ui-btn--sm ui-btn--ghost" id="dbgTimelineClearBtn" type="button">Clear</button>
+                            <div class="dbg-timeline-spacer"></div>
+                            <label class="ui-check dbg-timeline-inline">
+                                <input type="checkbox" id="dbgTimelineChangedOnlyChk" checked>
+                                Changed only
+                            </label>
+                            <input class="ui-input dbg-timeline-search" id="dbgTimelineSearchInput" placeholder="Search locals / globals">
+                        </div>
+
+                        <div class="dbg-timeline-main">
+                            <div class="dbg-timeline-list">
+                                <div class="dbg-timeline-list__header">
+                                    <span class="dbg-timeline-list__title">Stops</span>
+                                    <span class="dbg-timeline-list__meta" id="dbgTimelineListMeta"></span>
+                                </div>
+                                <div class="dbg-timeline-list__body" id="dbgTimelineList"></div>
+                            </div>
+
+                            <div class="dbg-timeline-details">
+                                <div class="dbg-timeline-meta" id="dbgTimelineMeta"></div>
+
+                                <div class="dbg-timeline-compare">
+                                    <div class="dbg-timeline-compare__label">Compare with</div>
+                                    <select class="ui-select dbg-timeline-compare__select" id="dbgTimelineCompareSelect"></select>
+                                </div>
+
+                                <div class="dbg-timeline-panels">
+                                    <div class="dbg-timeline-panel">
+                                        <div class="dbg-timeline-panel__title">Locals</div>
+                                        <div class="dbg-timeline-panel__body" id="dbgTimelineLocals"></div>
+                                    </div>
+                                    <div class="dbg-timeline-panel">
+                                        <div class="dbg-timeline-panel__title">Watched globals</div>
+                                        <div class="dbg-timeline-panel__body" id="dbgTimelineGlobals"></div>
+                                    </div>
+                                </div>
+
+                                    <div class="dbg-timeline-panel dbg-timeline-watches">
+                                        <div class="dbg-timeline-panel__title">Watch a global node</div>
+                                        <div class="dbg-timeline-watch-row">
+                                        <input class="ui-input dbg-timeline-watch-input" id="dbgTimelineWatchInput" placeholder="^DIC(0) or ^GLOBAL(&quot;sub&quot;)">
+                                        <button class="ui-btn ui-btn--sm" id="dbgTimelineWatchAddBtn" type="button">Add</button>
+                                    </div>
+                                    <div class="dbg-timeline-watch-list" id="dbgTimelineWatchList"></div>
+                                    <div class="pane-subtitle" id="dbgTimelineWatchHint"></div>
+                                </div>
+
+                                <div class="pane-subtitle dbg-timeline-status" id="dbgTimelineStatus"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="debug-tabpane" id="tab-console">
                     <pre class="debug-output" id="debugOutput"></pre>
@@ -810,6 +874,77 @@
                         background: rgba(139, 233, 253, 0.5);
                     }
                 </style>
+            </div>
+        `,
+        globalImpactPanel: `
+            <div class="ps-gi-window ps-git-window" id="globalImpactRoot">
+                <div class="ps-git-toolbar">
+                    <div class="ps-gi-search-wrap">
+                        <input type="text" class="ps-search ps-gi-search" id="globalImpactSearchInput" placeholder="^GLOBAL (e.g., ^DIC)" spellcheck="false" autocomplete="off">
+                        <div class="ps-gi-suggestions hidden" id="globalImpactSuggestions" role="listbox" aria-label="Global suggestions"></div>
+                    </div>
+                    <button class="ps-icon-btn" id="globalImpactSearchBtn" type="button" title="Search">
+                        <span data-ui-icon="search" data-ui-icon-size="16" aria-hidden="true"></span>
+                    </button>
+                    <span class="ps-separator"></span>
+                    <button class="ps-gi-chip" data-access="READ" type="button" title="Filter READ">READ</button>
+                    <button class="ps-gi-chip" data-access="WRITE" type="button" title="Filter WRITE">WRITE</button>
+                    <button class="ps-gi-chip" data-access="KILL" type="button" title="Filter KILL">KILL</button>
+                    <button class="ps-gi-chip" data-access="MERGE" type="button" title="Filter MERGE">MERGE</button>
+                    <button class="ps-gi-chip" data-access="UNKNOWN" type="button" title="Filter UNKNOWN">UNKNOWN</button>
+                    <span class="ps-separator"></span>
+                    <select class="ps-select-sm" id="globalImpactExportFormat" title="Export format">
+                        <option value="json">JSON</option>
+                        <option value="csv">CSV</option>
+                    </select>
+                    <button class="ps-icon-btn" id="globalImpactExportBtn" type="button" title="Export results">
+                        <span data-ui-icon="download" data-ui-icon-size="16" aria-hidden="true"></span>
+                    </button>
+                    <button class="ps-icon-btn" id="globalImpactRefreshIndexBtn" type="button" title="Refresh index">
+                        <span data-ui-icon="refresh" data-ui-icon-size="16" aria-hidden="true"></span>
+                    </button>
+                    <span class="ps-separator"></span>
+                    <span class="ps-gi-runtime-badge hidden" id="globalImpactRuntimeBadge">Runtime available</span>
+                    <button class="ps-icon-btn" id="globalImpactDirectModeBtn" type="button" title="Open in Direct Mode" disabled>
+                        <span data-ui-icon="terminal" data-ui-icon-size="16" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <div class="ps-gi-meta" id="globalImpactMeta">
+                    <div class="ps-gi-meta-left" id="globalImpactMetaLeft">Index: idle</div>
+                    <div class="ps-gi-meta-right" id="globalImpactMetaRight"></div>
+                </div>
+                <div class="ps-gi-results" id="globalImpactResults">
+                    <div class="ps-tree-empty">Type a global name like ^DIC to see where it is used.</div>
+                </div>
+            </div>
+        `,
+        callHierarchyPanel: `
+            <div class="ps-call-hierarchy-window">
+                <div class="ps-git-toolbar">
+                    <button class="ps-btn-sm ps-btn-primary active" id="callHierarchyModeOutgoing" type="button" title="Outgoing Calls">
+                        <span data-ui-icon="arrow-right" data-ui-icon-size="12" aria-hidden="true"></span>
+                        Calls
+                    </button>
+                    <button class="ps-btn-sm ps-btn-primary" id="callHierarchyModeIncoming" type="button" title="Incoming Calls">
+                        <span data-ui-icon="arrow-left" data-ui-icon-size="12" aria-hidden="true"></span>
+                        Called By
+                    </button>
+                    <span class="ps-separator"></span>
+                    <input type="text" class="ps-search" placeholder="Filter..." id="callHierarchySearchInput">
+                    <button class="ps-icon-btn" id="callHierarchyRefreshBtn" type="button" title="Refresh Index">
+                        <span data-ui-icon="refresh" data-ui-icon-size="16" aria-hidden="true"></span>
+                    </button>
+                </div>
+                <div class="ps-git-3pane" style="grid-template-columns: 1fr;">
+                    <div class="ps-git-log-panel" id="callHierarchyTree">
+                        <div class="ps-tree-empty">
+                            <div style="text-align: center; padding: 20px; color: var(--text-secondary);">
+                                <div style="font-size: 14px; margin-bottom: 8px;">No routine selected</div>
+                                <div style="font-size: 11px;">Right-click in editor → "Show Call Hierarchy"</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         `
     };

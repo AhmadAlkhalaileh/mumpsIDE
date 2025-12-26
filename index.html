@@ -23,9 +23,11 @@
     <link rel="stylesheet" href="./styles/toolbar.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/panels-terminal.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/debug-problems.css?v=20251209-performance">
+    <link rel="stylesheet" href="./styles/debug-timeline.css?v=20251226">
     <link rel="stylesheet" href="./styles/search.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/connections.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/git.css?v=20251209-performance">
+    <link rel="stylesheet" href="./styles/global-impact.css">
     <link rel="stylesheet" href="./styles/extensions.css?v=20251209-performance">
     <link rel="stylesheet" href="./styles/compare-with-release.css?v=20251223">
     <link rel="stylesheet" href="./styles/services.css?v=20251220">
@@ -278,6 +280,11 @@
                     </svg>
                     <span class="stripe-text">Services</span>
                 </button>
+                <button class="tool-window-stripe-btn horizontal" data-panel="globalImpactPanel" data-position="bottom"
+                    title="Global Impact">
+                    <span data-ui-icon="graph" data-ui-icon-size="16" aria-hidden="true"></span>
+                    <span class="stripe-text">Impact</span>
+                </button>
                 <button class="tool-window-stripe-btn horizontal" data-panel="patchTrackingPanel" data-position="bottom"
                     title="Patch Tracking">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
@@ -297,6 +304,7 @@
                     <section class="panel debug-panel hidden" id="gitToolPanel"></section>
                     <section class="panel debug-panel hidden" id="extensionsPanel"></section>
                     <section class="panel services-panel hidden" id="servicesPanel"></section>
+                    <section class="panel debug-panel hidden" id="globalImpactPanel"></section>
                     <section class="panel debug-panel hidden" id="patchTrackingPanel"></section>
                     <section class="panel debug-panel hidden" id="callHierarchyPanel"></section>
                 </div>
@@ -386,6 +394,8 @@
     <script src="./utils/debug-log.js"></script>
     <script src="./utils/logger.js"></script>
     <script src="./src/services/settingsService.js"></script>
+    <script src="./src/services/debugTimelineService.js"></script>
+    <script src="./src/services/debugTimelineDiffService.js"></script>
     <script src="./src/services/fontService.js"></script>
     <script src="./src/services/extensionsService.js"></script>
     <script src="./src/app/registries/dialogRegistry.js"></script>
@@ -431,6 +441,7 @@
     <script src="./src/features/terminal/plain-fallback.js"></script>
     <script src="./src/editor/search/renderer-search.js"></script>
     <script src="./src/editor/debug/renderer-debug.js"></script>
+    <script src="./src/features/debugTimeline/renderer-debug-timeline.js"></script>
     <script src="./src/editor/problems/renderer-problems.js"></script>
     <script src="./src/editor/diagnostics/renderer-diagnostics.js"></script>
     <script src="./src/editor/extensions/renderer-extensions.js"></script>
@@ -439,7 +450,9 @@
     <script src="./src/editor/git/renderer-git-repo-manager.js"></script>
     <script src="./src/editor/git/renderer-git-blame.js"></script>
     <script src="./src/services/callIndexer.js"></script>
+    <script src="./src/services/globalReferenceIndexService.js"></script>
     <script src="./src/features/callHierarchy/renderer-call-hierarchy.js"></script>
+    <script src="./src/features/globalImpact/renderer-global-impact.js"></script>
     <script src="./src/editor/connections/renderer-connections.js"></script>
     <script src="./src/editor/project/renderer-project-create.js"></script>
     <script src="./src/editor/project/renderer-project-context-menu.js"></script>

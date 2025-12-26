@@ -9,6 +9,7 @@
 @import "./styles/toolbar.css?v=20251209-performance";
 @import "./styles/panels-terminal.css?v=20251209-performance";
 @import "./styles/debug-problems.css?v=20251209-performance";
+@import "./styles/debug-timeline.css?v=20251226";
 @import "./styles/search.css?v=20251209-performance";
 @import "./styles/connections.css?v=20251209-performance";
 @import "./styles/git.css?v=20251209-performance";

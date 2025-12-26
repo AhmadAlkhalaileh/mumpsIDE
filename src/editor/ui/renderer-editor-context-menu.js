@@ -72,6 +72,7 @@
 
         const getContext = (editor) => {
             let hasDeclaration = false;
+            let hasGlobalAtCursor = false;
             try {
                 if (parseRoutineReferenceAtPosition && editor) {
                     const model = editor.getModel?.();
@@ -79,8 +80,32 @@
                     hasDeclaration = !!(model && pos && parseRoutineReferenceAtPosition(model, pos));
                 }
             } catch (_) { }
+
+            // Check if there's a global variable at cursor (^NAME)
+            try {
+                if (editor) {
+                    const model = editor.getModel?.();
+                    const pos = editor.getPosition?.();
+                    if (model && pos) {
+                        const line = model.getLineContent(pos.lineNumber) || '';
+                        const column = pos.column - 1; // Convert to 0-based
+                        // Match global pattern: ^[A-Za-z%][A-Za-z0-9]*
+                        const globalRx = /\^([A-Za-z%][A-Za-z0-9]*)/g;
+                        let m;
+                        while ((m = globalRx.exec(line))) {
+                            const start = m.index;
+                            const end = start + m[0].length;
+                            if (column >= start && column <= end) {
+                                hasGlobalAtCursor = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (_) { }
+
             const activePath = String(getActiveRoutine() || '').trim();
-            return { hasDeclaration, activePath };
+            return { hasDeclaration, activePath, hasGlobalAtCursor };
         };
 
         function bindEditorContextMenu(editor) {

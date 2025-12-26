@@ -1,0 +1,746 @@
+/* ========================================
+   DEBUG TIMELINE - MODERN REDESIGN
+   ======================================== */
+
+.dbg-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    padding: 12px 14px 10px 14px;
+    background: linear-gradient(135deg, rgba(40, 42, 54, 0.95) 0%, rgba(47, 49, 65, 0.95) 100%);
+    box-sizing: border-box;
+}
+
+/* ========================================
+   TOOLBAR - Sleek & Compact
+   ======================================== */
+
+.dbg-timeline-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    background: rgba(47, 49, 65, 0.6);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    flex-shrink: 0;
+}
+
+.dbg-timeline-toolbar button {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dbg-timeline-toolbar button:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(189, 147, 249, 0.3);
+}
+
+.dbg-timeline-toolbar button:not(:disabled):active {
+    transform: translateY(0);
+}
+
+.dbg-timeline-spacer {
+    flex: 1;
+    min-width: 12px;
+}
+
+.dbg-timeline-inline {
+    color: var(--ui-text-muted);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+.dbg-timeline-search {
+    min-width: 200px;
+    flex: 0 1 280px;
+}
+
+/* ========================================
+   MAIN LAYOUT - Modern Split View
+   ======================================== */
+
+.dbg-timeline-main {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 10px;
+    min-height: 0;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ========================================
+   SNAPSHOT LIST - Timeline Style
+   ======================================== */
+
+.dbg-timeline-list,
+.dbg-timeline-details {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    background: rgba(47, 49, 65, 0.5);
+    backdrop-filter: blur(16px);
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.dbg-timeline-list__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(135deg, rgba(52, 55, 70, 0.8) 0%, rgba(43, 45, 58, 0.8) 100%);
+    flex-shrink: 0;
+}
+
+.dbg-timeline-list__title {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-bright);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.dbg-timeline-list__meta {
+    font-size: 10px;
+    color: var(--accent-blue);
+    font-weight: 600;
+    background: rgba(139, 233, 253, 0.1);
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(139, 233, 253, 0.2);
+}
+
+.dbg-timeline-list__body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 8px;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+}
+
+/* Custom scrollbar */
+.dbg-timeline-list__body::-webkit-scrollbar,
+.dbg-timeline-details::-webkit-scrollbar,
+.dbg-timeline-panel__body::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.dbg-timeline-list__body::-webkit-scrollbar-track,
+.dbg-timeline-details::-webkit-scrollbar-track,
+.dbg-timeline-panel__body::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.dbg-timeline-list__body::-webkit-scrollbar-thumb,
+.dbg-timeline-details::-webkit-scrollbar-thumb,
+.dbg-timeline-panel__body::-webkit-scrollbar-thumb {
+    background: rgba(189, 147, 249, 0.3);
+    border-radius: 4px;
+}
+
+.dbg-timeline-list__body::-webkit-scrollbar-thumb:hover,
+.dbg-timeline-details::-webkit-scrollbar-thumb:hover,
+.dbg-timeline-panel__body::-webkit-scrollbar-thumb:hover {
+    background: rgba(189, 147, 249, 0.5);
+}
+
+/* ========================================
+   TIMELINE ITEMS - Beautiful Cards
+   ======================================== */
+
+.dbg-timeline-item {
+    position: relative;
+    display: grid;
+    grid-template-columns: 20px 1fr;
+    gap: 10px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    background: rgba(40, 42, 54, 0.4);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dbg-timeline-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--muted);
+    border-radius: 8px 0 0 8px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dbg-timeline-item:hover {
+    background: rgba(52, 55, 70, 0.6);
+    border-color: rgba(189, 147, 249, 0.2);
+    transform: translateX(2px);
+}
+
+.dbg-timeline-item:hover::before {
+    background: var(--accent);
+    box-shadow: 0 0 12px rgba(189, 147, 249, 0.4);
+}
+
+.dbg-timeline-item.active {
+    background: linear-gradient(135deg, rgba(189, 147, 249, 0.15) 0%, rgba(139, 233, 253, 0.1) 100%);
+    border-color: rgba(189, 147, 249, 0.4);
+    box-shadow: 0 4px 16px rgba(189, 147, 249, 0.2);
+}
+
+.dbg-timeline-item.active::before {
+    background: linear-gradient(180deg, var(--accent) 0%, var(--accent-blue) 100%);
+    box-shadow: 0 0 16px rgba(189, 147, 249, 0.6);
+}
+
+/* Timeline connector line */
+.dbg-timeline-list__body::before {
+    content: '';
+    position: absolute;
+    left: 21px;
+    top: 20px;
+    bottom: 20px;
+    width: 2px;
+    background: linear-gradient(180deg,
+        rgba(189, 147, 249, 0.2) 0%,
+        rgba(139, 233, 253, 0.2) 50%,
+        rgba(189, 147, 249, 0.2) 100%
+    );
+    border-radius: 2px;
+    pointer-events: none;
+}
+
+.dbg-timeline-item__dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--muted);
+    border: 2px solid var(--panel);
+    margin-top: 2px;
+    position: relative;
+    z-index: 1;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 0 0 rgba(189, 147, 249, 0);
+}
+
+.dbg-timeline-item:hover .dbg-timeline-item__dot {
+    box-shadow: 0 0 0 4px rgba(189, 147, 249, 0.2);
+}
+
+.dbg-timeline-item.active .dbg-timeline-item__dot {
+    box-shadow: 0 0 0 6px rgba(189, 147, 249, 0.3),
+                0 0 16px rgba(189, 147, 249, 0.5);
+}
+
+.dbg-timeline-item__dot.reason-breakpoint {
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(189, 147, 249, 0.6);
+}
+
+.dbg-timeline-item__dot.reason-step {
+    background: var(--accent-blue);
+    box-shadow: 0 0 8px rgba(139, 233, 253, 0.6);
+}
+
+.dbg-timeline-item__dot.reason-manual {
+    background: var(--accent-green);
+    box-shadow: 0 0 8px rgba(80, 250, 123, 0.6);
+}
+
+.dbg-timeline-item__main {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.dbg-timeline-item__loc {
+    font-family: var(--font-code);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dbg-timeline-item.active .dbg-timeline-item__loc {
+    color: var(--accent-blue);
+    font-weight: 600;
+}
+
+.dbg-timeline-item__meta {
+    display: flex;
+    gap: 6px;
+    font-size: 9px;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+/* ========================================
+   DETAILS PANEL - Modern Cards
+   ======================================== */
+
+.dbg-timeline-details {
+    padding: 10px 12px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    min-height: 0;
+}
+
+.dbg-timeline-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    background: linear-gradient(135deg, rgba(52, 55, 70, 0.6) 0%, rgba(43, 45, 58, 0.6) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.dbg-timeline-meta__left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    flex: 1;
+}
+
+.dbg-timeline-meta__title {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--text-bright);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dbg-timeline-meta__sub {
+    font-size: 10px;
+    color: var(--accent-blue);
+    font-weight: 500;
+}
+
+.dbg-timeline-meta__right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dbg-timeline-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid rgba(189, 147, 249, 0.3);
+    background: linear-gradient(135deg, rgba(189, 147, 249, 0.15) 0%, rgba(139, 233, 253, 0.1) 100%);
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent);
+    user-select: none;
+    letter-spacing: 0.3px;
+    box-shadow: 0 2px 8px rgba(189, 147, 249, 0.15);
+}
+
+/* ========================================
+   COMPARE SELECT
+   ======================================== */
+
+.dbg-timeline-compare {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    background: rgba(43, 45, 58, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+}
+
+.dbg-timeline-compare__label {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+    min-width: 75px;
+    letter-spacing: 0.3px;
+}
+
+.dbg-timeline-compare__select {
+    min-width: 160px;
+    flex: 1;
+    max-width: 320px;
+}
+
+/* ========================================
+   VARIABLE PANELS - Beautiful Cards
+   ======================================== */
+
+.dbg-timeline-panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.dbg-timeline-panel {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgba(43, 45, 58, 0.5) 0%, rgba(36, 38, 49, 0.5) 100%);
+    backdrop-filter: blur(12px);
+    overflow: hidden;
+    min-height: 100px;
+    max-height: 140px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dbg-timeline-panel:hover {
+    border-color: rgba(189, 147, 249, 0.2);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.dbg-timeline-panel__title {
+    padding: 7px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(135deg, rgba(52, 55, 70, 0.8) 0%, rgba(43, 45, 58, 0.8) 100%);
+    font-weight: 600;
+    color: var(--text-bright);
+    font-size: 10px;
+    letter-spacing: 0.6px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.dbg-timeline-panel__body {
+    padding: 8px 10px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    flex: 1;
+    min-height: 0;
+    font-family: var(--font-code);
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+.dbg-timeline-empty {
+    color: var(--muted);
+    font-family: var(--ui-font-ui);
+    font-size: 10px;
+    padding: 8px;
+    text-align: center;
+    font-style: italic;
+    opacity: 0.6;
+}
+
+/* ========================================
+   VARIABLE ROWS - Modern Design
+   ======================================== */
+
+.dbg-timeline-row {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 10px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    align-items: baseline;
+    transition: all 0.2s ease;
+}
+
+.dbg-timeline-row:last-child {
+    border-bottom: none;
+}
+
+.dbg-timeline-row:hover {
+    background: rgba(189, 147, 249, 0.05);
+    border-radius: 4px;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+.dbg-timeline-row__name {
+    color: var(--accent-blue);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.dbg-timeline-row__value {
+    display: grid;
+    grid-template-columns: 1fr 14px 1fr;
+    gap: 6px;
+    min-width: 0;
+}
+
+.dbg-timeline-row__before,
+.dbg-timeline-row__after {
+    color: var(--text);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    padding: 3px 6px;
+    background: rgba(40, 42, 54, 0.6);
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dbg-timeline-row__arrow {
+    color: var(--accent);
+    text-align: center;
+    font-weight: 600;
+    font-size: 10px;
+}
+
+/* Status-based styling */
+.dbg-timeline-row.status-added {
+    border-left: 2px solid var(--accent-green);
+    padding-left: 6px;
+    background: linear-gradient(90deg, rgba(80, 250, 123, 0.08) 0%, transparent 100%);
+}
+
+.dbg-timeline-row.status-added .dbg-timeline-row__after {
+    border-color: rgba(80, 250, 123, 0.3);
+    background: rgba(80, 250, 123, 0.1);
+}
+
+.dbg-timeline-row.status-removed {
+    border-left: 2px solid var(--accent-2);
+    padding-left: 6px;
+    background: linear-gradient(90deg, rgba(255, 121, 198, 0.08) 0%, transparent 100%);
+}
+
+.dbg-timeline-row.status-removed .dbg-timeline-row__before {
+    border-color: rgba(255, 121, 198, 0.3);
+    background: rgba(255, 121, 198, 0.1);
+}
+
+.dbg-timeline-row.status-changed {
+    border-left: 2px solid var(--accent);
+    padding-left: 6px;
+    background: linear-gradient(90deg, rgba(189, 147, 249, 0.08) 0%, transparent 100%);
+}
+
+.dbg-timeline-row.status-changed .dbg-timeline-row__before,
+.dbg-timeline-row.status-changed .dbg-timeline-row__after {
+    border-color: rgba(189, 147, 249, 0.3);
+}
+
+.dbg-timeline-row.status-unchanged {
+    opacity: 0.6;
+}
+
+/* ========================================
+   ARRAY EXPANSION
+   ======================================== */
+
+.dbg-timeline-array-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dbg-timeline-array-toggle {
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    border: 1px solid rgba(189, 147, 249, 0.3);
+    background: rgba(189, 147, 249, 0.1);
+    color: var(--accent);
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.dbg-timeline-array-toggle:hover {
+    border-color: rgba(189, 147, 249, 0.5);
+    background: rgba(189, 147, 249, 0.2);
+    transform: scale(1.1);
+}
+
+.dbg-timeline-array-children {
+    margin-left: 20px;
+    margin-top: 4px;
+    padding-left: 8px;
+    border-left: 2px solid rgba(139, 233, 253, 0.2);
+}
+
+/* ========================================
+   WATCHED GLOBALS
+   ======================================== */
+
+.dbg-timeline-watches {
+    margin-top: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    overflow: hidden;
+    background: rgba(43, 45, 58, 0.3);
+}
+
+.dbg-timeline-watch-row {
+    display: flex;
+    gap: 8px;
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(52, 55, 70, 0.4);
+}
+
+.dbg-timeline-watch-input {
+    flex: 1;
+    min-width: 0;
+}
+
+.dbg-timeline-watch-list {
+    padding: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 40px;
+}
+
+.dbg-timeline-watch-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid rgba(139, 233, 253, 0.3);
+    background: linear-gradient(135deg, rgba(139, 233, 253, 0.15) 0%, rgba(189, 147, 249, 0.1) 100%);
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-family: var(--font-code);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--accent-blue);
+    transition: all 0.2s ease;
+}
+
+.dbg-timeline-watch-chip:hover {
+    background: linear-gradient(135deg, rgba(139, 233, 253, 0.25) 0%, rgba(189, 147, 249, 0.2) 100%);
+    border-color: rgba(139, 233, 253, 0.5);
+    box-shadow: 0 2px 8px rgba(139, 233, 253, 0.3);
+}
+
+.dbg-timeline-watch-remove {
+    width: 16px;
+    height: 16px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 10px;
+}
+
+.dbg-timeline-watch-remove:hover {
+    background: rgba(255, 121, 198, 0.2);
+    border-color: var(--accent-2);
+    color: var(--accent-2);
+}
+
+.dbg-timeline-status {
+    margin-top: 8px;
+    font-size: 10px;
+    color: var(--muted);
+    font-style: italic;
+    padding: 6px 8px;
+    background: rgba(40, 42, 54, 0.4);
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* ========================================
+   RESPONSIVE DESIGN
+   ======================================== */
+
+@media (max-width: 1200px) {
+    .dbg-timeline-main {
+        grid-template-columns: 240px 1fr;
+    }
+}
+
+@media (max-width: 980px) {
+    .dbg-timeline-main {
+        grid-template-columns: 1fr;
+    }
+
+    .dbg-timeline-panels {
+        grid-template-columns: 1fr;
+    }
+
+    .dbg-timeline-row {
+        grid-template-columns: 100px 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .dbg-timeline {
+        padding: 8px;
+        gap: 8px;
+    }
+
+    .dbg-timeline-main {
+        gap: 8px;
+    }
+
+    .dbg-timeline-toolbar {
+        padding: 8px 10px;
+    }
+}
+
+/* ========================================
+   ANIMATIONS
+   ======================================== */
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.dbg-timeline-item {
+    animation: slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.dbg-timeline-item.active .dbg-timeline-item__dot {
+    animation: pulse 2s ease-in-out infinite;
+}

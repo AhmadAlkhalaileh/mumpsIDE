@@ -64,6 +64,42 @@ contextBridge.exposeInMainWorld('ahmadIDE', {
     openFolderDialog: () => ipcRenderer.invoke('dialog:openFolder'),
     revealInExplorer: (path) => ipcRenderer.invoke('shell:reveal', { path }),
 
+    // Workspace FS (offline indexing)
+    listFiles: async (dir, pattern, opts) => {
+        try {
+            const res = await ipcRenderer.invoke('workspace:listFiles', { dir, pattern, opts });
+            return res?.ok ? (res.files || []) : [];
+        } catch (_) {
+            return [];
+        }
+    },
+    readFile: async (filePath, opts) => {
+        try {
+            return await ipcRenderer.invoke('workspace:readFile', { filePath, opts });
+        } catch (err) {
+            return { ok: false, error: err?.message || String(err) };
+        }
+    },
+    watchFiles: async (root, pattern, opts) => {
+        try {
+            return await ipcRenderer.invoke('workspace:watch', { root, pattern, opts });
+        } catch (err) {
+            return { ok: false, error: err?.message || String(err) };
+        }
+    },
+    unwatchFiles: async (watchId) => {
+        try {
+            return await ipcRenderer.invoke('workspace:unwatch', { watchId });
+        } catch (err) {
+            return { ok: false, error: err?.message || String(err) };
+        }
+    },
+    onWorkspaceFilesChanged: (callback) => {
+        const handler = (_event, payload) => callback(payload);
+        ipcRenderer.on('workspace:filesChanged', handler);
+        return () => ipcRenderer.removeListener('workspace:filesChanged', handler);
+    },
+
     // App
     toggleDevTools: () => ipcRenderer.invoke('devtools:toggle'),
     exitApp: () => ipcRenderer.invoke('app:exit'),

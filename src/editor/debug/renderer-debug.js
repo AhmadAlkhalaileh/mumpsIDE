@@ -59,6 +59,20 @@
 
         const currentDebugSessionRef = state.currentDebugSessionRef;
         const expandedArrayKeys = new Set();
+        const getDebugTimelineService = () =>
+            deps?.debugTimelineService || window.AhmadIDEModules?.services?.debugTimelineService || null;
+
+        let lastDebugAction = null; // 'into' | 'over' | 'out' | 'continue' | 'start' | null
+        const setGlobalDebugPaused = (paused) => {
+            const next = !!paused;
+            try { window.__ahmadIDE_debugPaused = next; } catch (_) { }
+            try {
+                window.AhmadIDEModules = window.AhmadIDEModules || {};
+                window.AhmadIDEModules.debug = window.AhmadIDEModules.debug || {};
+                window.AhmadIDEModules.debug.state = window.AhmadIDEModules.debug.state || {};
+                window.AhmadIDEModules.debug.state.paused = next;
+            } catch (_) { }
+        };
 
         const bpKeyFor = (file, line) => `${file || 'Untitled'}::${line}`;
         const parseBpKey = (key) => {
@@ -590,6 +604,7 @@
                 engine: res.engine || 'zstep',
                 currentLine: res.currentLine,
                 currentRoutine: res.currentRoutine || 'TMPDBG',
+                currentTag: res.currentTag || '',
                 stack: res.stack || [],
                 locals: res.locals || {},
                 ready: res.ready || false,
@@ -598,6 +613,10 @@
             };
 
             const currentDebugSession = currentDebugSessionRef.value;
+            setGlobalDebugPaused(!!currentDebugSession.currentLine);
+            try {
+                getDebugTimelineService()?.startSession?.(currentDebugSession.id);
+            } catch (_) { }
             if (dbgState) {
                 dbgState.sessionId = res.sessionId;
                 dbgState.locals = currentDebugSession.locals;
@@ -634,6 +653,8 @@
             // If the engine is ready but not executing, automatically run to first breakpoint (or stop on entry if none)
             if (currentDebugSession.ready && !currentDebugSession.currentLine) {
                 try {
+                    setGlobalDebugPaused(false);
+                    lastDebugAction = (breakpoints && breakpoints.length) ? 'continue' : 'into';
                     const initialResult = (breakpoints && breakpoints.length)
                         ? await window.ahmadIDE.debugContinue(currentDebugSession.id)
                         : await window.ahmadIDE.debugStep(currentDebugSession.id, 'into');
@@ -648,9 +669,19 @@
             // If the backend already paused us somewhere, reflect that immediately
             if (currentDebugSession.currentLine) {
                 dbgLog('[DEBUG] Debugger in PAUSED state - enabling all buttons');
+                setGlobalDebugPaused(true);
                 setDebugButtons(true);
                 gotoEditorLine(currentDebugSession.currentLine);
                 showToast('success', 'Debug', 'Debugger paused at line ' + currentDebugSession.currentLine);
+                try {
+                    getDebugTimelineService()?.captureOnStop?.({
+                        sessionId: currentDebugSession.id,
+                        reason: 'Start',
+                        location: { routine: currentDebugSession.currentRoutine, tag: currentDebugSession.currentTag, line: currentDebugSession.currentLine },
+                        stack: currentDebugSession.stack,
+                        locals: currentDebugSession.locals
+                    });
+                } catch (_) { }
                 return;
             }
 
@@ -663,6 +694,8 @@
                 showToast('warn', 'Debug', 'No active debug session');
                 return;
             }
+            setGlobalDebugPaused(false);
+            lastDebugAction = 'into';
             const result = await window.ahmadIDE.debugStep(currentDebugSession.id, 'into');
             await handleDebugResult(result);
         }
@@ -673,6 +706,8 @@
                 showToast('warn', 'Debug', 'No active debug session');
                 return;
             }
+            setGlobalDebugPaused(false);
+            lastDebugAction = 'over';
             const result = await window.ahmadIDE.debugStep(currentDebugSession.id, 'over');
             await handleDebugResult(result);
         }
@@ -683,6 +718,8 @@
                 showToast('warn', 'Debug', 'No active debug session');
                 return;
             }
+            setGlobalDebugPaused(false);
+            lastDebugAction = 'out';
             const result = await window.ahmadIDE.debugStep(currentDebugSession.id, 'out');
             await handleDebugResult(result);
         }
@@ -694,6 +731,8 @@
                 showToast('warn', 'Debug', 'No active debug session');
                 return;
             }
+            setGlobalDebugPaused(false);
+            lastDebugAction = 'continue';
             const result = await window.ahmadIDE.debugContinue(currentDebugSession.id);
             await handleDebugResult(result);
         }
@@ -761,13 +800,15 @@
                     currentDebugSessionRef.value = {
                         id: result.sessionId || null,
                         engine: 'zstep',
-                        originalRoutine: routineStateRef?.current || null
+                        originalRoutine: routineStateRef?.current || null,
+                        currentTag: result.currentTag || ''
                     };
                 }
 
                 const currentDebugSession = currentDebugSessionRef.value;
                 currentDebugSession.currentLine = result.currentLine;
                 currentDebugSession.currentRoutine = result.currentRoutine || currentDebugSession.currentRoutine;
+                currentDebugSession.currentTag = result.currentTag || currentDebugSession.currentTag || '';
                 currentDebugSession.stack = result.stack || currentDebugSession.stack || [];
                 // CRITICAL: Always update locals from result (don't use fallback to old locals)
                 currentDebugSession.locals = result.locals || {};
@@ -825,6 +866,7 @@
                 updateDebugButtonState();
 
                 // Enable all debug buttons (debugger is paused at a line)
+                setGlobalDebugPaused(true);
                 setDebugButtons(true);
 
                 if (wasReady) {
@@ -833,6 +875,32 @@
 
                 logger.debug('Debug State Updated:', currentDebugSession);
                 dbgLog('[DEBUG] Current variables:', currentDebugSession.locals);
+
+                // Time‑travel snapshots (optional; guarded inside service)
+                try {
+                    const reason = isUserBreakpoint
+                        ? 'Breakpoint'
+                        : lastDebugAction === 'into'
+                            ? 'Step Into'
+                            : lastDebugAction === 'over'
+                                ? 'Step Over'
+                                : lastDebugAction === 'out'
+                                    ? 'Step Out'
+                                    : lastDebugAction === 'continue'
+                                        ? 'Continue'
+                                        : wasReady
+                                            ? 'Start'
+                                            : 'Stop';
+
+                    getDebugTimelineService()?.captureOnStop?.({
+                        sessionId: currentDebugSession.id,
+                        reason,
+                        location: { routine: currentDebugSession.currentRoutine, tag: currentDebugSession.currentTag, line: currentDebugSession.currentLine },
+                        stack: currentDebugSession.stack,
+                        locals: currentDebugSession.locals
+                    });
+                } catch (_) { }
+                lastDebugAction = null;
             }
         }
 
@@ -852,6 +920,7 @@
         }
 
         function resetDebugUI(clearSession = false, keepArmed = false) {
+            setGlobalDebugPaused(false);
             setDebugButtons(false);
             const bar = document.getElementById('debugBar');
             if (bar) {
@@ -872,6 +941,10 @@
 
             // Reset session
             if (clearSession) {
+                try {
+                    const sid = currentDebugSessionRef.value?.id;
+                    if (sid) getDebugTimelineService()?.endSession?.(sid);
+                } catch (_) { }
                 currentDebugSessionRef.value = null;
                 const dbgStateRef = getDbgStateRef();
                 if (dbgStateRef) {
@@ -889,6 +962,40 @@
                 }
             }
             updateDebugButtonState();
+        }
+
+        function wireDebugTimelineEvents() {
+            try {
+                if (!window || window.__ahmadIDE_debugTimelineWired) return;
+                window.__ahmadIDE_debugTimelineWired = true;
+            } catch (_) {
+                return;
+            }
+
+            window.addEventListener('ahmadIDE:debugTimelineCapture', () => {
+                try {
+                    const current = currentDebugSessionRef.value;
+                    if (!current?.id) return;
+                    getDebugTimelineService()?.captureManual?.({
+                        sessionId: current.id,
+                        reason: 'Manual',
+                        location: { routine: current.currentRoutine, tag: current.currentTag, line: current.currentLine },
+                        stack: current.stack || [],
+                        locals: current.locals || {}
+                    });
+                } catch (_) { }
+            });
+
+            window.addEventListener('ahmadIDE:debugTimelineNavigate', async (e) => {
+                try {
+                    const routine = String(e?.detail?.routine || '').trim();
+                    const line = Number(e?.detail?.line || 0) || null;
+                    if (!routine || !line) return;
+                    const dbgStateRef = getDbgStateRef();
+                    await focusDebugLocation(routine, line, getGlobalTerminalState(), dbgStateRef);
+                    highlightLine(getActiveEditor(), line);
+                } catch (_) { }
+            });
         }
 
         function setDebugButtons(enabled) {
@@ -959,17 +1066,20 @@
 
                     let varName = word.word.toUpperCase();
 
-                    // Handle Mumps % variables (e.g., %Z) which getWordAtPosition might split
+                    // Handle Mumps % variables (e.g., %Z) and global variables (e.g., ^DIC)
+                    // which getWordAtPosition might split
                     // Check character immediately before the word
                     if (word.startColumn > 1) {
                         const prevCharRange = new monacoRef.Range(position.lineNumber, word.startColumn - 1, position.lineNumber, word.startColumn);
                         const prevChar = model.getValueInRange(prevCharRange);
                         if (prevChar === '%') {
                             varName = '%' + varName;
+                        } else if (prevChar === '^') {
+                            varName = '^' + varName;
                         }
                     }
 
-                    const subMatch = varName.match(/^([A-Z%][A-Z0-9]*)(\(.+\))$/);
+                    const subMatch = varName.match(/^(\^?[A-Z%][A-Z0-9]*)(\(.+\))$/);
                     const baseName = subMatch ? subMatch[1] : null;
                     const subscriptKey = subMatch ? subMatch[2] : null;
 
@@ -1061,7 +1171,8 @@
             setDebugButtons,
             updateDebugButtonState,
             scheduleDebugUiBindings,
-            registerMumpsHover
+            registerMumpsHover,
+            wireDebugTimelineEvents
         };
     }
 
@@ -1071,4 +1182,3 @@
         window.AhmadIDEModules.debug.createDebugManager = createDebugManager;
     }
 })();
-
