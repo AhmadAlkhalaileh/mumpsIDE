@@ -205,9 +205,7 @@ Mumps Studio is a modern, inspired Integrated Development Environment built spec
 |----------|-------------|---------|
 | `AHMAD_IDE_USE_SG` | Use `sg docker` wrapper for Docker commands | `0` |
 | `AHMAD_IDE_ENABLE_NODE_PTY` | Enable node-pty for terminal (requires compilation) | `0` |
-| `AHMAD_IDE_DEBUG_ENGINE` | Debug engine mode (`legacy` or default ZSTEP) | `zstep` |
-| `AHMDDG_HOST` | AHMDDG server host | `127.0.0.1` |
-| `AHMDDG_PORT` | AHMDDG server port | `9200` |
+| `AHMAD_IDE_DEBUG_ENGINE` | Debug engine mode (ZSTEP only) | `zstep` |
 
 ---
 
@@ -1201,8 +1199,7 @@ editor.deltaDecorations([], [
 #### AHMDBG.m Structure
 
 **Entry Points:**
-1. `AHMDBGJSON^AHMDBG(routine, tag)` - JSON mode entry
-2. `MAIN^AHMDBG` - TCP server mode (port 9200)
+1. `AHMDBGJSON^AHMDBG(routine, tag)` - JSON mode entry (stdin/stdout communication)
 
 **Core Functions:**
 - `STEPJSON()` - $ZSTEP handler, sends stopped event
@@ -1224,14 +1221,13 @@ SET $ZSTEP="ZSHOW ""V"":^%AHMDBG($J,""VARS"") SET %STP=$$STEPJSON^AHMDBG() ZSTEP
 1. User clicks Debug button
 2. Renderer calls `ahmadIDE.debugStart(code, breakpoints, startLine)`
 3. Main process calls `bridge.debugStart()`
-4. Bridge writes code to temp file
-5. Bridge starts AHMDBG server (if not running)
-6. Bridge connects MDebugClient to server
-7. Client sends breakpoints via SETBPJSON
-8. Client sends INTO command
-9. AHMDBG loads routine and enters ZSTEP mode
-10. Each step triggers STEPJSON, sends stopped event
-11. Client receives event, updates UI
+4. Bridge spawns YottaDB process with ZSTEP engine
+5. Bridge sends JSON commands via stdin
+6. ZSTEP engine sets breakpoints using ZBREAK
+7. Engine executes routine in debug mode
+8. Each step triggers $ZSTEP action, sends JSON event to stdout
+9. Bridge receives events, parses them
+10. Updates UI via IPC to renderer
 12. User clicks Step/Continue
 13. Client sends command (INTO/OVER/OUTOF/CONTINUE)
 14. AHMDBG executes next step

@@ -1312,9 +1312,6 @@ These are internal functions in `bridge.js`, not directly exposed to renderer.
 - `runHostCommand(cmd)` - Execute command on host
 - `writeRemoteFile(path, content)` - Write file to remote system
 - `readRemoteFile(path)` - Read file from remote system
-- `startMdebugServer(host, port)` - Start AHMDBG server
-- `ensureMdebugServer(host, port)` - Ensure server is running
-- `convertMdebugPosition(posString)` - Convert MUMPS position to file:line
 
 ---
 

@@ -329,34 +329,80 @@
 
         function ensureConsoleInput() {
             const pane = document.getElementById('tab-console');
+            if (!pane) {
+                console.warn('[DEBUG CONSOLE] tab-console element not found - retrying in 1s');
+                // Retry after panel might be mounted
+                setTimeout(() => {
+                    const paneRetry = document.getElementById('tab-console');
+                    if (!paneRetry) {
+                        console.error('[DEBUG CONSOLE] tab-console still not found after retry');
+                        return;
+                    }
+                    console.log('[DEBUG CONSOLE] Found on retry, initializing...');
+                    ensureConsoleInputInternal(paneRetry);
+                }, 1000);
+                return;
+            }
+            ensureConsoleInputInternal(pane);
+        }
+
+        function ensureConsoleInputInternal(pane) {
             if (!pane) return;
-            if (document.getElementById('debugConsoleInput')) return;
-            const wrapper = document.createElement('div');
-            wrapper.className = 'debug-console-input';
-            const input = document.createElement('input');
-            input.id = 'debugConsoleInput';
-            input.type = 'text';
-            input.placeholder = 'M command (e.g., SET X=5 or WRITE X)';
-            const btn = document.createElement('button');
-            btn.id = 'debugConsoleSend';
-            btn.className = 'btn ghost';
-            btn.textContent = 'Run';
-            btn.title = 'Execute in paused frame';
-            wrapper.appendChild(input);
-            wrapper.appendChild(btn);
-            pane.appendChild(wrapper);
+
+            let input = document.getElementById('debugConsoleInput');
+            let btn = document.getElementById('debugConsoleSend');
+
+            console.log('[DEBUG CONSOLE] Elements found:', { input: !!input, btn: !!btn });
+
+            // If elements don't exist, create them
+            if (!input || !btn) {
+                console.log('[DEBUG CONSOLE] Creating console input elements');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'debug-console-input';
+                input = document.createElement('input');
+                input.id = 'debugConsoleInput';
+                input.type = 'text';
+                input.className = 'ui-input';
+                input.placeholder = 'Enter MUMPS code...';
+                btn = document.createElement('button');
+                btn.id = 'debugConsoleSend';
+                btn.className = 'ui-btn ui-btn--sm ui-btn--primary';
+                btn.textContent = 'Send';
+                btn.title = 'Execute in paused frame';
+                wrapper.appendChild(input);
+                wrapper.appendChild(btn);
+                pane.appendChild(wrapper);
+            }
+
+            // Skip if already wired
+            if (btn && btn.dataset && btn.dataset.wired) {
+                console.log('[DEBUG CONSOLE] Already wired, skipping');
+                return;
+            }
+            if (btn && btn.dataset) {
+                btn.dataset.wired = 'true';
+            }
+
+            console.log('[DEBUG CONSOLE] Wiring event listeners');
 
             const run = async () => {
+                console.log('[DEBUG CONSOLE] Run function called');
                 const currentDebugSession = currentDebugSessionRef.value;
                 if (!currentDebugSession || !currentDebugSession.id) {
-                    showToast('warn', 'Debug', 'No active debug session');
+                    console.warn('[DEBUG CONSOLE] No active debug session');
+                    showToast('warn', 'Debug', 'No active debug session. Start debugging first.');
                     return;
                 }
                 const code = (input.value || '').trim();
-                if (!code) return;
+                if (!code) {
+                    console.warn('[DEBUG CONSOLE] No code to execute');
+                    return;
+                }
+                console.log('[DEBUG CONSOLE] Executing:', code);
                 appendDebugConsole(`> ${code}`);
                 try {
                     const res = await window.ahmadIDE.debugEval(currentDebugSession.id, code);
+                    console.log('[DEBUG CONSOLE] Result:', res);
                     if (res && res.ok) {
                         if (res.output) appendDebugConsole(res.output.split(/\r?\n/));
                         if (res.locals) {
@@ -370,6 +416,7 @@
                         showToast('error', 'Debug', msg);
                     }
                 } catch (e) {
+                    console.error('[DEBUG CONSOLE] Error:', e);
                     const msg = e?.message || 'Eval error';
                     appendDebugConsole(`! ${msg}`);
                     showToast('error', 'Debug', msg);
@@ -378,13 +425,22 @@
                 }
             };
 
-            btn.addEventListener('click', run);
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    e.preventDefault();
+            if (btn) {
+                btn.addEventListener('click', () => {
+                    console.log('[DEBUG CONSOLE] Send button clicked');
                     run();
-                }
-            });
+                });
+            }
+            if (input) {
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        console.log('[DEBUG CONSOLE] Enter key pressed');
+                        e.preventDefault();
+                        run();
+                    }
+                });
+            }
+            console.log('[DEBUG CONSOLE] Event listeners attached');
         }
 
         function logDebug(lines, termState, replace = false) {

@@ -382,7 +382,7 @@ USER SEES OUTPUT in terminal
 
 ---
 
-### Debug Session Flow
+### Debug Session Flow (ZSTEP Engine)
 
 ```
 1. USER: Clicks Debug button
@@ -392,58 +392,49 @@ USER SEES OUTPUT in terminal
    - Calls debugStart(code, breakpoints)
 
 3. MAIN (bridge.js):
-   - Checks if AHMDBG server is running
-   - If not, starts AHMDBG server:
-     a. Write AHMDBG.m to /tmp/ahmad_dbg/
-     b. Compile: mumps AHMDBG.m
-     c. Start server: mumps -run MAIN^AHMDBG
-     d. Wait for port 9200 to open
-   - Create MDebugClient instance
-   - Connect to 127.0.0.1:9200 (Docker container IP)
+   - Spawns YottaDB process with ZSTEP engine
+   - Uses stdin/stdout pipes for communication (NO TCP)
+   - Sends JSON commands via stdin:
+     {"cmd":"start","routine":"TEST","breakpoints":[...]}
 
-4. MDEBUG CLIENT:
-   - TCP connection established
-   - Sends breakpoints: SETBPJSON;{"routine":"TEST","tag":"MAIN","offset":3}
-   - Sends start command: INTO
-
-5. AHMDBG (YottaDB):
-   - Receives INTO command
+4. ZSTEP ENGINE (YottaDB):
+   - Receives start command via stdin
+   - Sets up breakpoints using $ZSTEP
    - Executes: ZSTEP INTO
    - Enters routine at first line
-   - $ZSTEP action fires: calls STEPJSON^AHMDBG
-   - STEPJSON sends stopped event (JSON via stdout):
+   - $ZSTEP action fires
+   - Sends stopped event via stdout (JSON):
      {"event":"stopped","routine":"TEST","line":5,"tag":"MAIN","offset":3}
-   - Waits for next command (READ from stdin)
+   - Waits for next command via stdin
 
-6. MDEBUG CLIENT:
-   - Receives stopped event
-   - Parses JSON
-   - Converts position to file:line
-   - Sends GETVARS command
-   - AHMDBG responds with {"event":"vars","vars":{...}}
+5. MAIN (bridge.js):
+   - Receives JSON event from stdout
+   - Parses position data
+   - Requests variables: {"cmd":"vars"}
+   - Receives: {"event":"vars","vars":{...}}
 
-7. MAIN → RENDERER:
+6. MAIN → RENDERER:
    - Returns debug state via IPC
    - { ok: true, stopped: true, file: "TEST.m", line: 5, vars: {...} }
 
-8. RENDERER:
+7. RENDERER:
    - Shows debug bar
    - Highlights current line
    - Updates Variables panel
    - Updates Call Stack panel
 
-9. USER: Clicks "Step Over" (F8)
+8. USER: Clicks "Step Over" (F8)
 
-10. RENDERER → MAIN → CLIENT:
-    - debugStep(sessionId, 'over')
-    - Client sends: OVER
+9. RENDERER → MAIN:
+   - debugStep(sessionId, 'over')
+   - Sends via stdin: {"cmd":"step","type":"over"}
 
-11. AHMDBG:
+10. ZSTEP ENGINE:
     - Executes: ZSTEP OVER
     - Stops at next line
-    - Sends stopped event
+    - Sends stopped event via stdout
 
-12. REPEAT steps 6-11 until:
+11. REPEAT steps 5-10 until:
     - User clicks Continue (CONTINUE command)
     - User clicks Stop (HALT command)
     - Routine ends (QUIT)

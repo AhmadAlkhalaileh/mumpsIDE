@@ -167,6 +167,10 @@
                 </div>
                 <div class="debug-tabpane" id="tab-console">
                     <pre class="debug-output" id="debugOutput"></pre>
+                    <div class="debug-console-input">
+                        <input type="text" id="debugConsoleInput" placeholder="Enter MUMPS code..." class="ui-input">
+                        <button id="debugConsoleSend" class="ui-btn ui-btn--sm ui-btn--primary">Send</button>
+                    </div>
                 </div>
                 <div class="debug-tabpane" id="tab-problems">
                     <ul class="problems-list" id="problemsList"></ul>

@@ -366,31 +366,6 @@ app.whenReady().then(() => {
         return bridge.debugEval(payload?.sessionId || '', payload?.code || '');
     });
 
-    // LEGACY MDEBUG TCP HANDLERS (Isolated / Optional)
-    // These are not exposed by preload.js anymore but kept if needed for reference
-    ipcHandle('debug:start:mdebug', async (_event, payload) => {
-        return bridge.debugStartMdebug(
-            payload?.routine || payload?.file || '',
-            payload?.breakpoints || [],
-            { stopOnEntry: !!payload?.stopOnEntry }
-        );
-    });
-
-    ipcHandle('debug:step:mdebug', async (_event, payload) => {
-        return bridge.debugStepMdebug(
-            payload?.sessionId || '',
-            payload?.stepType || 'over'
-        );
-    });
-
-    ipcHandle('debug:continue:mdebug', async (_event, payload) => {
-        return bridge.debugContinueMdebug(payload?.sessionId || '');
-    });
-
-    ipcHandle('debug:stop:mdebug', async (_event, payload) => {
-        return bridge.debugStopMdebug(payload?.sessionId || '');
-    });
-
     // Docker list
     ipcHandle('docker:list', async () => {
         const dockerCmd = wrapDockerCmd('docker ps --format "{{.ID}}|{{.Names}}|{{.Status}}"');
