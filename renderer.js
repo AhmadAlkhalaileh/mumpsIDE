@@ -3292,7 +3292,20 @@
             // Debug panel is lazy-mounted; bind when it becomes available.
             if (!bindDebugTabs.__lazyHooked) {
                 const fr = window.AhmadIDEModules?.app?.featureRegistry;
-                fr?.onMounted?.('debugPanel', () => bindDebugTabs());
+                fr?.onMounted?.('debugPanel', () => {
+                    bindDebugTabs();
+                    // Wire console input after panel is mounted
+                    setTimeout(() => {
+                        try {
+                            if (debugManager && debugManager.ensureConsoleInput) {
+                                console.log('[DEBUG] Wiring console input after debugPanel mount');
+                                debugManager.ensureConsoleInput();
+                            }
+                        } catch (e) {
+                            console.error('[DEBUG] Failed to wire console on mount:', e);
+                        }
+                    }, 100);
+                });
                 bindDebugTabs.__lazyHooked = true;
             }
             return;
@@ -3306,6 +3319,17 @@
             tab.addEventListener('click', () => {
                 const target = tab.getAttribute('data-tab');
                 setActiveDebugTab(target);
+                // Ensure console input is wired when console tab is activated
+                if (target === 'tab-console') {
+                    try {
+                        if (debugManager && debugManager.ensureConsoleInput) {
+                            console.log('[DEBUG] Wiring console input on tab click');
+                            debugManager.ensureConsoleInput();
+                        }
+                    } catch (e) {
+                        console.error('[DEBUG] Failed to ensure console input:', e);
+                    }
+                }
             });
         });
         setActiveDebugTab(activeDebugTab);

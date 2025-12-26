@@ -27,101 +27,21 @@ if (process.env.SNAP) {
   const prefix = snapPaths ? `${snapPaths}:${sysPaths}` : sysPaths;
   process.env.PATH = prefix + (process.env.PATH ? ':' + process.env.PATH : '');
 }
-let SSHClient = undefined;
-let sshLoadError = null;
+const sshClient = require('./src/bridge/ssh/sshClient');
+const { ensureSshClient } = sshClient;
 let mdebugEnsureLock = false;
-function hasActiveMdebugSession() {
-  return Object.keys(mdebugSessions).length > 0;
-}
-function ensureSshClient() {
-  if (SSHClient !== undefined) return SSHClient;
-  try {
-    SSHClient = require('ssh2').Client;
-  } catch (e) {
-    SSHClient = null;
-    sshLoadError = e;
-  }
-  return SSHClient;
-}
 
-function mergeSshConfig(cfg = {}) {
-  const fallbackEnvKey = cfg.envKey || cfg.baseKey || cfg.namespace || connectionConfig.ssh?.envKey || DEFAULT_ENV_KEY;
-  const envKey = deriveEnvKeyFromUsername(cfg.username, fallbackEnvKey);
-  const ydbPath = cfg.ydbPath || connectionConfig.ssh?.ydbPath || '/opt/fis-gtm/YDB136';
-  const paths = buildSshPaths(envKey, ydbPath);
-  return {
-    ...connectionConfig.ssh,
-    ...paths,
-    ...cfg,
-    envKey
-  };
-}
+const { mergeSshConfig, mergeDockerConfig, setConnectionConfig } = require('./src/bridge/config/mergeConnectionConfig');
 
-function mergeDockerConfig(cfg = {}) {
-  // Use envKey from config if provided, otherwise use default
-  const envKey = cfg.envKey || connectionConfig.docker?.envKey || DOCKER_DEFAULT_ENV_KEY;
-  // ydbPath is optional - if not provided, Docker works in universal mode
-  const ydbPath = cfg.ydbPath !== undefined ? cfg.ydbPath : connectionConfig.docker?.ydbPath;
-  const paths = buildDockerPaths(envKey, ydbPath);
-  return {
-    ...connectionConfig.docker,
-    ...paths,
-    ...cfg,
-    envKey
-  };
-}
+const { connectionConfig } = require('./src/bridge/config/connectionConfig');
+setConnectionConfig(connectionConfig);
 
-const connectionConfig = {
-  type: 'docker',
-  docker: {
-    containerId: null, // Will be set when user selects a container
-    envKey: DOCKER_DEFAULT_ENV_KEY,
-    ydbPath: null,  // null = universal mode (no YottaDB paths)
-    gldPath: null,
-    routinesPath: null,
-    rpcRoutinesPath: null,
-    basePath: null
-  },
-  ssh: {
-    host: '',
-    port: 22,
-    username: '',
-    password: '',
-    ...buildSshPaths(DEFAULT_ENV_KEY)
-  }
-};
-
-const debugSessions = {};
-const sshSessions = {};
-const mdebugSessions = {};
+const { debugSessions, sshSessions, mdebugSessions, hasActiveMdebugSession, hasActiveSshSession } = require('./src/bridge/state/sessions');
 // Default to the richer zstep engine unless explicitly disabled
 const USE_ZSTEP_ENGINE = process.env.AHMAD_IDE_DEBUG_ENGINE !== 'legacy';
 const sourceMapCache = {};
-// Default MDEBUG host/port (using AHMDBG.m on port 9200 to avoid zombie connections on 9000)
-const MDEBUG_DEFAULT_HOST = process.env.MDEBUG_HOST || '127.0.0.1';
-const MDEBUG_DEFAULT_PORT = parseInt(process.env.MDEBUG_PORT || '9200', 10);
-
-// --- MDEBUG TCP client (parity with mumps-debug-master) ---
-const mdebugStates = {
-  disconnected: 'disconnected',
-  waitingForStart: 'waitingForStart',
-  waitingForVars: 'waitingForVars',
-  waitingForBreakpoints: 'waitingForBreakpoints',
-  waitingForSingleVar: 'waitingForSingleVar',
-  waitingForSingleVarContent: 'waitingForSingleVarContent',
-  waitingForErrorReport: 'waitingForErrorReport',
-  waitingForHints: 'waitingForHints',
-  waitingForGlobals: 'waitingForGlobals'
-};
-
-function defaultRoutinePath(routineName) {
-  const cfg = connectionConfig.docker || {};
-  const root = (cfg.routinesPath || cfg.rpcRoutinesPath || '').split(' ')[0] || '';
-  const norm = normalizeRoutineName(routineName);
-  if (!norm) return '';
-  if (!root) return `${norm}.m`;
-  return `${root}/${norm}.m`;
-}
+const { MDEBUG_DEFAULT_HOST, MDEBUG_DEFAULT_PORT, mdebugStates } = require('./src/bridge/mdebug/constants');
+const { defaultRoutinePath, convertMdebugPosition } = require('./src/bridge/mdebug/routinePaths');
 
 async function getDockerContainerIp() {
   try {
@@ -140,22 +60,7 @@ async function getDockerContainerIp() {
   }
 }
 
-async function isPortOpen(host, port, timeoutMs = 800) {
-  return new Promise((resolve) => {
-    const sock = net.connect({ host, port, timeout: timeoutMs }, () => {
-      sock.destroy();
-      resolve(true);
-    });
-    sock.on('error', () => {
-      sock.destroy();
-      resolve(false);
-    });
-    sock.on('timeout', () => {
-      sock.destroy();
-      resolve(false);
-    });
-  });
-}
+const { isPortOpen } = require('./src/bridge/mdebug/isPortOpen');
 
 async function startMdebugServer(targetHost, targetPort) {
   // Use AHMDBG.m (our port 9200 version) instead of MDEBUG.m
@@ -287,62 +192,6 @@ async function ensureMdebugServer(host, port, { forceRestart = false } = {}) {
 
 async function forceRestartMdebug(host, port) {
   return ensureMdebugServer(host, port, { forceRestart: true });
-}
-
-/**
- * Convert MUMPS position string to file/line coordinates
- * @param {string} positionString - MUMPS position format: TAG+OFFSET^ROUTINE or +OFFSET^ROUTINE
- * @returns {object} { routine, tag, offset, line }
- *   - routine: normalized routine name (uppercase, no .m extension)
- *   - tag: label/tag name (empty string if none)
- *   - offset: numeric offset from tag
- *   - line: **0-BASED** line number in the source file (matches mumps-debug-master)
- *
- * CRITICAL COORDINATE SYSTEM (MISMATCH #1 fix):
- * - This function returns **0-BASED** line numbers (line 0 = first line of file)
- * - MDEBUG server also uses **0-BASED** line numbers internally
- * - When sending breakpoints to server: use **1-BASED** (SETBP;file;1 for first line)
- * - When receiving positions from server: convert to **0-BASED** with this function
- * - Monaco editor uses **1-BASED** line numbers, so add 1 when displaying
- */
-function convertMdebugPosition(positionString = '') {
-  // positionString example: TAG+OFFSET^ROUTINE or +5^ROUTINE
-  const parts = positionString.split('^');
-  const left = parts[0] || '';
-  const routine = normalizeRoutineName(parts[1] ? parts[1].split(' ', 1)[0] : '');
-  let tag = '';
-  let offset = 0;
-  if (left.includes('+')) {
-    tag = left.split('+')[0];
-    offset = parseInt(left.split('+')[1] || '0', 10);
-    if (!tag) offset = Math.max(0, offset - 1); // M adds 1 when no tag
-  } else {
-    tag = left;
-  }
-
-  const file = defaultRoutinePath(routine);
-  let line = 0;  // 0-based line number
-  try {
-    const lines = fs.readFileSync(file, 'utf8').split('\n');
-    if (tag) {
-      const tagRe = new RegExp(`^${tag}([\\s(;:]|$)`);
-      for (let i = 0; i < lines.length; i++) {
-        if (tagRe.test(lines[i])) {
-          line = i;  // Found tag at 0-based line i
-          break;
-        }
-      }
-    }
-    line = line + offset;
-    if (line < 0) line = 0;
-    if (line >= lines.length) line = lines.length - 1;
-  } catch (e) {
-    // fall back to offset only
-    line = offset;
-  }
-
-  // Return 0-based line number (matches mumps-debug-master behavior)
-  return { routine, tag, offset, line };
 }
 
 class MDebugClient extends EventEmitter {
@@ -807,36 +656,7 @@ class MDebugClient extends EventEmitter {
 }
 
 
-function run(cmd, args = [], opts = {}) {
-  return new Promise((resolve) => {
-    const child = spawn(cmd, args, { timeout: 8000, ...opts });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', d => stdout += d.toString());
-    child.stderr.on('data', d => stderr += d.toString());
-    child.on('error', err => resolve({ ok: false, error: err.message, stdout, stderr }));
-    child.on('close', code => {
-      if (code !== 0) return resolve({ ok: false, error: `exit ${code}`, stdout, stderr });
-      resolve({ ok: true, stdout, stderr });
-    });
-  });
-}
-
-function tmpFile(dir, ext) {
-  const name = `ahmad_ide_${Date.now()}_${Math.random().toString(16).slice(2)}.${ext}`;
-  return path.join(dir || process.cwd(), name);
-}
-
-// Wrap docker commands. By default, call docker directly.
-// If env AHMAD_IDE_USE_SG=1, fall back to sg docker -c "...".
-function wrapDockerCmd(cmd) {
-  if (process.env.AHMAD_IDE_USE_SG === '1') {
-    return `sg docker -c "${cmd.replace(/"/g, '\\"')}"`;
-  }
-  // In snap, docker is bundled at $SNAP/usr/bin/docker
-  const dockerPath = process.env.SNAP ? `${process.env.SNAP}/usr/bin/docker` : 'docker';
-  return cmd.replace(/^docker\s/, `${dockerPath} `);
-}
+const { run, tmpFile, wrapDockerCmd } = require('./src/bridge/util/process');
 
 function buildYdbEnv(cfg = {}, opts = {}) {
   const ydbPath = cfg.ydbPath || '';
@@ -2773,34 +2593,7 @@ function readGitConfig(projectPath) {
   }
 }
 
-function sanitizeRoutineName(name = '') {
-  const trimmed = name.trim();
-  // MUMPS routines can start with %, Ø, or other special chars, including _
-  // Allow: %NAME, _NAME, ØNAME, or regular NAME (alphanumeric, up to 31 chars)
-  if (!/^[A-Za-z%_ØŒÆÐ][A-Za-z0-9%_ØŒÆÐ]{0,30}$/i.test(trimmed)) return null;
-  return trimmed.toUpperCase();
-}
-
-function cleanOutput(raw = '') {
-  return (raw || '')
-    .replace(/YDB>/g, '')
-    .split('\n')
-    .filter(line =>
-      !line.includes('mupip:') &&
-      !line.includes('.bashrc') &&
-      !line.toLowerCase().includes('permission denied') &&
-      !line.includes('%YDB-E-NOTEXTRINSIC') &&
-      !line.includes('At M source location') &&
-      line.trim().length > 0
-    )
-    .map(line => line.trimEnd())
-    .join('\n')
-    .trim();
-}
-
-function hasActiveSshSession() {
-  return Object.keys(sshSessions).length > 0;
-}
+const { sanitizeRoutineName, cleanOutput } = require('./src/bridge/util/ydb');
 
 function detectYottaDBPath(sshConn) {
   // Try to detect YottaDB installation by checking common paths
@@ -4026,7 +3819,7 @@ module.exports = {
   async sshConnect(config) {
     const sshCtor = ensureSshClient();
     if (!sshCtor) {
-      return { ok: false, error: `SSH not available (missing native module ssh2${sshLoadError ? `: ${sshLoadError.message}` : ''})` };
+      return { ok: false, error: `SSH not available (missing native module ssh2${sshClient.sshLoadError ? `: ${sshClient.sshLoadError.message}` : ''})` };
     }
     const cfg = config || {};
     const purpose = String(cfg.purpose || '').trim().toLowerCase();
