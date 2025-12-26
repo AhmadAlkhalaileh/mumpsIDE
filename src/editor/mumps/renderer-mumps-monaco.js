@@ -255,6 +255,17 @@
 
             // Formatting (Format Code / Reformat)
             registerMumpsFormatting();
+
+            // Refactor: Rename Symbol (F2)
+            try {
+                const renameFactory = (typeof window !== 'undefined')
+                    ? window.AhmadIDEModules?.mumpsMonaco?.createMumpsRenameProvider
+                    : null;
+                const renameProvider = (typeof renameFactory === 'function')
+                    ? renameFactory({ deps: { getMonaco } })
+                    : null;
+                renameProvider?.registerMumpsRenameProvider?.();
+            } catch (_) { }
         }
 
         function registerMumpsThemes() {
