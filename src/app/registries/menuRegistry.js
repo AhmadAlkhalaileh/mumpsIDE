@@ -63,8 +63,12 @@
                         ]
                     },
                     { id: 'file.open', label: 'Open…', action: 'open-project', icon: 'folder-open', shortcut: 'Ctrl+O' },
+                    { id: 'file.closeTab', label: 'Close Tab', action: 'tab:close', shortcut: 'Ctrl+F4' },
+                    { id: 'file.closeAllTabs', label: 'Close All Tabs', action: 'tab:close-all' },
+                    { type: 'separator' },
                     { id: 'file.closeProject', label: 'Close Project', action: 'close-project', icon: 'close' },
                     { type: 'separator' },
+                    { id: 'file.save', label: 'Save', action: 'save', icon: 'save', shortcut: 'Ctrl+S' },
                     { id: 'file.saveAll', label: 'Save All', action: 'save-all', icon: 'save', shortcut: 'Ctrl+Shift+S' },
                     { type: 'separator' },
                     { id: 'file.settings', label: 'Settings…', action: 'settings', icon: 'settings', shortcut: 'Ctrl+,' },
@@ -95,7 +99,11 @@
                         ]
                     },
                     { id: 'edit.duplicate', label: 'Duplicate Line', action: 'duplicate-line', shortcut: 'Ctrl+D' },
-                    { id: 'edit.comment', label: 'Toggle Comment', action: 'comment', icon: 'comment', shortcut: 'Ctrl+/' }
+                    { type: 'separator' },
+                    { id: 'edit.expandSelection', label: 'Expand Selection', action: 'expand-selection', shortcut: 'Ctrl+W' },
+                    { id: 'edit.shrinkSelection', label: 'Shrink Selection', action: 'shrink-selection', shortcut: 'Ctrl+Shift+W' },
+                    { type: 'separator' },
+                    { id: 'edit.selectAll', label: 'Select All', action: 'select-all', shortcut: 'Ctrl+A' }
                 ])
             },
             {
@@ -106,22 +114,35 @@
                         id: 'view.sidebar',
                         label: 'Tool Windows',
                         submenu: [
-                            { id: 'view.tw.project', label: 'Project', action: 'toggle-sidebar', type: 'checkbox', checked: (ctx) => !!ctx?.toolWindows?.leftVisible },
-                            { id: 'view.tw.terminal', label: 'Terminal', action: 'toggle-terminal', type: 'checkbox', checked: (ctx) => !!ctx?.toolWindows?.bottomVisible }
+                            { id: 'view.tw.project', label: 'Project', action: 'tool-project', type: 'checkbox', shortcut: 'Alt+1', checked: (ctx) => !!ctx?.toolWindows?.panels?.projectPanel },
+                            { id: 'view.tw.structure', label: 'Structure', action: 'tool-structure', type: 'checkbox', shortcut: 'Alt+7', checked: (ctx) => !!ctx?.toolWindows?.panels?.structurePanel },
+                            { id: 'view.tw.commit', label: 'Commit', action: 'tool-commit', type: 'checkbox', shortcut: 'Alt+0', checked: (ctx) => !!ctx?.toolWindows?.panels?.commitPanel },
+                            { type: 'separator' },
+                            { id: 'view.tw.terminal', label: 'Terminal', action: 'tool-terminal', type: 'checkbox', shortcut: 'Alt+F12', checked: (ctx) => !!ctx?.toolWindows?.panels?.terminalToolPanel },
+                            { id: 'view.tw.run', label: 'Run Output', action: 'tool-run', type: 'checkbox', shortcut: 'Alt+4', checked: (ctx) => !!ctx?.toolWindows?.panels?.terminalPanel },
+                            { id: 'view.tw.debug', label: 'Debug', action: 'tool-debug', type: 'checkbox', shortcut: 'Alt+5', checked: (ctx) => !!ctx?.toolWindows?.panels?.debugPanel },
+                            { id: 'view.tw.problems', label: 'Problems', action: 'tool-todo', type: 'checkbox', shortcut: 'Alt+6', checked: (ctx) => !!ctx?.toolWindows?.panels?.problemsPanel },
+                            { id: 'view.tw.git', label: 'Git', action: 'tool-git', type: 'checkbox', shortcut: 'Alt+9', checked: (ctx) => !!ctx?.toolWindows?.panels?.gitToolPanel },
+                            { id: 'view.tw.services', label: 'Services', action: 'tool-services', type: 'checkbox', shortcut: 'Alt+8', checked: (ctx) => !!ctx?.toolWindows?.panels?.servicesPanel },
+                            { id: 'view.tw.extensions', label: 'Extensions', action: 'extensions', type: 'checkbox', checked: (ctx) => !!ctx?.toolWindows?.panels?.extensionsPanel },
+                            { id: 'view.tw.patchTracking', label: 'Patch Tracking', action: 'tool-patch-tracking', type: 'checkbox', checked: (ctx) => !!ctx?.toolWindows?.panels?.patchTrackingPanel }
                         ]
                     },
-                    { type: 'separator' },
-                    { id: 'view.appearance', label: 'Appearance', action: 'appearance', disabled: true }
                 ])
             },
             {
                 id: 'navigate',
                 label: 'Navigate',
                 items: withSeparatorCleanup([
+                    { id: 'nav.searchEverywhere', label: 'Search Everywhere…', action: 'search-everywhere', shortcut: 'Shift+Shift' },
+                    { type: 'separator' },
                     { id: 'nav.file', label: 'Go to File…', action: 'goto-file', shortcut: 'Ctrl+N' },
                     { id: 'nav.line', label: 'Go to Line…', action: 'goto-line', shortcut: 'Ctrl+L' },
                     { type: 'separator' },
-                    { id: 'nav.recent', label: 'Recent Files', action: 'recent-files', disabled: true }
+                    { id: 'nav.declaration', label: 'Go to Declaration', action: 'goto-declaration' },
+                    { type: 'separator' },
+                    { id: 'nav.nextTab', label: 'Next Tab', action: 'tab-next', shortcut: 'Ctrl+Tab' },
+                    { id: 'nav.prevTab', label: 'Previous Tab', action: 'tab-prev', shortcut: 'Ctrl+Shift+Tab' }
                 ])
             },
             {
@@ -129,16 +150,16 @@
                 label: 'Code',
                 items: withSeparatorCleanup([
                     { id: 'code.format', label: 'Format Code', action: 'reformat', icon: 'format', shortcut: 'Ctrl+Alt+L' },
-                    { id: 'code.comment', label: 'Comment/Uncomment', action: 'comment', icon: 'comment' },
-                    { id: 'code.rename', label: 'Rename…', action: 'rename', shortcut: 'Shift+F6' }
+                    { id: 'code.comment', label: 'Comment/Uncomment', action: 'comment', icon: 'comment', shortcut: 'Ctrl+/' },
+                    { type: 'separator' },
+                    { id: 'code.lint', label: 'Lint', action: 'lint' }
                 ])
             },
             {
                 id: 'refactor',
                 label: 'Refactor',
                 items: withSeparatorCleanup([
-                    { id: 'ref.rename', label: 'Rename…', action: 'rename', shortcut: 'Shift+F6' },
-                    { id: 'ref.extract', label: 'Extract Method…', action: 'refactor-extract', disabled: true }
+                    { id: 'ref.rename', label: 'Rename…', action: 'rename', shortcut: 'F2' }
                 ])
             },
             {
@@ -153,44 +174,32 @@
             {
                 id: 'tools',
                 label: 'Tools',
-                items: (() => {
-                    console.log('[MenuRegistry] Defining Tools menu items...');
-                    const items = [
-                        { id: 'tools.terminal', label: 'Terminal', action: 'terminal', icon: 'terminal', shortcut: 'Alt+F12' },
-                        { id: 'tools.lint', label: 'Lint', action: 'lint' },
-                        { id: 'tools.shortcuts', label: 'Shortcuts', action: 'shortcuts' },
-                        { id: 'tools.extensions', label: 'Extensions', action: 'extensions' }
-                    ];
-                    console.log('[MenuRegistry] Tools items:', items);
-                    return withSeparatorCleanup(items);
-                })()
+                items: withSeparatorCleanup([
+                    { id: 'tools.connections', label: 'Connections…', action: 'connections' },
+                    { type: 'separator' },
+                    { id: 'tools.shortcuts', label: 'Shortcuts…', action: 'shortcuts' },
+                    { type: 'separator' },
+                    { id: 'tools.devtools', label: 'Toggle DevTools', action: 'toggle-devtools' }
+                ])
             },
             {
                 id: 'git',
                 label: 'Git',
                 items: withSeparatorCleanup([
-                    { id: 'git.tool', label: 'Git Tool Window', action: 'git', icon: 'git' },
+                    { id: 'git.tool', label: 'Git Tool Window', action: 'tool-git', icon: 'git', shortcut: 'Alt+9' },
+                    { id: 'git.commitTool', label: 'Commit Tool Window', action: 'tool-commit', shortcut: 'Alt+0' },
                     { type: 'separator' },
-                    { id: 'git.status', label: 'Status', action: 'git-status' },
-                    { id: 'git.diff', label: 'Diff', action: 'git-diff' },
-                    { id: 'git.history', label: 'History', action: 'git-history' }
-                ])
-            },
-            {
-                id: 'window',
-                label: 'Window',
-                items: withSeparatorCleanup([
-                    { id: 'win.sidebar', label: 'Toggle Sidebar', action: 'toggle-sidebar' },
-                    { id: 'win.terminal', label: 'Toggle Terminal', action: 'toggle-terminal' },
+                    { id: 'git.commit', label: 'Commit…', action: 'vcs:commit' },
+                    { id: 'git.history', label: 'Show History', action: 'vcs:history' },
                     { type: 'separator' },
-                    { id: 'win.store', label: 'Store Layout', action: 'window-store', disabled: true }
+                    { id: 'git.pull', label: 'Pull / Fetch', action: 'vcs:pull' },
+                    { id: 'git.push', label: 'Push', action: 'vcs:push' }
                 ])
             },
             {
                 id: 'help',
                 label: 'Help',
                 items: withSeparatorCleanup([
-                    { id: 'help.docs', label: 'Docs', action: 'docs', disabled: true },
                     { id: 'help.about', label: 'About', action: 'about' },
                     { type: 'separator' },
                     { id: 'help.menuSelfTest', label: 'Menu System Self-Test', action: 'menu-self-test' }

@@ -152,10 +152,8 @@
                             }
                             // Ensure Git gets the project path
                             const gitRepoManager = window.AhmadIDEModules?.git?.repoManager;
-                            console.log("[OpenProjectDialog] Calling gitRepoManager.setProject with:", result.projectPath);
                             if (gitRepoManager?.setProject) {
                                 gitRepoManager.setProject(result.projectPath)
-                                    .then(() => console.log("[OpenProjectDialog] setProject completed"))
                                     .catch(err => console.error("[OpenProjectDialog] setProject failed:", err));
                             } else {
                                 console.error("[OpenProjectDialog] gitRepoManager.setProject not found");

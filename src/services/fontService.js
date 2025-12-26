@@ -88,8 +88,49 @@
     };
 
     function createFontService() {
-        const installedCache = { ts: 0, list: null };
+        const installedCache = { ts: 0, list: null, pending: null };
         const registered = new Map(); // fontId -> { url, styleEl, family }
+
+        const uniqFamilies = (arr) => {
+            const out = [];
+            const seen = new Set();
+            (arr || []).forEach((v) => {
+                const s = String(v || '').trim();
+                if (!s) return;
+                const k = s.toLowerCase();
+                if (seen.has(k)) return;
+                seen.add(k);
+                out.push(s);
+            });
+            return out;
+        };
+
+        const buildFontStack = (primary, fallbacks) => {
+            const raw = String(primary || '').trim();
+            if (!raw) return uniqFamilies(fallbacks || []).join(', ');
+            if (raw.includes(',')) return raw;
+            const merged = uniqFamilies([raw, ...(fallbacks || [])]);
+            return merged.join(', ');
+        };
+
+        const UI_FALLBACK = [
+            'Inter',
+            'Segoe UI',
+            'SF Pro Display',
+            'system-ui',
+            'sans-serif'
+        ];
+
+        const CODE_FALLBACK_TAIL = [
+            'ui-monospace',
+            'SFMono-Regular',
+            'Menlo',
+            'Monaco',
+            'Consolas',
+            'Liberation Mono',
+            'Courier New',
+            'monospace'
+        ];
 
         const registerFontFaceFromBlob = async ({ id, family, blob, fileName }) => {
             const safeFamily = sanitizeFamily(family || baseNameNoExt(fileName) || 'Custom Font');
@@ -179,17 +220,31 @@
             const root = document.documentElement;
             if (!root) return;
 
-            const uiScale = Number(settings?.fonts?.ui?.scalePercent ?? 100) || 100;
-            const uiSizeBase = 13;
-            const uiSize = Math.max(10, Math.round(uiSizeBase * (uiScale / 100)));
-            root.style.setProperty('--font-size-ui', `${uiSize}px`);
+            const uiFamilyRaw = String(settings?.ui?.fontFamily || '').trim();
+            const uiSizePx = Number(settings?.ui?.fontSize);
+
+            if (uiFamilyRaw) {
+                root.style.setProperty('--font-ui', buildFontStack(uiFamilyRaw, UI_FALLBACK));
+            } else {
+                try { root.style.removeProperty('--font-ui'); } catch (_) { }
+            }
+
+            if (Number.isFinite(uiSizePx) && uiSizePx > 0) {
+                root.style.setProperty('--font-size-ui', `${Math.max(10, Math.round(uiSizePx))}px`);
+            } else {
+                const uiScale = Number(settings?.fonts?.ui?.scalePercent ?? 100) || 100;
+                const uiSizeBase = 13;
+                const uiSize = Math.max(10, Math.round(uiSizeBase * (uiScale / 100)));
+                root.style.setProperty('--font-size-ui', `${uiSize}px`);
+            }
 
             const editorFamily = String(settings?.fonts?.editor?.family || '').trim();
             const editorSize = Number(settings?.fonts?.editor?.sizePx ?? 13) || 13;
             const editorLineHeight = Number(settings?.fonts?.editor?.lineHeight ?? 1.55) || 1.55;
             const editorWeight = String(settings?.fonts?.editor?.weight ?? '400');
             const editorLigatures = !!settings?.fonts?.editor?.ligatures;
-            root.style.setProperty('--font-code', editorFamily || FALLBACK_EDITOR_FONTS.join(', '));
+            const codeFallback = uniqFamilies([...FALLBACK_EDITOR_FONTS, ...CODE_FALLBACK_TAIL]);
+            root.style.setProperty('--font-code', buildFontStack(editorFamily, codeFallback));
             root.style.setProperty('--font-size-code', `${editorSize}px`);
             root.style.setProperty('--line-height-code', String(editorLineHeight));
             root.style.setProperty('--font-weight-code', editorWeight);
@@ -197,34 +252,43 @@
 
             const terminalFamily = String(settings?.fonts?.terminal?.family || '').trim() || editorFamily;
             const terminalSize = Number(settings?.fonts?.terminal?.sizePx ?? 13) || 13;
-            root.style.setProperty('--font-terminal', terminalFamily || FALLBACK_EDITOR_FONTS.join(', '));
+            root.style.setProperty('--font-terminal', buildFontStack(terminalFamily, codeFallback));
             root.style.setProperty('--font-size-terminal', `${terminalSize}px`);
         };
 
         const listInstalledFonts = async () => {
             const now = Date.now();
             if (installedCache.list && now - installedCache.ts < 10_000) return installedCache.list;
+            if (installedCache.pending) return installedCache.pending;
 
-            const families = new Set(FALLBACK_EDITOR_FONTS);
-            try {
-                if (typeof window.queryLocalFonts === 'function') {
-                    const localFonts = await window.queryLocalFonts();
-                    (localFonts || []).forEach((f) => {
-                        const fam = sanitizeFamily(f?.family);
-                        if (fam) families.add(fam);
-                    });
+            installedCache.pending = (async () => {
+                const families = new Set(FALLBACK_EDITOR_FONTS);
+                try {
+                    if (typeof window.queryLocalFonts === 'function') {
+                        const localFonts = await window.queryLocalFonts();
+                        (localFonts || []).forEach((f) => {
+                            const fam = sanitizeFamily(f?.family);
+                            if (fam) families.add(fam);
+                        });
+                    }
+                } catch (_) {
+                    // permissions / unsupported
                 }
-            } catch (_) {
-                // permissions / unsupported
+
+                const list = Array.from(families)
+                    .filter(Boolean)
+                    .sort((a, b) => a.localeCompare(b));
+
+                installedCache.ts = now;
+                installedCache.list = list;
+                return list;
+            })();
+
+            try {
+                return await installedCache.pending;
+            } finally {
+                installedCache.pending = null;
             }
-
-            const list = Array.from(families)
-                .filter(Boolean)
-                .sort((a, b) => a.localeCompare(b));
-
-            installedCache.ts = now;
-            installedCache.list = list;
-            return list;
         };
 
         const registerDynamicFont = async ({ url, fileName }) => {

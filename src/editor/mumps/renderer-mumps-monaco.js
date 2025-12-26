@@ -2,6 +2,73 @@
     function createMumpsMonacoManager({ deps } = {}) {
         const $ = deps?.$ || (typeof window !== 'undefined' ? (window.$ || window.jQuery || null) : null);
         const getMonaco = deps?.getMonaco || (() => (typeof monaco !== 'undefined' ? monaco : null));
+        const getMumpsCommands = (() => {
+            let cached = null;
+            return () => {
+                if (cached) return cached;
+                try {
+                    const Lexer = (typeof MUMPSLexer !== 'undefined')
+                        ? MUMPSLexer
+                        : (typeof window !== 'undefined' ? window.MUMPSLexer : null);
+                    if (typeof Lexer === 'function') {
+                        const lx = new Lexer('');
+                        if (lx?.commands && typeof lx.commands.has === 'function') {
+                            cached = lx.commands;
+                            return cached;
+                        }
+                    }
+                } catch (_) { }
+                cached = new Set([
+                    'B', 'BREAK',
+                    'C', 'CLOSE',
+                    'D', 'DO',
+                    'E', 'ELSE',
+                    'F', 'FOR',
+                    'G', 'GOTO',
+                    'H', 'HALT', 'HANG',
+                    'I', 'IF',
+                    'J', 'JOB',
+                    'K', 'KILL',
+                    'L', 'LOCK',
+                    'M', 'MERGE',
+                    'N', 'NEW',
+                    'O', 'OPEN',
+                    'Q', 'QUIT',
+                    'R', 'READ',
+                    'S', 'SET',
+                    'TC', 'TCOMMIT',
+                    'TRE', 'TRESTART',
+                    'TRO', 'TROLLBACK',
+                    'TS', 'TSTART',
+                    'U', 'USE',
+                    'V', 'VIEW',
+                    'W', 'WRITE',
+                    'X', 'XECUTE',
+                    // Common Z-commands
+                    'ZB', 'ZBREAK',
+                    'ZCO', 'ZCOMPILE',
+                    'ZCON', 'ZCONTINUE',
+                    'ZD', 'ZDEALLOCATE',
+                    'ZE', 'ZEDIT',
+                    'ZG', 'ZGOTO',
+                    'ZH', 'ZHALT',
+                    'ZHE', 'ZHELP',
+                    'ZK', 'ZKILL',
+                    'ZL', 'ZLINK',
+                    'ZM', 'ZMESSAGE',
+                    'ZP', 'ZPRINT',
+                    'ZRU', 'ZRUPDATE',
+                    'ZSH', 'ZSHOW',
+                    'ZST', 'ZSTEP',
+                    'ZSY', 'ZSYSTEM',
+                    'ZTCO', 'ZTCOMMIT',
+                    'ZTS', 'ZTSTART',
+                    'ZWI', 'ZWITHDRAW',
+                    'ZW', 'ZWRITE'
+                ]);
+                return cached;
+            };
+        })();
 
         let mumpsAutocompleteCache = null;
         async function loadAutocompleteData() {
@@ -31,6 +98,116 @@
                 '    IF X=1 WRITE "X is one",!',
                 '    QUIT'
             ].join('\n');
+        }
+
+        let formattingRegistered = false;
+        const formatMumpsText = (text, { tabSize = 4 } = {}) => {
+            const norm = String(text ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+            const lines = norm.split('\n');
+
+            const trimRight = (s) => String(s || '').replace(/[ \t]+$/g, '');
+
+            const formatCommandField = (field) => {
+                const f = String(field || '').trimStart();
+                if (!f) return '';
+                const m = f.match(/^(\.+)(.*)$/);
+                if (!m) return f;
+                const dots = m[1] || '';
+                const rest = String(m[2] || '').trimStart();
+                return rest ? `${dots} ${rest}` : dots;
+            };
+
+            const clampInt = (n, min, max) => Math.max(min, Math.min(max, n));
+
+            const detectIndentSize = () => {
+                const freq = new Map();
+                for (const line of lines) {
+                    const s = String(line || '');
+                    const m = s.match(/^(\s+)[.;A-Za-z%$]/);
+                    if (!m) continue;
+                    const len = m[1].length;
+                    if (!len) continue;
+                    if (len > 24) continue;
+                    freq.set(len, (freq.get(len) || 0) + 1);
+                }
+                let bestLen = 0;
+                let bestCount = -1;
+                for (const [len, count] of freq.entries()) {
+                    if (count > bestCount || (count === bestCount && len < bestLen)) {
+                        bestLen = len;
+                        bestCount = count;
+                    }
+                }
+                const fallback = clampInt(Number(tabSize) || 4, 1, 24);
+                return bestLen > 0 ? bestLen : fallback;
+            };
+
+            const INDENT = ' '.repeat(detectIndentSize());
+
+            const formatIndentedLine = (line) => {
+                const s = String(line || '');
+                const trimmed = s.trimStart();
+                if (!trimmed) return '';
+                if (trimmed.startsWith(';')) return `${INDENT}${trimmed}`;
+                if (trimmed.startsWith('.')) return `${INDENT}${formatCommandField(trimmed)}`;
+                return `${INDENT}${formatCommandField(trimmed)}`;
+            };
+
+            const formatLine = (line) => {
+                const raw = trimRight(line);
+                if (!raw.trim()) return '';
+
+                const startsWithWs = /^\s/.test(raw);
+                if (startsWithWs) return formatIndentedLine(raw);
+
+                // Keep top-level comment lines at column 1.
+                if (raw.startsWith(';')) return raw;
+
+                // Lines that start with dot at column 1 are still command-field lines.
+                if (raw.startsWith('.')) return formatIndentedLine(raw);
+
+                // Label line: preserve spacing (only trim right).
+                return raw;
+            };
+
+            const out = lines.map(formatLine).join('\n');
+            return out;
+        };
+
+        function registerMumpsFormatting() {
+            if (formattingRegistered) return;
+            formattingRegistered = true;
+
+            const monacoRef = getMonaco();
+            if (!monacoRef?.languages?.registerDocumentFormattingEditProvider) return;
+
+            monacoRef.languages.registerDocumentFormattingEditProvider('mumps', {
+                provideDocumentFormattingEdits: (model, options, token) => {
+                    if (!model) return [];
+                    const original = model.getValue();
+                    const formatted = formatMumpsText(original, options || {});
+                    if (formatted === original) return [];
+                    return [{
+                        range: model.getFullModelRange(),
+                        text: formatted
+                    }];
+                }
+            });
+
+            if (monacoRef.languages.registerDocumentRangeFormattingEditProvider) {
+                monacoRef.languages.registerDocumentRangeFormattingEditProvider('mumps', {
+                    provideDocumentRangeFormattingEdits: (model, range, options, token) => {
+                        if (!model || !range) return [];
+                        const startLine = Math.max(1, Math.min(model.getLineCount(), range.startLineNumber));
+                        const endLine = Math.max(startLine, Math.min(model.getLineCount(), range.endLineNumber));
+                        const fullLineRange = new monacoRef.Range(startLine, 1, endLine, model.getLineMaxColumn(endLine));
+                        const original = model.getValueInRange(fullLineRange);
+                        const formatted = formatMumpsText(original, options || {});
+                        if (formatted === original) return [];
+                        return [{ range: fullLineRange, text: formatted }];
+                    }
+                });
+            }
         }
 
         function registerMumpsLanguage() {
@@ -75,6 +252,9 @@
                     ]
                 }
             });
+
+            // Formatting (Format Code / Reformat)
+            registerMumpsFormatting();
         }
 
         function registerMumpsThemes() {
@@ -284,12 +464,132 @@
             });
         }
 
+        function attachDotIndentGuides(editor, opts = {}) {
+            const monacoRef = getMonaco();
+            if (!monacoRef || !editor) return null;
+
+            if (editor.__mumpsDotIndentGuides) {
+                return editor.__mumpsDotIndentGuides;
+            }
+
+            const MAX_LEVEL = Math.max(1, Math.min(4, Number(opts.maxLevel ?? 4) || 4));
+            let disposed = false;
+            let timer = null;
+            let scheduled = false;
+
+            const collection = (typeof editor.createDecorationsCollection === 'function')
+                ? editor.createDecorationsCollection([])
+                : null;
+            let legacyDecorations = [];
+
+            const dotLevelForLine = (line) => {
+                const s = String(line || '');
+                const m = s.match(/^\s*(\.+)(?=\s*[A-Za-z%$;])/);
+                if (!m) return 0;
+                return m[1].length || 0;
+            };
+
+            const classForLevel = (level) => {
+                const lvl = Math.max(0, Math.min(MAX_LEVEL, level));
+                return lvl > 0 ? `mumps-dot-indent mumps-dot-indent-${lvl}` : '';
+            };
+
+            const update = () => {
+                scheduled = false;
+                if (disposed) return;
+
+                const model = editor.getModel?.();
+                if (!model) {
+                    try { collection?.clear?.(); } catch (_) { }
+                    if (!collection && legacyDecorations.length) {
+                        try { legacyDecorations = editor.deltaDecorations(legacyDecorations, []); } catch (_) { }
+                    }
+                    return;
+                }
+
+                const lineCount = model.getLineCount?.() || 0;
+                const visibleRanges = editor.getVisibleRanges?.() || [];
+                const decs = [];
+
+                for (const vr of visibleRanges) {
+                    const start = Math.max(1, Math.min(lineCount, vr.startLineNumber));
+                    const end = Math.max(1, Math.min(lineCount, vr.endLineNumber));
+                    for (let ln = start; ln <= end; ln++) {
+                        const text = model.getLineContent(ln);
+                        const level = dotLevelForLine(text);
+                        if (!level) continue;
+                        const cls = classForLevel(level);
+                        if (!cls) continue;
+                        decs.push({
+                            range: new monacoRef.Range(ln, 1, ln, 1),
+                            options: {
+                                isWholeLine: true,
+                                linesDecorationsClassName: cls
+                            }
+                        });
+                    }
+                }
+
+                try {
+                    if (collection) {
+                        collection.set(decs);
+                    } else {
+                        legacyDecorations = editor.deltaDecorations(legacyDecorations, decs);
+                    }
+                } catch (_) { }
+            };
+
+            const schedule = () => {
+                if (disposed) return;
+                if (scheduled) return;
+                scheduled = true;
+                if (timer) clearTimeout(timer);
+                timer = setTimeout(update, 60);
+            };
+
+            const disposables = [];
+            try {
+                disposables.push(editor.onDidScrollChange?.(schedule));
+                disposables.push(editor.onDidChangeModelContent?.(schedule));
+                disposables.push(editor.onDidChangeModel?.(() => {
+                    try { collection?.clear?.(); } catch (_) { }
+                    schedule();
+                }));
+                disposables.push(editor.onDidDispose?.(() => {
+                    api.dispose();
+                }));
+            } catch (_) { }
+
+            const api = {
+                dispose: () => {
+                    if (disposed) return;
+                    disposed = true;
+                    if (timer) clearTimeout(timer);
+                    timer = null;
+                    try { collection?.clear?.(); } catch (_) { }
+                    if (!collection && legacyDecorations.length) {
+                        try { editor.deltaDecorations(legacyDecorations, []); } catch (_) { }
+                    }
+                    legacyDecorations = [];
+                    disposables.forEach((d) => {
+                        try { d?.dispose?.(); } catch (_) { }
+                    });
+                }
+            };
+
+            editor.__mumpsDotIndentGuides = api;
+            schedule();
+            return api;
+        }
+
         return {
             loadAutocompleteData,
             sampleMumps,
             registerMumpsLanguage,
             registerMumpsThemes,
-            registerMumpsCompletion
+            registerMumpsCompletion,
+            attachDotIndentGuides,
+            registerMumpsFormatting
         };
     }
 

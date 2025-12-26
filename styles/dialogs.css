@@ -360,6 +360,79 @@
     overflow: auto;
 }
 
+.ui-fonts-group__header {
+    margin-bottom: var(--ui-space-3);
+}
+
+.ui-fonts-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: var(--ui-space-4);
+    align-items: start;
+}
+
+.ui-fonts-grid__controls {
+    min-width: 0;
+}
+
+.ui-fonts-grid__preview {
+    min-width: 0;
+    position: sticky;
+    top: var(--ui-space-4);
+}
+
+.ui-fonts-preview {
+    background: rgba(0, 0, 0, 0.22);
+    border-color: rgba(255, 255, 255, 0.10);
+}
+
+.ui-font-picker {
+    display: flex;
+    gap: var(--ui-space-2);
+    align-items: center;
+    flex-wrap: wrap;
+    width: 100%;
+    min-width: 0;
+}
+
+.ui-settings-row__control.ui-font-control {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+}
+
+.ui-font-picker__select {
+    flex: 1;
+    min-width: 220px;
+}
+
+.ui-font-picker__advanced {
+    width: 100%;
+}
+
+.ui-font-picker__advancedInput {
+    width: 100%;
+}
+
+.ui-range {
+    flex: 1;
+    min-width: 160px;
+    accent-color: var(--accent);
+}
+
+@media (max-width: 980px) {
+    .ui-fonts-grid {
+        grid-template-columns: 1fr;
+    }
+    .ui-fonts-grid__preview {
+        position: static;
+        top: auto;
+    }
+    .ui-font-picker__select {
+        min-width: 0;
+    }
+}
+
 .ui-hover-tooltip {
     position: fixed;
     z-index: 10010;
@@ -509,6 +582,15 @@
 }
 
 .shortcuts-row:hover .shortcuts-edit-btn {
+    opacity: 1;
+}
+
+.shortcuts-remove-btn {
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.shortcuts-row:hover .shortcuts-remove-btn {
     opacity: 1;
 }
 

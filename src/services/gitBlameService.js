@@ -36,15 +36,6 @@ class GitBlameService {
         this.gitRepoPath = path.resolve(expandedPath);
         this.configuredRepoRoot = null;
         this.clearAllCaches();
-        console.log('[Git Blame] Git repository path set to:', this.gitRepoPath);
-
-        try {
-            if (!fs.existsSync(this.gitRepoPath)) {
-                console.warn('[Git Blame] Repo path does not exist:', this.gitRepoPath);
-            } else if (!fs.existsSync(path.join(this.gitRepoPath, '.git'))) {
-                console.warn('[Git Blame] Repo path has no .git (may still be a worktree/submodule):', this.gitRepoPath);
-            }
-        } catch (_) { }
     }
 
     /**
@@ -162,8 +153,6 @@ class GitBlameService {
             }
         } catch (_) { }
 
-        console.log(`[Git Blame] Mapped "${filePath}" -> "${mappedPath}"`);
-
         return mappedPath;
     }
 
@@ -267,8 +256,6 @@ class GitBlameService {
                 // Calculate indentation level (treating tabs as 8 spaces for comparison)
                 const markerIndentLevel = markerPrefix.replace(/\t/g, '        ').length;
 
-                console.log(`[Git Blame] Found marker at line ${lineNumber}: ${patchId} by ${patchAuthor}`);
-
                 // Mark the marker line itself
                 patchMap.set(lineNumber, { ...patchInfo });
 
@@ -341,12 +328,9 @@ class GitBlameService {
                 for (const ln of markedLines) {
                     patchMap.set(ln, { ...patchInfo });
                 }
-
-                console.log(`[Git Blame]   Marked lines ${markedLines.join(', ')} for patch ${patchId}`);
             }
         }
 
-        console.log(`[Git Blame] Parsed ${patchMap.size} lines with inline patch markers`);
         return patchMap;
     }
 
@@ -356,8 +340,6 @@ class GitBlameService {
      * @returns {Promise<Array>} Array of blame info per line
      */
     async getBlame(filePath) {
-        console.log('[Git Blame] Getting blame for:', filePath);
-
         const normalizedPath = this.normalizeFilePath(filePath);
 
         // Map to Git repository if configured (for Docker files)
@@ -370,7 +352,6 @@ class GitBlameService {
             (String(normalizedPath || '').startsWith('/') && !fs.existsSync(normalizedPath));
 
         if (looksRemote && !this.gitRepoPath) {
-            console.log('[Git Blame] No Git repo path configured for docker/remote routines (set repo path first)');
             return null;
         }
 
@@ -381,7 +362,6 @@ class GitBlameService {
             repoRoot = await this.findGitRepo(mappedPath);
         }
         if (!repoRoot) {
-            console.log('[Git Blame] File not in Git repository');
             return null;
         }
 
@@ -392,10 +372,8 @@ class GitBlameService {
             // Verify cache has patchAuthor field (new format)
             const hasNewFormat = cached.length > 0 && cached.some(b => 'patchAuthor' in b);
             if (hasNewFormat) {
-                console.log('[Git Blame] Using cached blame data (with patch metadata)');
                 return cached;
             } else {
-                console.log('[Git Blame] Cache outdated (no patch metadata) - refetching');
                 this.blameCache.delete(cacheKey);
             }
         }
@@ -408,7 +386,6 @@ class GitBlameService {
 
             // Run git blame with porcelain format for easier parsing
             // --line-porcelain gives full commit info per line
-            console.log('[Git Blame] Running git blame on:', relPath);
             const { stdout } = await execFileAsync('git', ['blame', '--line-porcelain', '--', relPath], {
                 cwd: repoRoot,
                 timeout: 30000,
@@ -416,14 +393,11 @@ class GitBlameService {
             });
 
             const blameData = this.parseBlameOutput(stdout);
-            console.log(`[Git Blame] Parsed ${blameData.length} lines`);
 
             // Enrich with commit messages to extract patch IDs
-            console.log('[Git Blame] Enriching with commit messages...');
             await this.enrichWithCommitMessages(blameData, repoRoot);
 
             // Parse inline patch markers from file content (OVERRIDES Git commit markers)
-            console.log('[Git Blame] Parsing inline patch markers from file...');
             try {
                 const fileContent = fs.readFileSync(mappedPath, 'utf8');
                 const inlinePatchMap = this.parseInlinePatchMarkers(fileContent);
@@ -438,20 +412,56 @@ class GitBlameService {
                         blame.inlineMarker = true; // Flag to indicate this came from inline marker
                     }
                 }
-
-                console.log(`[Git Blame] Applied inline markers to ${inlinePatchMap.size} lines`);
-            } catch (error) {
-                console.warn('[Git Blame] Failed to parse inline markers:', error.message);
-            }
+            } catch (_) { }
 
             // Cache the result
             this.blameCache.set(cacheKey, blameData);
-
-            console.log(`[Git Blame] ✓ Processed and cached ${blameData.length} lines with patch metadata`);
             return blameData;
 
         } catch (error) {
-            console.error('[Git Blame] Error:', error.message);
+            // If git blame fails, check if this is a NEW file that exists locally
+            // In that case, we can still provide patch information if available
+            console.log(`[Git Blame] git blame failed for ${mappedPath}, checking if new file:`, error.message);
+
+            try {
+                // Check if file exists locally (new file not yet committed)
+                if (fs.existsSync(mappedPath)) {
+                    console.log('[Git Blame] File exists but not in Git - creating synthetic blame for new file');
+
+                    // Read file to get line count and parse inline markers
+                    const fileContent = fs.readFileSync(mappedPath, 'utf8');
+                    const lines = fileContent.split('\n');
+                    const inlinePatchMap = this.parseInlinePatchMarkers(fileContent);
+
+                    // Create synthetic blame data for new file
+                    const syntheticBlame = lines.map((line, idx) => {
+                        const lineNumber = idx + 1;
+                        const inlineInfo = inlinePatchMap.get(lineNumber);
+
+                        return {
+                            lineNumber,
+                            hash: '0000000000000000000000000000000000000000', // Uncommitted
+                            hashShort: '0000000',
+                            author: inlineInfo?.patchAuthor || 'Not Committed',
+                            authorMail: '',
+                            date: inlineInfo?.patchDate ? new Date(inlineInfo.patchDate) : new Date(),
+                            summary: 'New file - not yet committed to Git',
+                            patchId: inlineInfo?.patchId || null,
+                            patchAuthor: inlineInfo?.patchAuthor || null,
+                            patchDate: inlineInfo?.patchDate || null,
+                            inlineMarker: !!inlineInfo,
+                            isNewFile: true // Flag to indicate this is a new file
+                        };
+                    });
+
+                    // Cache and return
+                    this.blameCache.set(cacheKey, syntheticBlame);
+                    return syntheticBlame;
+                }
+            } catch (readError) {
+                console.error('[Git Blame] Failed to create synthetic blame:', readError);
+            }
+
             return null;
         }
     }
@@ -551,21 +561,14 @@ class GitBlameService {
                 const patchId = this.extractPatchId(message);
                 let patchAuthor = this.extractPatchAuthor(message);
 
-                console.log(`[Git Blame] Commit ${hash.substring(0,8)}:`);
-                console.log(`[Git Blame]   Message preview:`, message.substring(0, 200).replace(/\n/g, ' ↵ '));
-                console.log(`[Git Blame]   Patch ID: ${patchId}`);
-                console.log(`[Git Blame]   Patch Author (extracted): ${patchAuthor}`);
-
                 // Fallback to Co-Authored-By if no patch author found
                 if (!patchAuthor) {
                     const coAuthor = this.extractCoAuthor(message);
                     patchAuthor = coAuthor ? coAuthor.name : null;
-                    console.log(`[Git Blame]   Patch Author (from Co-Authored-By): ${patchAuthor}`);
                 }
 
                 commitInfo.set(hash, { patchId, patchAuthor });
-            } catch (error) {
-                console.warn(`[Git Blame] Failed to get commit message for ${hash}`);
+            } catch (_) {
                 commitInfo.set(hash, { patchId: null, patchAuthor: null });
             }
         }
@@ -619,11 +622,8 @@ class GitBlameService {
 
                 if (modifiedLines.size > 0) {
                     linesModifiedInCommit.set(hash, modifiedLines);
-                    console.log(`[Git Blame]   Lines modified in ${hash.substring(0,8)}:`, Array.from(modifiedLines));
                 }
-            } catch (error) {
-                console.warn(`[Git Blame] Failed to get diff for ${hash}:`, error.message);
-            }
+            } catch (_) { }
         }
 
         // Update blame data with patch IDs/authors
@@ -737,16 +737,6 @@ class GitBlameService {
         if (!blameData) return null;
 
         const blame = blameData.find(b => b.lineNumber === lineNumber) || null;
-
-        if (blame) {
-            console.log(`[Git Blame Service] Line ${lineNumber}:`, {
-                author: blame.author,
-                patchAuthor: blame.patchAuthor,
-                patchId: blame.patchId,
-                hash: blame.hash?.substring(0, 8)
-            });
-        }
-
         return blame;
     }
 
@@ -756,7 +746,6 @@ class GitBlameService {
      */
     clearCache(filePath) {
         this.blameCache.delete(filePath);
-        console.log('[Git Blame] Cleared cache for:', filePath);
     }
 
     /**
@@ -765,7 +754,6 @@ class GitBlameService {
     clearAllCaches() {
         this.blameCache.clear();
         this.repoRoots.clear();
-        console.log('[Git Blame] Cleared all caches');
     }
 
     /**

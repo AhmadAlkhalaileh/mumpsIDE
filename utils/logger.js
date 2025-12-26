@@ -44,6 +44,15 @@
 
     const logger = createLogger();
 
+    // Silence noisy logs in production-like runs (keeps errors visible).
+    try {
+        if (typeof console !== 'undefined' && !isDevEnv) {
+            console.log = () => { };
+            console.info = () => { };
+            console.debug = () => { };
+        }
+    } catch (_) { }
+
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = { logger };
     }

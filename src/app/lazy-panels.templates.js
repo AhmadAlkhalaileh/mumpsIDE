@@ -520,93 +520,296 @@
             <div class="search-everywhere-results" id="searchEverywhereResults">Press Shift twice to search…</div>
         `,
         patchTrackingPanel: `
-            <div style="padding: 20px; background: var(--ps-bg-main, #1e1e1e); color: var(--ps-text-main, #d4d4d4); height: 100%; overflow-y: auto;">
-                <!-- Header -->
-                <div style="margin-bottom: 24px; padding-bottom: 16px; border-bottom: 2px solid rgba(139, 233, 253, 0.3);">
-                    <h2 style="margin: 0; font-size: 24px; color: #8be9fd;">
-                        📦 Vista Patch Tracking
-                    </h2>
-                    <p style="margin: 8px 0 0 0; color: #6272a4; font-size: 13px;">
-                        Intelligent patch detection and Git integration
-                    </p>
-                </div>
-
-                <!-- Git Repository Settings -->
-                <div style="background: rgba(40, 42, 54, 0.3); border: 1px solid rgba(139, 233, 253, 0.2); border-radius: 8px; padding: 16px; margin-bottom: 24px;">
+            <div style="display: flex; flex-direction: column; height: 100%; background: var(--panel-2, #282a36); color: var(--text, #f8f8f2);">
+                <!-- Compact Header with Inline Stats -->
+                <div style="flex-shrink: 0; padding: 12px 16px; border-bottom: 1px solid var(--border, #44475a); background: var(--panel-strong, #21222c); display: flex; align-items: center; justify-content: space-between;">
                     <div style="display: flex; align-items: center; gap: 12px;">
-                        <div style="flex: 1;">
-                            <label style="display: block; font-size: 12px; color: #6272a4; margin-bottom: 6px;">Git Repository Path</label>
-                            <input type="text" id="gitRepoPathInput" placeholder="~/Desktop/vista-routines"
-                                   style="width: 100%; padding: 8px 12px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(139, 233, 253, 0.3); border-radius: 4px; color: #f8f8f2; font-size: 13px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <svg width="18" height="18" fill="none" stroke="#8be9fd" stroke-width="2">
+                                <rect x="3" y="3" width="6" height="6" rx="1"/>
+                                <rect x="11" y="3" width="6" height="6" rx="1"/>
+                                <rect x="3" y="11" width="6" height="6" rx="1"/>
+                                <rect x="11" y="11" width="6" height="6" rx="1"/>
+                            </svg>
+                            <span style="font-weight: 600; font-size: 13px; color: var(--text-bright, #ffffff);">Vista Patch Tracking</span>
                         </div>
-                        <div>
-                            <button id="setRepoPathBtn" style="margin-top: 18px; padding: 8px 16px; background: rgba(139, 233, 253, 0.2); border: 1px solid #8be9fd; border-radius: 4px; color: #8be9fd; cursor: pointer; font-size: 12px; font-weight: 600;">
-                                Set Path
-                            </button>
-                        </div>
-                        <div>
-                            <button id="browseRepoBtn" style="margin-top: 18px; padding: 8px 16px; background: rgba(139, 233, 253, 0.1); border: 1px solid rgba(139, 233, 253, 0.3); border-radius: 4px; color: #8be9fd; cursor: pointer; font-size: 12px;">
-                                📁 Browse
-                            </button>
+                        <div style="display: flex; gap: 12px; font-size: 11px; color: var(--text-muted, #6272a4);">
+                            <span><strong id="statPatches">0</strong> patches</span>
+                            <span>•</span>
+                            <span><strong id="statPending" style="color: #ffb86c;">0</strong> pending</span>
+                            <span>•</span>
+                            <span><strong id="statCommitted" style="color: #50fa7b;">0</strong> committed</span>
                         </div>
                     </div>
-                    <div id="repoPathStatus" style="font-size: 11px; color: #6272a4; margin-top: 8px;"></div>
-                </div>
-
-                <!-- Workflow Steps -->
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
-                    <div class="workflow-step" data-step="1" style="background: rgba(139, 233, 253, 0.1); border: 1px solid rgba(139, 233, 253, 0.3); border-radius: 8px; padding: 16px; cursor: pointer;">
-                        <div style="font-size: 24px; margin-bottom: 8px;">📦</div>
-                        <div style="font-weight: 600; margin-bottom: 4px;">1. Upload Patch</div>
-                        <div style="font-size: 11px; color: #6272a4;">Upload KIDS file</div>
-                    </div>
-                    <div class="workflow-step" data-step="2" style="background: rgba(139, 233, 253, 0.1); border: 1px solid rgba(139, 233, 253, 0.3); border-radius: 8px; padding: 16px; cursor: pointer;">
-                        <div style="font-size: 24px; margin-bottom: 8px;">🔍</div>
-                        <div style="font-weight: 600; margin-bottom: 4px;">2. Scan Docker</div>
-                        <div style="font-size: 11px; color: #6272a4;">Detect changes</div>
-                    </div>
-                    <div class="workflow-step" data-step="3" style="background: rgba(139, 233, 253, 0.1); border: 1px solid rgba(139, 233, 253, 0.3); border-radius: 8px; padding: 16px; cursor: pointer;">
-                        <div style="font-size: 24px; margin-bottom: 8px;">🔗</div>
-                        <div style="font-weight: 600; margin-bottom: 4px;">3. Correlate</div>
-                        <div style="font-size: 11px; color: #6272a4;">Match patch to changes</div>
-                    </div>
-                    <div class="workflow-step" data-step="4" style="background: rgba(139, 233, 253, 0.1); border: 1px solid rgba(139, 233, 253, 0.3); border-radius: 8px; padding: 16px; cursor: pointer;">
-                        <div style="font-size: 24px; margin-bottom: 8px;">✅</div>
-                        <div style="font-weight: 600; margin-bottom: 4px;">4. Approve & Commit</div>
-                        <div style="font-size: 11px; color: #6272a4;">Review and push to Git</div>
+                    <div style="display: flex; gap: 6px; position: relative;">
+                        <button id="patchTrackingRefreshBtn" title="Refresh stats" style="padding: 4px 8px; background: transparent; border: 1px solid transparent; border-radius: 4px; cursor: pointer; color: var(--text-muted, #6272a4); font-size: 11px;">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 8a5 5 0 0 1 5-5 5 5 0 0 1 5 5M13 8a5 5 0 0 1-5 5 5 5 0 0 1-5-5" stroke-linecap="round"/>
+                                <path d="M8 3V1M8 15v-2M3 8H1M15 8h-2" stroke-linecap="round"/>
+                            </svg>
+                        </button>
+                        <button id="patchTrackingMenuBtn" title="Menu" style="padding: 4px 8px; background: transparent; border: 1px solid transparent; border-radius: 4px; cursor: pointer; color: var(--text-muted, #6272a4); font-size: 11px;">
+                            <svg width="14" height="14" fill="currentColor">
+                                <circle cx="7" cy="3" r="1.5"/>
+                                <circle cx="7" cy="7" r="1.5"/>
+                                <circle cx="7" cy="11" r="1.5"/>
+                            </svg>
+                        </button>
+                        <!-- Dropdown Menu -->
+                        <div id="patchTrackingDropdown" style="display: none; position: absolute; top: 100%; right: 0; margin-top: 4px; min-width: 280px; background: var(--panel-strong, #21222c); border: 1px solid var(--border, #44475a); border-radius: 6px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); z-index: 1000;">
+                            <!-- Dropdown content will be inserted here -->
+                        </div>
                     </div>
                 </div>
 
-                <!-- Statistics -->
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
-                    <div style="background: rgba(139, 233, 253, 0.05); border: 1px solid rgba(139, 233, 253, 0.2); border-radius: 6px; padding: 16px; text-align: center;">
-                        <div style="font-size: 28px; font-weight: 700; color: #8be9fd;" id="statPatches">0</div>
-                        <div style="font-size: 12px; color: #6272a4; margin-top: 4px;">Patches</div>
+                <!-- Workflow Progress Bar -->
+                <div style="flex-shrink: 0; display: flex; background: var(--panel-2, #282a36); border-bottom: 1px solid var(--border, #44475a);">
+                    <div class="workflow-step" data-step="1" style="flex: 1; padding: 10px; text-align: center; cursor: pointer; border-right: 1px solid var(--border, #44475a); transition: background 0.15s;">
+                        <div style="font-size: 11px; font-weight: 600; color: var(--text-muted, #6272a4);">UPLOAD</div>
+                        <div class="workflow-step-indicator" style="width: 100%; height: 3px; background: rgba(139, 233, 253, 0.2); margin-top: 6px; border-radius: 2px;"></div>
                     </div>
-                    <div style="background: rgba(139, 233, 253, 0.05); border: 1px solid rgba(139, 233, 253, 0.2); border-radius: 6px; padding: 16px; text-align: center;">
-                        <div style="font-size: 28px; font-weight: 700; color: #8be9fd;" id="statChanges">0</div>
-                        <div style="font-size: 12px; color: #6272a4; margin-top: 4px;">Changes</div>
+                    <div class="workflow-step" data-step="2" style="flex: 1; padding: 10px; text-align: center; cursor: pointer; border-right: 1px solid var(--border, #44475a); transition: background 0.15s;">
+                        <div style="font-size: 11px; font-weight: 600; color: var(--text-muted, #6272a4);">SCAN</div>
+                        <div class="workflow-step-indicator" style="width: 100%; height: 3px; background: rgba(139, 233, 253, 0.2); margin-top: 6px; border-radius: 2px;"></div>
                     </div>
-                    <div style="background: rgba(139, 233, 253, 0.05); border: 1px solid rgba(139, 233, 253, 0.2); border-radius: 6px; padding: 16px; text-align: center;">
-                        <div style="font-size: 28px; font-weight: 700; color: #ffb86c;" id="statPending">0</div>
-                        <div style="font-size: 12px; color: #6272a4; margin-top: 4px;">Pending</div>
+                    <div class="workflow-step" data-step="3" style="flex: 1; padding: 10px; text-align: center; cursor: pointer; border-right: 1px solid var(--border, #44475a); transition: background 0.15s;">
+                        <div style="font-size: 11px; font-weight: 600; color: var(--text-muted, #6272a4);">CORRELATE</div>
+                        <div class="workflow-step-indicator" style="width: 100%; height: 3px; background: rgba(139, 233, 253, 0.2); margin-top: 6px; border-radius: 2px;"></div>
                     </div>
-                    <div style="background: rgba(139, 233, 253, 0.05); border: 1px solid rgba(139, 233, 253, 0.2); border-radius: 6px; padding: 16px; text-align: center;">
-                        <div style="font-size: 28px; font-weight: 700; color: #50fa7b;" id="statCommitted">0</div>
-                        <div style="font-size: 12px; color: #6272a4; margin-top: 4px;">Committed</div>
+                    <div class="workflow-step" data-step="4" style="flex: 1; padding: 10px; text-align: center; cursor: pointer; transition: background 0.15s;">
+                        <div style="font-size: 11px; font-weight: 600; color: var(--text-muted, #6272a4);">COMMIT</div>
+                        <div class="workflow-step-indicator" style="width: 100%; height: 3px; background: rgba(139, 233, 253, 0.2); margin-top: 6px; border-radius: 2px;"></div>
                     </div>
                 </div>
 
-                <!-- Content Area -->
-                <div id="patchTrackingContent" style="background: rgba(40, 42, 54, 0.5); border: 1px solid rgba(139, 233, 253, 0.2); border-radius: 8px; padding: 40px; min-height: 300px;">
-                    <div style="text-align: center; color: #6272a4;">
-                        <svg width="80" height="80" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity: 0.3; margin-bottom: 20px;">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke-width="2"/>
-                            <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke-width="2" stroke-linecap="round"/>
+                <!-- Main Content Area (Scrollable) -->
+                <div id="patchTrackingContent" style="flex: 1; overflow-y: auto; padding: 16px;">
+                    <!-- Initial Welcome State -->
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100%; padding: 40px 20px; text-align: center; color: var(--text-muted, #6272a4);">
+                        <svg width="64" height="64" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity: 0.25; margin-bottom: 16px;">
+                            <rect x="8" y="8" width="48" height="48" rx="4"/>
+                            <path d="M20 28h24M20 36h16" stroke-linecap="round"/>
+                            <circle cx="16" cy="20" r="2" fill="currentColor"/>
+                            <circle cx="24" cy="20" r="2" fill="currentColor"/>
                         </svg>
-                        <p style="font-size: 16px; margin: 0;">Click on "1. Upload Patch" above to begin tracking a Vista KIDS patch</p>
+                        <div style="font-size: 14px; font-weight: 500; color: var(--text, #f8f8f2); margin-bottom: 6px;">Drop .KIDS file to begin</div>
+                        <div style="font-size: 12px;">or click on workflow steps above</div>
                     </div>
                 </div>
+
+                <style>
+                    .workflow-step:hover {
+                        background: rgba(139, 233, 253, 0.05);
+                    }
+                    .workflow-step.active {
+                        background: rgba(139, 233, 253, 0.08);
+                    }
+                    .workflow-step.active .workflow-step-indicator {
+                        background: #8be9fd !important;
+                        box-shadow: 0 0 8px rgba(139, 233, 253, 0.5);
+                    }
+                    .workflow-step.completed .workflow-step-indicator {
+                        background: #50fa7b !important;
+                    }
+
+                    .patch-form {
+                        max-width: 640px;
+                        margin: 0 auto;
+                    }
+                    .patch-form-group {
+                        margin-bottom: 16px;
+                    }
+                    .patch-form-label {
+                        display: block;
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: var(--text-bright, #ffffff);
+                        margin-bottom: 6px;
+                    }
+                    .patch-form-input {
+                        width: 100%;
+                        padding: 8px 12px;
+                        background: rgba(0, 0, 0, 0.2);
+                        border: 1px solid var(--border, #44475a);
+                        border-radius: 4px;
+                        color: var(--text, #f8f8f2);
+                        font-size: 13px;
+                        outline: none;
+                    }
+                    .patch-form-input:focus {
+                        border-color: #8be9fd;
+                        box-shadow: 0 0 0 2px rgba(139, 233, 253, 0.15);
+                    }
+                    .patch-btn {
+                        padding: 8px 16px;
+                        border-radius: 4px;
+                        font-size: 12px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        border: 1px solid;
+                        transition: all 0.15s;
+                        outline: none;
+                    }
+                    .patch-btn:disabled {
+                        opacity: 0.5;
+                        cursor: not-allowed;
+                    }
+                    .patch-btn-primary {
+                        background: rgba(139, 233, 253, 0.15);
+                        border-color: #8be9fd;
+                        color: #8be9fd;
+                    }
+                    .patch-btn-primary:hover:not(:disabled) {
+                        background: rgba(139, 233, 253, 0.25);
+                    }
+                    .patch-btn-secondary {
+                        background: rgba(255, 255, 255, 0.05);
+                        border-color: var(--border, #44475a);
+                        color: var(--text, #f8f8f2);
+                    }
+                    .patch-btn-secondary:hover:not(:disabled) {
+                        background: rgba(255, 255, 255, 0.08);
+                    }
+                    .patch-actions {
+                        display: flex;
+                        gap: 8px;
+                        justify-content: flex-end;
+                        margin-top: 20px;
+                    }
+                    .patch-result-item {
+                        margin-top: 16px;
+                        padding: 12px;
+                        border-radius: 6px;
+                        border: 1px solid;
+                        font-size: 13px;
+                    }
+                    .patch-result-item.success {
+                        background: rgba(80, 250, 123, 0.08);
+                        border-color: rgba(80, 250, 123, 0.3);
+                    }
+                    .patch-result-item.warning {
+                        background: rgba(255, 184, 108, 0.08);
+                        border-color: rgba(255, 184, 108, 0.3);
+                    }
+                    .patch-result-item.error {
+                        background: rgba(255, 85, 85, 0.08);
+                        border-color: rgba(255, 85, 85, 0.3);
+                    }
+                    .patch-result-header {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-bottom: 8px;
+                    }
+                    .patch-result-title {
+                        font-weight: 600;
+                    }
+                    .patch-result-badge {
+                        font-size: 10px;
+                        font-weight: 700;
+                        padding: 3px 8px;
+                        border-radius: 3px;
+                        background: rgba(0, 0, 0, 0.2);
+                    }
+                    .patch-result-body {
+                        font-size: 12px;
+                        line-height: 1.6;
+                    }
+
+                    /* Drag and drop styles */
+                    #patchTrackingContent.drag-over {
+                        background: rgba(139, 233, 253, 0.05);
+                        outline: 2px dashed #8be9fd;
+                        outline-offset: -8px;
+                    }
+
+                    /* Compact repo settings */
+                    .patch-repo-settings {
+                        background: rgba(0, 0, 0, 0.15);
+                        border: 1px solid var(--border, #44475a);
+                        border-radius: 6px;
+                        padding: 12px;
+                        margin-bottom: 16px;
+                    }
+                    .patch-repo-settings-compact {
+                        display: flex;
+                        gap: 8px;
+                        align-items: center;
+                    }
+                    .patch-repo-settings-input {
+                        flex: 1;
+                        min-width: 0;
+                    }
+
+                    /* Progress animation */
+                    @keyframes progress {
+                        0% { transform: translateX(-100%); }
+                        50% { transform: translateX(0); }
+                        100% { transform: translateX(100%); }
+                    }
+
+                    @keyframes pulse {
+                        0%, 100% { opacity: 1; }
+                        50% { opacity: 0.5; }
+                    }
+
+                    /* Info cards */
+                    .patch-info-card {
+                        background: rgba(0, 0, 0, 0.2);
+                        border: 1px solid var(--border, #44475a);
+                        border-radius: 6px;
+                        padding: 12px;
+                        font-size: 12px;
+                        margin-bottom: 12px;
+                    }
+
+                    .patch-info-card-row {
+                        display: flex;
+                        justify-content: space-between;
+                        padding: 4px 0;
+                    }
+
+                    .patch-info-card-label {
+                        color: var(--text-muted, #6272a4);
+                        font-weight: 600;
+                    }
+
+                    .patch-info-card-value {
+                        color: var(--text, #f8f8f2);
+                    }
+
+                    /* Scrollable routine list */
+                    .patch-routine-list {
+                        max-height: 200px;
+                        overflow-y: auto;
+                        background: rgba(0, 0, 0, 0.15);
+                        border: 1px solid var(--border, #44475a);
+                        border-radius: 4px;
+                        padding: 8px;
+                        font-size: 11px;
+                        font-family: 'Courier New', monospace;
+                        color: #50fa7b;
+                        margin-top: 8px;
+                    }
+
+                    .patch-routine-list::-webkit-scrollbar {
+                        width: 8px;
+                    }
+
+                    .patch-routine-list::-webkit-scrollbar-track {
+                        background: rgba(0, 0, 0, 0.2);
+                        border-radius: 4px;
+                    }
+
+                    .patch-routine-list::-webkit-scrollbar-thumb {
+                        background: rgba(139, 233, 253, 0.3);
+                        border-radius: 4px;
+                    }
+
+                    .patch-routine-list::-webkit-scrollbar-thumb:hover {
+                        background: rgba(139, 233, 253, 0.5);
+                    }
+                </style>
             </div>
         `
     };

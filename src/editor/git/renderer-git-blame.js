@@ -1,19 +1,21 @@
 /**
  * Git Blame Integration for Monaco Editor
- * Shows author and patch information on hover
+ * Shows author and patch information inline - OPTIMIZED FOR PERFORMANCE
  */
 
 (() => {
     function createGitBlameProvider({ deps } = {}) {
         const getMonaco = deps?.getMonaco || (() => (typeof monaco !== 'undefined' ? monaco : null));
 
-        let blameCache = new Map();
-        let decorationsMap = new Map(); // Map of editor -> decoration IDs
-        let currentLineDecorationsMap = new Map(); // Map of editor -> decoration IDs (single current-line)
-        let currentLineLastKeyMap = new Map(); // Map of editor -> last rendered key
-        let currentLineTimerMap = new Map(); // Map of editor -> timer id
-        let currentLineDisposablesMap = new Map(); // Map of editor -> disposables
-        let currentLineWidgetMap = new Map(); // Map of editor -> content widget
+        let fileBlameCache = new Map(); // filePath -> Map(lineNumber -> blameData)
+        let decorationsMap = new Map();
+        let currentLineWidgetMap = new Map();
+        let currentLineLastKeyMap = new Map();
+        let currentLineTimerMap = new Map();
+        let currentLineDisposablesMap = new Map();
+        let pendingFetchMap = new Map(); // filePath -> Promise
+        let scheduledPrefetchMap = new Map(); // filePath -> { type, id }
+        let hoverDisposable = null;
         let editorCreateDisposable = null;
         let enabled = true;
         const GLOBAL_REPO_ROOT_KEY = 'ahmadIDE:gitRepoRootGlobal';
@@ -49,59 +51,194 @@
 
             try {
                 await api.setRepoPath(repoPath);
-                console.log('[Git Blame] Applied repo path from settings:', repoPath);
+                fileBlameCache.clear();
+            } catch (_) { }
+        }
 
-                // Clear frontend cache when repo path is set to ensure fresh blame data
-                blameCache.clear();
-                console.log('[Git Blame] Cleared frontend cache after setting repo path');
-            } catch (e) {
-                console.warn('[Git Blame] Failed to apply repo path:', e?.message || e);
+        async function prefetchFileBlame(filePath) {
+            if (!filePath) return null;
+
+            // Check cache first
+            if (fileBlameCache.has(filePath)) {
+                return fileBlameCache.get(filePath);
             }
+
+            // Check if already fetching
+            if (pendingFetchMap.has(filePath)) {
+                return await pendingFetchMap.get(filePath);
+            }
+
+            // Fetch blame data for entire file
+            const fetchPromise = (async () => {
+                try {
+                    await ensureRepoPathApplied();
+
+                    const result = await window.ahmadIDE.gitBlame.getBlame(filePath);
+                    if (!result?.success || !Array.isArray(result?.blameData)) {
+                        return null;
+                    }
+
+                    // Index by line number for O(1) lookup
+                    const lineMap = new Map();
+                    for (const blame of result.blameData) {
+                        if (blame?.lineNumber) {
+                            lineMap.set(blame.lineNumber, blame);
+                        }
+                    }
+
+                    fileBlameCache.set(filePath, lineMap);
+                    return lineMap;
+                } catch (_) {
+                    return null;
+                } finally {
+                    pendingFetchMap.delete(filePath);
+                }
+            })();
+
+            pendingFetchMap.set(filePath, fetchPromise);
+            return await fetchPromise;
         }
 
-        /**
-         * Register Git blame hover provider for all languages
-         * DISABLED - User only wants inline annotations
-         */
+        function cancelScheduledPrefetch(filePath) {
+            if (!filePath) return;
+            const entry = scheduledPrefetchMap.get(filePath);
+            if (!entry) return;
+            scheduledPrefetchMap.delete(filePath);
+            try {
+                if (entry.type === 'idle' && typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+                    window.cancelIdleCallback(entry.id);
+                } else {
+                    clearTimeout(entry.id);
+                }
+            } catch (_) { }
+        }
+
+        function schedulePrefetchFileBlame(filePath) {
+            if (!filePath) return;
+            if (fileBlameCache.has(filePath) || pendingFetchMap.has(filePath)) return;
+            if (scheduledPrefetchMap.has(filePath)) return;
+
+            const run = () => {
+                scheduledPrefetchMap.delete(filePath);
+                prefetchFileBlame(filePath).then(() => {
+                    try {
+                        for (const editor of currentLineDisposablesMap.keys()) {
+                            const model = editor?.getModel?.();
+                            const fp = model?.uri?.toString?.() || '';
+                            if (fp === filePath) scheduleCurrentLineUpdate(editor);
+                        }
+                    } catch (_) { }
+                });
+            };
+
+            try {
+                if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+                    const id = window.requestIdleCallback(run, { timeout: 2000 });
+                    scheduledPrefetchMap.set(filePath, { type: 'idle', id });
+                    return;
+                }
+            } catch (_) { }
+
+            const id = setTimeout(run, 1500);
+            scheduledPrefetchMap.set(filePath, { type: 'timeout', id });
+        }
+
         function registerBlameHoverProvider() {
-            console.log('[Git Blame] Hover provider DISABLED (user preference: inline only)');
-            // Hover provider disabled - user only wants inline annotations
-            return;
+            const monacoRef = getMonaco();
+            if (!monacoRef?.languages?.registerHoverProvider) return;
+            if (hoverDisposable) return;
+
+            const escapeMd = (s) => String(s || '').replace(/([\\\\`*_{}\\[\\]()#+\\-.!])/g, '\\\\$1');
+            const fmtDate = (val) => {
+                if (!val) return '';
+                try {
+                    const d = (val instanceof Date) ? val : new Date(val);
+                    if (Number.isNaN(d.getTime())) return '';
+                    return d.toLocaleString();
+                } catch (_) {
+                    return '';
+                }
+            };
+
+            try {
+                hoverDisposable = monacoRef.languages.registerHoverProvider('mumps', {
+                    provideHover: async (model, position) => {
+                        if (!enabled) return null;
+                        if (!model || !position?.lineNumber) return null;
+
+                        const filePath = model.uri?.toString?.() || '';
+                        if (!filePath) return null;
+
+                        const lineMap = fileBlameCache.get(filePath) || await prefetchFileBlame(filePath);
+                        if (!lineMap) return null;
+
+                        const blame = lineMap.get(position.lineNumber);
+                        if (!blame) return null;
+
+                        const patchId = blame.patchId;
+                        const patchAuthor = blame.patchAuthor;
+                        const patchDate = blame.patchDate;
+                        const author = blame.author || 'Unknown';
+                        const commit = blame.hashShort || (blame.hash ? String(blame.hash).slice(0, 8) : '');
+                        const summary = blame.summary;
+                        const isNewFile = blame.isNewFile || false;
+
+                        const contents = [];
+
+                        // Show NEW FILE banner for uncommitted files
+                        if (isNewFile) {
+                            contents.push({ value: `🆕 **NEW FILE** - Not yet committed to Git` });
+                            contents.push({ value: `---` });
+                        }
+
+                        if (patchId) contents.push({ value: `**Patch**: \`${escapeMd(patchId)}\`` });
+                        if (patchAuthor) contents.push({ value: `**Patch Author**: ${escapeMd(patchAuthor)}` });
+                        if (!patchAuthor && !isNewFile) contents.push({ value: `**Author**: ${escapeMd(author)}` });
+
+                        const when = patchDate || fmtDate(blame.date);
+                        if (when && !isNewFile) contents.push({ value: `**Date**: ${escapeMd(when)}` });
+
+                        if (commit && commit !== '0000000') contents.push({ value: `**Commit**: \`${escapeMd(commit)}\`` });
+                        if (summary && !isNewFile) contents.push({ value: `**Summary**: ${escapeMd(summary)}` });
+
+                        // If new file and has patch metadata, show helpful message
+                        if (isNewFile && patchId) {
+                            contents.push({ value: `---` });
+                            contents.push({ value: `_This routine was created by patch **${escapeMd(patchId)}**. Commit it to preserve attribution._` });
+                        }
+
+                        if (!contents.length) return null;
+
+                        return {
+                            range: new monacoRef.Range(position.lineNumber, 1, position.lineNumber, 1),
+                            contents
+                        };
+                    }
+                });
+            } catch (_) { }
         }
 
-        /**
-         * Show inline blame annotations (like GitLens)
-         * @param {Object} editor - Monaco editor instance
-         */
         async function showInlineAnnotations(editor) {
             if (!enabled) return;
 
             try {
-                await ensureRepoPathApplied();
-
                 const model = editor.getModel();
                 if (!model) return;
 
                 const filePath = model.uri.toString();
                 if (!filePath) return;
 
-                // Get full blame for the file
-                const result = await window.ahmadIDE.gitBlame.getBlame(filePath);
-                if (!result.success || !result.blameData) {
-                    return;
-                }
+                const lineMap = await prefetchFileBlame(filePath);
+                if (!lineMap) return;
 
-                const blameData = result.blameData;
-                blameCache.set(filePath, blameData);
-
-                // Create inline decorations
-                const decorations = [];
                 const monacoRef = getMonaco();
+                if (!monacoRef) return;
 
-                // Group consecutive lines with same commit to avoid clutter
+                const decorations = [];
                 let lastHash = null;
-                for (const blame of blameData) {
-                    // Only show annotation if commit is different from previous line
+
+                // Create decorations from cached data
+                for (const [lineNumber, blame] of lineMap.entries()) {
                     if (blame.hash !== lastHash) {
                         const authorSrc = blame.patchAuthor || blame.author;
                         const author = authorSrc ? String(authorSrc).split(' ')[0] : 'Unknown';
@@ -109,7 +246,7 @@
                         const text = patchId ? `${author} • ${patchId}` : author;
 
                         decorations.push({
-                            range: new monacoRef.Range(blame.lineNumber, 1, blame.lineNumber, 1),
+                            range: new monacoRef.Range(lineNumber, 1, lineNumber, 1),
                             options: {
                                 isWholeLine: false,
                                 after: {
@@ -123,42 +260,21 @@
                     lastHash = blame.hash;
                 }
 
-                // Apply decorations
                 const oldDecorations = decorationsMap.get(editor) || [];
                 const newDecorations = editor.deltaDecorations(oldDecorations, decorations);
                 decorationsMap.set(editor, newDecorations);
-
-                console.log(`[Git Blame] Applied ${decorations.length} inline annotations`);
-
-            } catch (error) {
-                console.error('[Git Blame] Inline annotations error:', error);
-            }
+            } catch (_) { }
         }
 
-        /**
-         * Clear inline annotations
-         * @param {Object} editor - Monaco editor instance
-         */
         function clearInlineAnnotations(editor) {
             const oldDecorations = decorationsMap.get(editor) || [];
             if (oldDecorations.length > 0) {
                 editor.deltaDecorations(oldDecorations, []);
                 decorationsMap.delete(editor);
-                console.log('[Git Blame] Cleared inline annotations');
             }
         }
 
-        function clearCurrentLineDecoration(editor) {
-            const old = currentLineDecorationsMap.get(editor) || [];
-            if (old.length > 0) {
-                try {
-                    editor.deltaDecorations(old, []);
-                } catch (_) { }
-            }
-            currentLineDecorationsMap.delete(editor);
-            currentLineLastKeyMap.delete(editor);
-
-            // Also remove content widget
+        function clearCurrentLineWidget(editor) {
             const widget = currentLineWidgetMap.get(editor);
             if (widget) {
                 try {
@@ -168,139 +284,97 @@
             }
         }
 
-        async function updateCurrentLineDecoration(editor) {
-            if (!enabled) {
-                console.log('[Git Blame] Inline disabled');
-                return;
-            }
-            if (!editor) {
-                console.log('[Git Blame] No editor');
-                return;
-            }
+        async function updateCurrentLineWidget(editor) {
+            if (!enabled || !editor) return;
 
             const model = editor.getModel?.();
-            if (!model) {
-                console.log('[Git Blame] No model');
-                return;
-            }
+            if (!model) return;
 
             const position = editor.getPosition?.();
-            if (!position || !position.lineNumber) {
-                console.log('[Git Blame] No position');
-                return;
-            }
+            if (!position || !position.lineNumber) return;
 
             const monacoRef = getMonaco();
-            if (!monacoRef) {
-                console.log('[Git Blame] No monaco');
-                return;
-            }
-
-            await ensureRepoPathApplied();
+            if (!monacoRef) return;
 
             const filePath = model.uri?.toString?.() || '';
             const lineNumber = position.lineNumber;
             const key = `${filePath}#${lineNumber}`;
+
             if (currentLineLastKeyMap.get(editor) === key) return;
             currentLineLastKeyMap.set(editor, key);
 
-            console.log(`[Git Blame] Updating inline for line ${lineNumber}`);
+            // Get from cache (already prefetched when file opened)
+            const lineMap = fileBlameCache.get(filePath);
+            if (!lineMap) {
+                // Trigger background fetch
+                schedulePrefetchFileBlame(filePath);
+                clearCurrentLineWidget(editor);
+                return;
+            }
+
+            const blame = lineMap.get(lineNumber);
+            if (!blame) {
+                clearCurrentLineWidget(editor);
+                return;
+            }
+
+            const gitAuthor = blame.author || 'Unknown';
+            const patchAuthor = blame.patchAuthor;
+            const patchId = blame.patchId;
+            const patchDate = blame.patchDate;
+
+            let text;
+            if (patchAuthor && patchId) {
+                text = patchDate ? `${patchAuthor} • ${patchId} • ${patchDate}` : `${patchAuthor} • ${patchId}`;
+            } else {
+                text = gitAuthor;
+            }
+
+            const safeText = String(text).trim().slice(0, 180);
+
+            const oldWidget = currentLineWidgetMap.get(editor);
+            if (oldWidget) {
+                try {
+                    editor.removeContentWidget(oldWidget);
+                } catch (_) { }
+            }
+
+            const widgetNode = document.createElement('div');
+            widgetNode.className = 'git-blame-inline-widget';
+            widgetNode.textContent = safeText;
+            widgetNode.style.cssText = `
+                color: #888;
+                font-size: 0.85em;
+                font-style: italic;
+                padding-left: 2em;
+                opacity: 0.7;
+                pointer-events: none;
+                white-space: nowrap;
+            `;
+
+            const widget = {
+                getId: () => `git-blame-line-${lineNumber}`,
+                getDomNode: () => widgetNode,
+                getPosition: () => ({
+                    position: {
+                        lineNumber: lineNumber,
+                        column: editor.getModel().getLineMaxColumn(lineNumber)
+                    },
+                    preference: [monacoRef.editor.ContentWidgetPositionPreference.EXACT]
+                })
+            };
 
             try {
-                const result = await window.ahmadIDE.gitBlame.getBlameForLine(filePath, lineNumber);
-                if (!result?.success || !result?.blame) {
-                    console.log('[Git Blame] No blame data for inline');
-                    clearCurrentLineDecoration(editor);
-                    return;
-                }
-
-                const blame = result.blame;
-                console.log(`[Git Blame] Blame data received for line ${lineNumber}:`, JSON.stringify({
-                    author: blame.author,
-                    patchAuthor: blame.patchAuthor,
-                    patchId: blame.patchId,
-                    hash: blame.hash?.substring(0, 8)
-                }, null, 2));
-
-                // Show git author + patch info if available
-                const gitAuthor = blame.author || 'Unknown';
-                const patchAuthor = blame.patchAuthor;
-                const patchId = blame.patchId;
-                const patchDate = blame.patchDate;
-
-                let text;
-                if (patchAuthor && patchId) {
-                    // Has patch metadata: show patch creator + ID + date
-                    if (patchDate) {
-                        text = `${patchAuthor} • ${patchId} • ${patchDate}`;
-                    } else {
-                        text = `${patchAuthor} • ${patchId}`;
-                    }
-                } else {
-                    // No patch: show only git committer
-                    text = gitAuthor;
-                }
-
-                const safeText = String(text).trim().slice(0, 180);
-
-                console.log(`[Git Blame] Creating inline widget: "${safeText}"`);
-
-                // Remove old widget
-                const oldWidget = currentLineWidgetMap.get(editor);
-                if (oldWidget) {
-                    try {
-                        editor.removeContentWidget(oldWidget);
-                    } catch (_) { }
-                }
-
-                // Create DOM node for the widget
-                const widgetNode = document.createElement('div');
-                widgetNode.className = 'git-blame-inline-widget';
-                widgetNode.textContent = safeText;
-                widgetNode.style.cssText = `
-                    color: #888;
-                    font-size: 0.85em;
-                    font-style: italic;
-                    padding-left: 2em;
-                    opacity: 0.7;
-                    pointer-events: none;
-                    white-space: nowrap;
-                `;
-
-                // Create content widget
-                const widget = {
-                    getId: () => `git-blame-line-${lineNumber}`,
-                    getDomNode: () => widgetNode,
-                    getPosition: () => ({
-                        position: {
-                            lineNumber: lineNumber,
-                            column: editor.getModel().getLineMaxColumn(lineNumber)
-                        },
-                        preference: [monacoRef.editor.ContentWidgetPositionPreference.EXACT]
-                    })
-                };
-
-                // Add widget to editor
-                try {
-                    editor.addContentWidget(widget);
-                    currentLineWidgetMap.set(editor, widget);
-                    console.log(`[Git Blame] ✓ Content widget added for line ${lineNumber}`);
-                    console.log(`[Git Blame] Widget ID:`, widget.getId());
-                    console.log(`[Git Blame] Widget position:`, widget.getPosition());
-                } catch (e) {
-                    console.error(`[Git Blame] Failed to add widget:`, e);
-                }
-            } catch (e) {
-                console.error('[Git Blame] Error updating inline:', e);
-                clearCurrentLineDecoration(editor);
-            }
+                editor.addContentWidget(widget);
+                currentLineWidgetMap.set(editor, widget);
+            } catch (_) { }
         }
 
         function scheduleCurrentLineUpdate(editor) {
             if (!editor) return;
             const oldTimer = currentLineTimerMap.get(editor);
             if (oldTimer) clearTimeout(oldTimer);
-            const t = setTimeout(() => updateCurrentLineDecoration(editor), 120);
+            const t = setTimeout(() => updateCurrentLineWidget(editor), 150);
             currentLineTimerMap.set(editor, t);
         }
 
@@ -315,7 +389,18 @@
                 );
                 disposables.push(
                     editor.onDidChangeModel?.(() => {
-                        clearCurrentLineDecoration(editor);
+                        clearCurrentLineWidget(editor);
+                        currentLineLastKeyMap.delete(editor);
+
+                        // Prefetch blame for new file
+                        const model = editor.getModel?.();
+                        if (model) {
+                            const filePath = model.uri?.toString?.();
+                            if (filePath) {
+                                schedulePrefetchFileBlame(filePath);
+                            }
+                        }
+
                         scheduleCurrentLineUpdate(editor);
                     })
                 );
@@ -324,7 +409,8 @@
                         const timer = currentLineTimerMap.get(editor);
                         if (timer) clearTimeout(timer);
                         currentLineTimerMap.delete(editor);
-                        clearCurrentLineDecoration(editor);
+                        clearCurrentLineWidget(editor);
+                        currentLineLastKeyMap.delete(editor);
                         const ds = currentLineDisposablesMap.get(editor) || [];
                         currentLineDisposablesMap.delete(editor);
                         ds.forEach((d) => {
@@ -335,6 +421,16 @@
             } catch (_) { }
 
             currentLineDisposablesMap.set(editor, disposables.filter(Boolean));
+
+            // Prefetch blame data when attaching
+            const model = editor.getModel?.();
+            if (model) {
+                const filePath = model.uri?.toString?.();
+                if (filePath) {
+                    schedulePrefetchFileBlame(filePath);
+                }
+            }
+
             scheduleCurrentLineUpdate(editor);
         }
 
@@ -344,17 +440,10 @@
             if (editorCreateDisposable) return;
 
             editorCreateDisposable = monacoRef.editor.onDidCreateEditor((editor) => {
-                console.log('[Git Blame] Editor created - attaching current-line blame');
                 attachCurrentLineBlame(editor);
             });
-
-            console.log('[Git Blame] Current-line annotations enabled - listening for new editors');
         }
 
-        /**
-         * Toggle inline annotations
-         * @param {Object} editor - Monaco editor instance
-         */
         async function toggleInlineAnnotations(editor) {
             const oldDecorations = decorationsMap.get(editor) || [];
             if (oldDecorations.length > 0) {
@@ -364,44 +453,41 @@
             }
         }
 
-        /**
-         * Enable/disable Git blame
-         * @param {boolean} isEnabled - Enable or disable
-         */
         function setEnabled(isEnabled) {
             enabled = isEnabled;
-            console.log(`[Git Blame] ${enabled ? 'Enabled' : 'Disabled'}`);
 
             if (!enabled) {
-                // Clear all decorations when disabled
                 try {
                     for (const editor of decorationsMap.keys()) {
                         clearInlineAnnotations(editor);
                     }
-                    for (const editor of currentLineDecorationsMap.keys()) {
-                        clearCurrentLineDecoration(editor);
+                    for (const editor of currentLineWidgetMap.keys()) {
+                        clearCurrentLineWidget(editor);
                     }
                 } catch (_) { }
             }
         }
 
-        /**
-         * Clear cache for a file
-         * @param {string} filePath - File path
-         */
         function clearCache(filePath) {
             if (filePath) {
-                blameCache.delete(filePath);
-                window.ahmadIDE.gitBlame.clearCache(filePath);
+                cancelScheduledPrefetch(filePath);
+                fileBlameCache.delete(filePath);
+                try {
+                    window.ahmadIDE?.gitBlame?.clearCache?.(filePath);
+                } catch (_) { }
             } else {
-                blameCache.clear();
-                window.ahmadIDE.gitBlame.clearCache();
+                try {
+                    for (const fp of scheduledPrefetchMap.keys()) cancelScheduledPrefetch(fp);
+                } catch (_) { }
+                fileBlameCache.clear();
+                try {
+                    window.ahmadIDE?.gitBlame?.clearCache?.();
+                } catch (_) { }
             }
 
-            // Also clear all current line decorations to force refresh
-            console.log('[Git Blame] Clearing all decorations due to cache clear');
-            for (const editor of currentLineDecorationsMap.keys()) {
-                clearCurrentLineDecoration(editor);
+            for (const editor of currentLineWidgetMap.keys()) {
+                clearCurrentLineWidget(editor);
+                currentLineLastKeyMap.delete(editor);
             }
             for (const editor of decorationsMap.keys()) {
                 clearInlineAnnotations(editor);
@@ -420,61 +506,44 @@
         };
     }
 
-    // Auto-register when Monaco is available
     if (typeof window !== 'undefined') {
         window.createGitBlameProvider = createGitBlameProvider;
 
-        // Initialize immediately if Monaco is ready
         function initGitBlame() {
             if (typeof monaco !== 'undefined') {
-                console.log('[Git Blame] Monaco detected, initializing...');
                 const provider = createGitBlameProvider();
 
-                // Clear cache on startup to ensure fresh data with latest blame format
                 if (window.ahmadIDE?.gitBlame?.clearCache) {
                     window.ahmadIDE.gitBlame.clearCache();
-                    console.log('[Git Blame] Cleared cache on initialization');
                 }
 
                 provider.registerBlameHoverProvider();
                 provider.registerCurrentLineAnnotations();
 
-                // Also attach to existing editors (if any)
-                // Monaco typically reuses the same editor instance with different models
                 try {
                     const activeEditor = window.AhmadIDEModules?.mumps?.getEditor?.();
                     if (activeEditor) {
-                        console.log('[Git Blame] Found existing editor - attaching current-line blame');
                         provider.attachCurrentLineBlame(activeEditor);
-                    } else {
-                        console.log('[Git Blame] No existing editor found - will attach when created');
                     }
-                } catch (e) {
-                    console.log('[Git Blame] Could not attach to existing editor:', e.message);
-                }
+                } catch (_) { }
 
                 window.gitBlameProvider = provider;
-                console.log('[Git Blame] ✓ Provider initialized and ready');
                 return true;
             }
             return false;
         }
 
-        // Try immediate initialization
         if (!initGitBlame()) {
-            // Wait for Monaco to load
             const checkInterval = setInterval(() => {
                 if (initGitBlame()) {
                     clearInterval(checkInterval);
                 }
             }, 100);
 
-            // Stop checking after 10 seconds
             setTimeout(() => clearInterval(checkInterval), 10000);
         }
     }
 
-    // Export for module systems
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = { createGitBlameProvider };
     }
