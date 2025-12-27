@@ -238,7 +238,16 @@
             if (terminalResizeObserver) return;
             const { viewport } = getTerminalElements();
             if (!viewport) return;
-            terminalResizeObserver = new ResizeObserver(() => refreshTerminalLayout(state));
+            let raf = 0;
+            terminalResizeObserver = new ResizeObserver(() => {
+                // PERF: ResizeObserver can fire many times while dragging panels.
+                // Resize the frontend terminal promptly, but avoid spamming backend resize IPC.
+                if (raf) cancelAnimationFrame(raf);
+                raf = requestAnimationFrame(() => {
+                    raf = 0;
+                    refreshTerminalLayout(state, { resizeSession: false });
+                });
+            });
             terminalResizeObserver.observe(viewport);
         }
 
@@ -434,9 +443,14 @@
                     });
                     tab.term.onResize(({ cols, rows }) => {
                         tab.lastSize = { cols, rows };
-                        if (tab.sessionId && window.ahmadIDE.terminalResize) {
-                            window.ahmadIDE.terminalResize(tab.sessionId, cols, rows);
-                        }
+                        // Debounce backend resize to prevent lag during dragging
+                        if (tab._resizeTimer) clearTimeout(tab._resizeTimer);
+                        tab._resizeTimer = setTimeout(() => {
+                            if (tab.sessionId && window.ahmadIDE.terminalResize) {
+                                window.ahmadIDE.terminalResize(tab.sessionId, cols, rows);
+                            }
+                            tab._resizeTimer = null;
+                        }, 300); // 300ms debounce
                     });
                     tab.term.attachCustomKeyEventHandler((ev) => {
                         if (

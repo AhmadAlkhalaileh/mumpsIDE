@@ -101,7 +101,9 @@
                         if (window.ahmadIDE?.createRoutine) {
                             await window.ahmadIDE.createRoutine(full);
                         } else {
-                            const newContent = `${routine}\t; New routine created\n\tQUIT\n`;
+                            const snippetsService = window.mumpsSnippets;
+                            const newContent = snippetsService?.getRoutineTemplate?.(routine)
+                                || `${routine}\t; New routine created\n\tQUIT\n`;
                             createTab(routine, newContent, { current: full });
                             editorRef?.setValue?.(newContent);
                             if (routineStateRef) routineStateRef.current = full;
@@ -184,6 +186,44 @@
                 }
                 return;
             }
+
+            // Direct handler for compare-routines (bypasses runMenuAction)
+            if (action === 'compare-routines') {
+                // Helper to normalize routine name (strip path and extension)
+                const normalizeRoutineName = (p) => {
+                    if (!p) return null;
+                    let name = String(p).split('/').pop(); // Get filename
+                    name = name.replace(/\.(m|M)$/, ''); // Remove .m/.M extension
+                    return name || null;
+                };
+
+                let leftRoutine = null;
+                let rightRoutine = null;
+
+                // Extract from selectedPaths (multi-select)
+                if (ctx && Array.isArray(ctx.selectedPaths) && ctx.selectedPaths.length > 0) {
+                    const names = ctx.selectedPaths.map(normalizeRoutineName);
+                    leftRoutine = names[0] || null;
+                    rightRoutine = names.length > 1 ? names[1] : null;
+                }
+                // Extract from path or name (single-select)
+                else if (ctx && ctx.name) {
+                    leftRoutine = normalizeRoutineName(ctx.name);
+                }
+                else if (ctx && ctx.path) {
+                    leftRoutine = normalizeRoutineName(ctx.path);
+                }
+
+                console.log('[Compare] Normalized routine names:', { leftRoutine, rightRoutine });
+
+                if (typeof window.compareRoutines === 'function') {
+                    window.compareRoutines(leftRoutine, rightRoutine);
+                } else {
+                    showToast('error', 'Compare', 'Compare Routines not initialized');
+                }
+                return;
+            }
+
             if (typeof runMenuAction === 'function') await runMenuAction(action, ctx || {});
         };
 

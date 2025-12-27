@@ -233,7 +233,7 @@ For issues or feature requests:
 
 ## Version History
 
-**v1.0.0** - Initial release
+**v2.0.0** - Initial release
 - SSH connection to release server
 - Find and compare routine files
 - Modern diff UI with  Dracula theme

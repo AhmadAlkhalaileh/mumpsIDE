@@ -44,19 +44,27 @@
         }
 
         function hasLintRules(linter) {
-            return !!(linter && linter.rules && Object.keys(linter.rules || {}).length);
+            // The linter loads rule metadata asynchronously; treat it as available as long as it can lint.
+            return typeof linter?.lint === 'function';
         }
 
         function applyLintMarkers(model, issues) {
             const monacoRef = getMonaco();
-            const markers = (issues || []).map(issue => ({
-                severity: markerSeverity(issue.severity),
-                message: issue.message || issue.description || 'Issue',
-                startLineNumber: issue.line || 1,
-                startColumn: issue.column || 1,
-                endLineNumber: issue.line || 1,
-                endColumn: (issue.column || 1) + 1
-            }));
+            const markers = (issues || []).map((issue) => {
+                const sev = normalizeSeverity(issue.severity);
+                const code = issue.ruleId || issue.code || null;
+                const msg = issue.message || issue.description || 'Issue';
+
+                return {
+                    severity: markerSeverity(sev),
+                    message: code ? `[${code}] ${msg}` : msg,
+                    startLineNumber: issue.line || 1,
+                    startColumn: issue.column || 1,
+                    endLineNumber: issue.line || 1,
+                    endColumn: (issue.column || 1) + 1,
+                    code
+                };
+            });
             monacoRef.editor.setModelMarkers(model, 'mumps-check', markers);
         }
 
@@ -96,6 +104,12 @@
 
             if (hasLintRules(linter)) {
                 const res = linter.lint(text || '', { mode: 'edit' });
+
+                // Store GOTO analysis for visualization (enhanced linter feature)
+                if (res.gotoAnalysis && typeof window.storeMumpsLintResults === 'function') {
+                    window.storeMumpsLintResults(model, res);
+                }
+
                 (res.issues || []).forEach(issue => {
                     const sev = normalizeSeverity(issue.severity);
                     problems.push({
@@ -110,7 +124,8 @@
                         startLineNumber: issue.line || 1,
                         startColumn: issue.column || 1,
                         endLineNumber: issue.line || 1,
-                        endColumn: (issue.column || 1) + 1
+                        endColumn: (issue.column || 1) + 1,
+                        code: issue.ruleId || issue.code || null
                     });
                 });
             } else {
@@ -269,4 +284,3 @@
         window.AhmadIDEModules.diagnostics.createDiagnosticsManager = createDiagnosticsManager;
     }
 })();
-

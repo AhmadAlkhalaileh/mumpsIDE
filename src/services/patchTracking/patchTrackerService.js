@@ -9,6 +9,9 @@ const dockerScanner = require('./dockerScanner');
 const changeDetector = require('./changeDetector');
 const gitlabIntegration = require('./gitlabIntegration');
 const sshService = require('../sshService');
+const { connectionConfig } = require('../../bridge/config/connectionConfig');
+const { hasActiveSshSession } = require('../../bridge/state/sessions');
+const { applyVistaProfilePathsToConfig } = require('../../bridge/vista/vistaProfilePaths');
 
 class PatchTrackerService {
     constructor() {
@@ -152,13 +155,13 @@ class PatchTrackerService {
         const {
             connectionId,
             envName = 'docker',
-            localrPath = '/var/worldvista/prod/hakeem/localr',
-            routinesPath = '/var/worldvista/prod/hakeem/routines',
+            localrPath = null,
+            routinesPath = null,
             patchId = null // NEW: Optional patch ID to scan only its routines
         } = options;
 
         if (!connectionId) {
-            throw new Error('SSH connection ID required');
+            throw new Error('Connection ID required');
         }
 
         console.log('[Patch Tracker] Scanning environment:', envName);
@@ -198,11 +201,32 @@ class PatchTrackerService {
             const changeResult = await changeDetector.detectChanges(connectionId, scanResult);
 
             // Register environment
+            const resolvedLocalr = scanResult?.paths?.localr || localrPath || null;
+            const resolvedRoutines = scanResult?.paths?.routines || routinesPath || null;
             await patchRegistry.registerEnvironment({
                 name: envName,
-                paths: { localr: localrPath, routines: routinesPath },
+                paths: { localr: resolvedLocalr, routines: resolvedRoutines },
                 connectionId
             });
+
+            // UPDATE: Ensure discovered paths are propagated to connectionConfig
+            // This provides a secondary update path in case dockerScanner didn't update it
+            if (resolvedLocalr || resolvedRoutines) {
+                const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
+                const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
+
+                const discovered = {
+                    ok: true,
+                    localrPath: resolvedLocalr,
+                    routinesPath: resolvedRoutines,
+                    basePath: scanResult?.paths?.basePath || null,
+                    gldPath: scanResult?.paths?.gldPath || null,
+                    envKey: scanResult?.paths?.envKey || null
+                };
+
+                applyVistaProfilePathsToConfig(cfg, discovered, { override: true });
+                console.log('[Patch Tracker] Updated connectionConfig with scan result paths');
+            }
 
             // Record changes
             const changeId = await patchRegistry.recordChanges(envName, changeResult);

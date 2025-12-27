@@ -16,6 +16,7 @@
         let dialogApi = null;
         let activeTab = 'all';
         let results = [];
+        let allRoutines = []; // Cache of all indexed routines
 
         const buildContent = () => {
             const container = document.createElement('div');
@@ -33,10 +34,10 @@
             // Tab filters
             const tabsRow = document.createElement('div');
             tabsRow.style.cssText = 'display:flex;gap:0;padding:var(--ui-space-2) var(--ui-space-4);border-bottom:1px solid var(--ui-border-subtle);';
-            ['All', 'Files', 'Symbols', 'Actions'].forEach((label) => {
+            ['All', 'localr', 'routines'].forEach((label) => {
                 const tab = document.createElement('button');
                 tab.className = 'ui-btn ui-btn--ghost ui-btn--sm';
-                tab.textContent = label;
+                tab.textContent = label === 'all' ? 'All' : label;
                 tab.dataset.tab = label.toLowerCase();
                 if (label.toLowerCase() === activeTab) {
                     tab.style.background = 'var(--accent-soft)';
@@ -46,7 +47,8 @@
                     tabsRow.querySelectorAll('button').forEach((b) => {
                         b.style.background = b.dataset.tab === activeTab ? 'var(--accent-soft)' : '';
                     });
-                    renderResults();
+                    const input = document.getElementById('searchEverywhereInput');
+                    performSearch(input?.value || '');
                 });
                 tabsRow.appendChild(tab);
             });
@@ -65,25 +67,56 @@
 
         const performSearch = (query) => {
             const q = String(query || '').trim().toLowerCase();
+
+            // Filter routines based on active tab
+            let filteredRoutines = allRoutines;
+            if (activeTab === 'localr') {
+                filteredRoutines = allRoutines.filter(r => r.path.toLowerCase().startsWith('localr/'));
+            } else if (activeTab === 'routines') {
+                filteredRoutines = allRoutines.filter(r => r.path.toLowerCase().startsWith('routines/'));
+            }
+
             if (!q) {
-                results = [];
+                // Show all routines in current tab (limit to first 100)
+                results = filteredRoutines.slice(0, 100).map(r => ({
+                    type: 'file',
+                    name: r.name,
+                    path: r.path,
+                    folder: r.folder,
+                    score: 1
+                }));
                 renderResults();
                 return;
             }
 
-            // Mock search results
-            results = [
-                { type: 'file', name: 'main.m', path: '/project/main.m', score: 0.9 },
-                { type: 'file', name: 'utils.m', path: '/project/utils.m', score: 0.7 },
-                { type: 'symbol', name: 'SAVEROUTINE', routine: 'main.m', line: 45, score: 0.8 },
-                { type: 'action', name: 'Open Settings', action: 'settings', score: 0.6 }
-            ].filter((r) => r.name.toLowerCase().includes(q));
+            // Search and score results
+            results = filteredRoutines
+                .map(r => {
+                    const name = r.name.toLowerCase();
+                    const path = r.path.toLowerCase();
+                    const idx = name.indexOf(q);
+                    const pathIdx = path.indexOf(q);
 
-            if (activeTab !== 'all') {
-                results = results.filter((r) => r.type === (activeTab === 'symbols' ? 'symbol' : activeTab.slice(0, -1)));
-            }
+                    if (idx === -1 && pathIdx === -1) return null;
 
-            results.sort((a, b) => b.score - a.score);
+                    // Score: prefer exact match at start, then anywhere in name, then in path
+                    let score = 0;
+                    if (idx === 0) score = 100;
+                    else if (idx > 0) score = 50 - idx;
+                    else if (pathIdx >= 0) score = 25 - pathIdx;
+
+                    return {
+                        type: 'file',
+                        name: r.name,
+                        path: r.path,
+                        folder: r.folder,
+                        score
+                    };
+                })
+                .filter(r => r !== null)
+                .sort((a, b) => b.score - a.score)
+                .slice(0, 60);
+
             renderResults();
         };
 
@@ -94,7 +127,10 @@
             container.innerHTML = '';
 
             if (results.length === 0) {
-                container.innerHTML = '<div style="padding:var(--ui-space-6);text-align:center;color:var(--muted);">No results</div>';
+                const emptyMsg = allRoutines.length === 0
+                    ? 'Indexing routines...'
+                    : 'No results';
+                container.innerHTML = `<div style="padding:var(--ui-space-6);text-align:center;color:var(--muted);">${emptyMsg}</div>`;
                 return;
             }
 
@@ -115,10 +151,11 @@
                     margin-bottom:2px;
                 `;
                 item.dataset.index = idx;
+                item.dataset.path = result.path;
 
                 const icon = document.createElement('div');
-                icon.style.cssText = 'width:16px;height:16px;';
-                icon.textContent = { file: '📄', symbol: '🔣', action: '⚡' }[result.type] || '•';
+                icon.style.cssText = 'width:16px;height:16px;font-size:12px;';
+                icon.textContent = '📄';
 
                 const details = document.createElement('div');
                 details.style.flex = '1';
@@ -126,7 +163,7 @@
                 name.textContent = result.name;
                 name.style.cssText = 'font-weight:500;';
                 const path = document.createElement('div');
-                path.textContent = result.path || result.routine || result.action || '';
+                path.textContent = result.path;
                 path.style.cssText = 'font-size:11px;color:var(--muted);';
                 details.appendChild(name);
                 details.appendChild(path);
@@ -140,9 +177,16 @@
                 item.addEventListener('mouseleave', () => {
                     item.style.background = '';
                 });
-                item.addEventListener('click', () => {
-                    console.log('Selected:', result);
-                    dialogApi?.close('selected');
+                item.addEventListener('click', async () => {
+                    console.log('Selected:', result.path);
+                    // Use the global search manager to open the routine
+                    const searchMgr = window.searchManager;
+                    if (searchMgr && typeof searchMgr.openSearchEverywhereResult === 'function') {
+                        await searchMgr.openSearchEverywhereResult(result.path);
+                        dialogApi?.close('selected');
+                    } else {
+                        console.error('searchManager.openSearchEverywhereResult not available');
+                    }
                 });
 
                 container.appendChild(item);
@@ -160,7 +204,6 @@
             });
 
             const wrapper = document.createElement('div');
-            wrapper.className = 'ui-dialog';
             wrapper.style.cssText = 'width:min(700px, 90vw);height:min(500px, 70vh);display:flex;flex-direction:column;';
 
             wrapper.appendChild(buildContent());
@@ -168,13 +211,60 @@
             dialogApi.setContent(wrapper);
         };
 
-        const open = () => {
+        const open = async () => {
             ensureDialog();
             results = [];
             activeTab = 'all';
             dialogApi.open();
+
+            // Index routines if not already done
+            if (allRoutines.length === 0) {
+                const container = document.getElementById('searchEverywhereResults');
+                if (container) container.innerHTML = '<div style="padding:var(--ui-space-6);text-align:center;color:var(--muted);">Indexing routines...</div>';
+
+                try {
+                    const allRoutinesSet = new Set();
+                    const folders = ['localr', 'routines'];
+
+                    for (const folder of folders) {
+                        try {
+                            const res = await window.ahmadIDE.listRoutines(`${folder}/`);
+                            if (res?.ok && Array.isArray(res.routines)) {
+                                res.routines.forEach(r => allRoutinesSet.add(r));
+                            }
+                        } catch (err) {
+                            console.warn(`Failed to list routines in ${folder}:`, err);
+                        }
+                    }
+
+                    // Fallback: also try listing without folder prefix
+                    try {
+                        const res = await window.ahmadIDE.listRoutines('');
+                        if (res?.ok && Array.isArray(res.routines)) {
+                            res.routines.forEach(r => allRoutinesSet.add(r));
+                        }
+                    } catch (err) {
+                        console.warn('Failed to list all routines:', err);
+                    }
+
+                    allRoutines = Array.from(allRoutinesSet).map(r => ({
+                        path: r,
+                        name: r.split('/').pop(),
+                        folder: r.split('/')[0] || ''
+                    }));
+                } catch (err) {
+                    console.error('Failed to index routines:', err);
+                }
+
+                performSearch(''); // Show initial results
+            }
+
             requestAnimationFrame(() => {
-                document.getElementById('searchEverywhereInput')?.focus();
+                const input = document.getElementById('searchEverywhereInput');
+                if (input) {
+                    input.value = '';
+                    input.focus();
+                }
             });
         };
 

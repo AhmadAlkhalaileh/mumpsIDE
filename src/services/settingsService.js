@@ -32,6 +32,12 @@
                 captureGlobals: false,
                 maxValueLength: 200
             }
+        },
+        mumps: {
+            fileman: {
+                snippetsEnabled: true,
+                hoverDocsEnabled: true
+            }
         }
     });
 

@@ -1,10 +1,6 @@
 const { exec } = require('child_process');
 
-const {
-  DEFAULT_ENV_KEY,
-  DOCKER_DEFAULT_ENV_KEY,
-  shellQuote
-} = require('../config/paths');
+const { shellQuote } = require('../config/paths');
 
 const sshClient = require('../ssh/sshClient');
 const { ensureSshClient } = sshClient;
@@ -19,16 +15,62 @@ const { detectYottaDBPath } = require('../ssh/detectYottaDBPath');
 
 const { wrapDockerCmd } = require('../util/process');
 
+const {
+  discoverVistaProfilePaths,
+  applyVistaProfilePathsToConfig
+} = require('../vista/vistaProfilePaths');
+
 module.exports = {
-  setConnection(type, cfg = {}) {
-    if (type === 'docker') {
-      connectionConfig.type = 'docker';
-      connectionConfig.docker = mergeDockerConfig(cfg.docker || {});
-    } else if (type === 'ssh') {
-      connectionConfig.type = 'ssh';
-      connectionConfig.ssh = mergeSshConfig(cfg.ssh || {});
+  async setConnection(type, cfg = {}) {
+    try {
+      let discovered = null;
+      if (type === 'docker') {
+        connectionConfig.type = 'docker';
+        connectionConfig.docker = mergeDockerConfig(cfg.docker || {});
+
+        // Auto-discover paths from /var/worldvista/prod/common/vista-profile when possible.
+        try {
+          if (connectionConfig.docker?.containerId) {
+            discovered = await discoverVistaProfilePaths({ timeoutMs: 4000 });
+            applyVistaProfilePathsToConfig(connectionConfig.docker, discovered, { override: true });
+
+            // Preserve any explicit user overrides.
+            const user = cfg.docker || {};
+            if (user.gldPath) connectionConfig.docker.gldPath = user.gldPath;
+            if (user.basePath) connectionConfig.docker.basePath = user.basePath;
+            if (user.routinesPath) connectionConfig.docker.routinesPath = user.routinesPath;
+            if (user.rpcRoutinesPath) connectionConfig.docker.rpcRoutinesPath = user.rpcRoutinesPath;
+            if (user.envKey && !(discovered?.ok && discovered.envKey)) connectionConfig.docker.envKey = user.envKey;
+          }
+        } catch (err) {
+          console.error('[setConnection] Path discovery failed:', err);
+        }
+      } else if (type === 'ssh') {
+        connectionConfig.type = 'ssh';
+        connectionConfig.ssh = mergeSshConfig(cfg.ssh || {});
+
+        try {
+          if (connectionConfig.ssh?.host && connectionConfig.ssh?.username) {
+            discovered = await discoverVistaProfilePaths({ timeoutMs: 4000 });
+            applyVistaProfilePathsToConfig(connectionConfig.ssh, discovered, { override: true });
+
+            const user = cfg.ssh || {};
+            if (user.gldPath) connectionConfig.ssh.gldPath = user.gldPath;
+            if (user.basePath) connectionConfig.ssh.basePath = user.basePath;
+            if (user.routinesPath) connectionConfig.ssh.routinesPath = user.routinesPath;
+            if (user.rpcRoutinesPath) connectionConfig.ssh.rpcRoutinesPath = user.rpcRoutinesPath;
+            if (user.envKey && !(discovered?.ok && discovered.envKey)) connectionConfig.ssh.envKey = user.envKey;
+          }
+        } catch (err) {
+          console.error('[setConnection] Path discovery failed:', err);
+        }
+      }
+
+      return { ok: true, type: connectionConfig.type, config: connectionConfig, discovered };
+    } catch (error) {
+      console.error('[setConnection] Error:', error);
+      return { ok: false, error: error.message };
     }
-    return { ok: true, type: connectionConfig.type, config: connectionConfig };
   },
 
   getConnection() {
@@ -36,8 +78,41 @@ module.exports = {
     const type = useDocker ? 'docker' : 'ssh';
     const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
 
-    // Handle null basePath (universal mode) - use default paths
-    const basePath = cfg.basePath || `/var/worldvista/prod/${cfg.envKey || DOCKER_DEFAULT_ENV_KEY}`;
+    const normalizeDirToken = (token) => {
+      const raw = String(token || '').trim();
+      if (!raw) return '';
+      const withoutParen = raw.includes('(') ? raw.slice(0, raw.indexOf('(')) : raw;
+      const cleaned = withoutParen.trim();
+      if (!cleaned) return '';
+      if (!cleaned.startsWith('/')) return '';
+      if (/\.(so|o|obj)$/i.test(cleaned)) return '';
+      if (cleaned.includes('$')) return '';
+      return cleaned;
+    };
+
+    const collectDirs = (raw) => String(raw || '')
+      .split(/\s+/)
+      .map(normalizeDirToken)
+      .filter(Boolean);
+
+    const candidates = [
+      ...collectDirs(cfg.routinesPath),
+      ...collectDirs(cfg.rpcRoutinesPath)
+    ];
+
+    const localrPath = candidates.find((d) => /\/localr\/?$/.test(d)) || (candidates[0] || null);
+    const routinesPath = candidates.find((d) => /\/routines\/?$/.test(d)) || null;
+    const basePath = cfg.basePath
+      || (localrPath ? localrPath.replace(/\/localr\/?$/, '') : null)
+      || (routinesPath ? routinesPath.replace(/\/routines\/?$/, '') : null)
+      || null;
+
+    const envKey = (() => {
+      const explicit = String(cfg.envKey || '').trim();
+      if (explicit) return explicit;
+      const m = String(basePath || '').match(/^\/var\/worldvista\/prod\/([^/]+)$/);
+      return m ? (m[1] || '') : '';
+    })();
 
     return {
       ok: true,
@@ -45,10 +120,11 @@ module.exports = {
       connectionId: type === 'docker' ? cfg.containerId : null,
       config: cfg,
       paths: {
-        localrPath: `${basePath}/localr`,
-        routinesPath: `${basePath}/routines`,
-        basePath: basePath,
-        envKey: cfg.envKey || (useDocker ? DOCKER_DEFAULT_ENV_KEY : DEFAULT_ENV_KEY)
+        localrPath,
+        routinesPath,
+        gldPath: cfg.gldPath || null,
+        basePath,
+        envKey: envKey || null
       }
     };
   },
@@ -177,4 +253,3 @@ module.exports = {
     });
   }
 };
-

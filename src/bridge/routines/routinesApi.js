@@ -8,15 +8,54 @@ const { writeRemoteFile } = require('../util/writeRemoteFile');
 const { sanitizeRoutineName } = require('../util/ydb');
 const { getRoutineDirs } = require('./fetchRoutineDirectoriesToLocal');
 const { executeYDB } = require('../ydb/executeYDB');
+const { discoverVistaProfilePaths, applyVistaProfilePathsToConfig } = require('../vista/vistaProfilePaths');
+
+async function ensureVistaPathsDiscovered() {
+  const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
+  const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
+
+  const hasConfiguredDirs = !!(String(cfg?.routinesPath || '').trim() || String(cfg?.rpcRoutinesPath || '').trim());
+  console.log('[ensureVistaPathsDiscovered] hasConfiguredDirs:', hasConfiguredDirs, 'routinesPath:', cfg?.routinesPath, 'rpcRoutinesPath:', cfg?.rpcRoutinesPath);
+  if (hasConfiguredDirs) return;
+
+  if (useDocker) {
+    if (!cfg?.containerId) {
+      console.log('[ensureVistaPathsDiscovered] No Docker container ID');
+      return;
+    }
+  } else {
+    if (!cfg?.host || !cfg?.username) {
+      console.log('[ensureVistaPathsDiscovered] No SSH host/username');
+      return;
+    }
+  }
+
+  try {
+    console.log('[ensureVistaPathsDiscovered] Calling discoverVistaProfilePaths...');
+    const discovered = await discoverVistaProfilePaths({ timeoutMs: 4000 });
+    console.log('[ensureVistaPathsDiscovered] Discovery result:', discovered);
+    applyVistaProfilePathsToConfig(cfg, discovered, { override: true });
+    console.log('[ensureVistaPathsDiscovered] Applied config:', { routinesPath: cfg?.routinesPath, rpcRoutinesPath: cfg?.rpcRoutinesPath });
+  } catch (err) {
+    console.error('[ensureVistaPathsDiscovered] Error:', err);
+  }
+}
 
 module.exports = {
   async listRoutines(search = '') {
+    console.log('[Routines API] listRoutines called, ensuring paths are discovered...');
+    await ensureVistaPathsDiscovered();
     const routineDirs = getRoutineDirs();
-    if (!routineDirs.length) return { ok: false, error: 'No routines path configured' };
+    console.log('[Routines API] Discovered routine dirs:', routineDirs);
+    if (!routineDirs.length) {
+      console.log('[Routines API] No routine dirs configured');
+      return { ok: false, error: 'No routines path configured' };
+    }
     logger.info('ROUTINE_LIST', { search, dirs: routineDirs });
 
     const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
     const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
+    console.log('[Routines API] Using config:', { type: connectionConfig.type, routinesPath: cfg?.routinesPath, rpcRoutinesPath: cfg?.rpcRoutinesPath });
     const basePath = (cfg.basePath || '').trim();
 
     // List routines with folder prefix: "localr/ROUTINE", "routines/ROUTINE"
@@ -70,6 +109,7 @@ module.exports = {
   },
 
   async readRoutine(name) {
+    await ensureVistaPathsDiscovered();
     // Handle both "ROUTINE" and "localr/ROUTINE" or "routines/HELLO.m" formats
     let routine, targetFolder;
     if (name.includes('/')) {
@@ -122,6 +162,7 @@ module.exports = {
   },
 
   async saveRoutine(name, code) {
+    await ensureVistaPathsDiscovered();
     // Handle both "ROUTINE", "localr/ROUTINE", and "routines/HELLO.m" formats
     let routine, targetFolder;
     if (name.includes('/')) {
@@ -173,6 +214,7 @@ module.exports = {
   },
 
   async searchRoutines(term, opts = {}) {
+    await ensureVistaPathsDiscovered();
     const routineDirs = getRoutineDirs();
     if (!routineDirs.length) return { ok: false, error: 'No routines path configured' };
     logger.info('ROUTINE_SEARCH', { term, opts, dirs: routineDirs });
@@ -222,6 +264,7 @@ module.exports = {
   },
 
   async zlinkRoutine(name) {
+    await ensureVistaPathsDiscovered();
     // Handle both "ROUTINE" and "localr/ROUTINE" formats
     let routine;
     if (name.includes('/')) {
@@ -237,4 +280,3 @@ module.exports = {
     return { ok: true, output: res.stdout || '' };
   }
 };
-

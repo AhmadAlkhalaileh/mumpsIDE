@@ -67,9 +67,18 @@ async function runMenuAction(action, ctx = {}) {
             try { openFindReplaceDialog?.('replace', getSelectedText?.() || ''); } catch (_) { }
             return;
         case 'search-everywhere':
-        case 'goto-file':
-            try { openSearchEverywhere?.(''); } catch (_) { }
+        case 'goto-file': {
+            // Try multiple ways to access openSearchEverywhere
+            const searchManager = window.searchManager || window.AhmadIDEModules?.search?.searchManager;
+            if (searchManager?.openSearchEverywhere) {
+                try { searchManager.openSearchEverywhere(''); } catch (_) { }
+            } else if (typeof window.openSearchEverywhere === 'function') {
+                try { window.openSearchEverywhere(''); } catch (_) { }
+            } else {
+                notImplemented('Search Everywhere');
+            }
             return;
+        }
         case 'comment':
             ed?.trigger('keyboard', 'editor.action.commentLine', null);
             return;
@@ -122,6 +131,21 @@ async function runMenuAction(action, ctx = {}) {
         case 'shortcuts':
             try { openShortcutsPanel?.(); } catch (_) { }
             return;
+        case 'show-goto-map':
+            try { window.showMumpsGotoMap?.(); } catch (_) { }
+            return;
+        case 'mumps:generate-tag-header': {
+            const Gen = window.AhmadIDEModules?.mumps?.MumpsTagHeaderGenerator || window.MumpsTagHeaderGenerator;
+            if (!Gen) {
+                notImplemented('Generate Tag Header (Module missing)');
+                return;
+            }
+            const showToastFn = (typeof showToast === 'function') ? showToast : (() => { });
+            const settingsService = window.AhmadIDEModules?.services?.settingsService;
+            try { new Gen({ showToast: showToastFn, settingsService }).generateTagHeader(ed); } catch (_) { }
+            return;
+        }
+        // compare-routines handled further down with proper context extraction
         case 'about':
             try { openAboutDialog?.(); } catch (_) { }
             return;
@@ -197,6 +221,19 @@ async function runMenuAction(action, ctx = {}) {
         }
         case 'vcs:open-git':
             try { openGitToolWindow?.(); } catch (_) { }
+            return;
+        case 'smart-rename-tag':
+            if (window.smartRenameProvider) {
+                try {
+                    await window.smartRenameProvider.triggerSmartRenameTag();
+                } catch (err) {
+                    if (typeof showToast === 'function') {
+                        showToast('error', 'Smart Rename', err.message || 'Error occurred');
+                    }
+                }
+            } else {
+                notImplemented('Smart Rename (Initializing...)');
+            }
             return;
         case 'run-config:run-current':
             if (getRunConfigApi()?.setActive) {
@@ -291,6 +328,48 @@ async function runMenuAction(action, ctx = {}) {
         case 'tab:close-right':
             // Handled in Phase 3A menus bootstrap (needs tab id).
             return;
+        case 'show-goto-map':
+            if (typeof window.showMumpsGotoMap === 'function') {
+                window.showMumpsGotoMap();
+            } else {
+                notImplemented('GOTO Flow Map (Integration skipped or failed)');
+            }
+            return;
+        case 'compare-routines': {
+            const MumpsRoutineCompare = window.AhmadIDEModules?.mumps?.MumpsRoutineCompare || window.MumpsRoutineCompare;
+            if (MumpsRoutineCompare) {
+                const showToastFn = (typeof showToast === 'function') ? showToast : (() => { });
+
+                let leftRoutine = null;
+                let rightRoutine = null;
+
+                // Context from Project Tree (Multi-select)
+                if (ctx && Array.isArray(ctx.selectedPaths) && ctx.selectedPaths.length > 0) {
+                    const names = ctx.selectedPaths.map(p => p.split('/').pop());
+                    leftRoutine = names[0];
+                    if (names.length > 1) {
+                        rightRoutine = names[1];
+                    }
+                }
+                // Context from Project Tree (Single-select)
+                else if (ctx && ctx.name) {
+                    leftRoutine = ctx.name;
+                }
+                // Context from Editor Tab
+                else if (ctx && ctx.path) {
+                    leftRoutine = ctx.path.split('/').pop();
+                }
+
+                new MumpsRoutineCompare({
+                    monaco: window.monaco,
+                    ahmadIDE: window.ahmadIDE,
+                    showToast: showToastFn
+                }).compare(leftRoutine, rightRoutine);
+            } else {
+                notImplemented('Routine Compare (Module missing)');
+            }
+            return;
+        }
         default:
             notImplemented(action);
     }

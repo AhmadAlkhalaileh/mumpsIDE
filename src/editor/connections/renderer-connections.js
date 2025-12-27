@@ -281,7 +281,6 @@
             } else if (savedProfiles.length) {
                 fillSshForm(savedProfiles[0]);
             }
-            if (sshEnvInput && !sshEnvInput.value) sshEnvInput.value = 'cc';
 
             const markSshStatus = (text, severity = 'info') => {
                 if (!sshFormStatus) return;
@@ -354,7 +353,7 @@
                 const username = sshUserInput.value.trim();
                 const password = sshPassInput.value;
                 const port = parseInt(sshPortInput.value || '22', 10) || 22;
-                const envKey = (sshEnvInput?.value || 'cc').trim() || 'cc';
+                const envKey = (sshEnvInput?.value || '').trim();
 
                 if (!host || !username || !password) {
                     markSshStatus('Host, user, and password are required', 'error');
@@ -365,20 +364,18 @@
                 if (sshConnectBtn) sshConnectBtn.disabled = true;
                 appendOutput(`🔌 SSH connecting to ${username}@${host}:${port}...`, terminalState);
 
-                const res = await window.ahmadIDE.sshConnect({
-                    host,
-                    port,
-                    username,
-                    password,
-                    envKey
-                });
+                const sshPayload = { host, port, username, password };
+                if (envKey) sshPayload.envKey = envKey;
+
+                const res = await window.ahmadIDE.sshConnect(sshPayload);
 
                 if (res.ok) {
                     try {
                         if (res.sessionId) localStorage.setItem('ahmadIDE:sshSessionId', String(res.sessionId));
                     } catch (_) { }
-                    const entry = { host, port, username, envKey };
-                    await window.ahmadIDE.setConnection('ssh', {
+                    const entry = { host, port, username };
+                    if (envKey) entry.envKey = envKey;
+                    const setConnResult = await window.ahmadIDE.setConnection('ssh', {
                         ssh: { ...entry, password }
                     });
                     setConnStatus(`SSH: ${host}`, 'success');
@@ -389,7 +386,14 @@
                     } catch (e) {
                         // ignore persistence errors
                     }
-                    upsertSavedProfile(entry);
+                    if (envKey) upsertSavedProfile(entry);
+
+                    // Auto-fetch routines to project if project is open
+                    if (typeof window.autoFetchRoutinesAfterConnection === 'function') {
+                        appendOutput('Auto-fetching routines to project...', terminalState);
+                        await window.autoFetchRoutinesAfterConnection({ discovered: setConnResult?.discovered });
+                    }
+
                     await loadRoutineList(routineState, editor);
                     closeConnectionsPanel();
                 } else {
@@ -472,10 +476,17 @@
 
                     const config = dockerConfig || {};
                     config.containerId = lastContainerId;
-                    await window.ahmadIDE.setConnection('docker', { docker: config });
+                    const setConnResult = await window.ahmadIDE.setConnection('docker', { docker: config });
                     const modeLabel = config.ydbPath ? 'Docker (configured)' : 'Docker (universal)';
                     setConnStatus(modeLabel, 'info');
                     appendOutput(`✓ Using ${modeLabel.toLowerCase()} connection`, terminalState);
+
+                    // Auto-fetch routines to project if project is open
+                    if (typeof window.autoFetchRoutinesAfterConnection === 'function') {
+                        appendOutput('Auto-fetching routines to project...', terminalState);
+                        await window.autoFetchRoutinesAfterConnection({ discovered: setConnResult?.discovered });
+                    }
+
                     closeConnectionsPanel();
                     await loadRoutineList(routineState, editor);
                 });
@@ -510,9 +521,9 @@
                     const host = sshHostInput.value.trim();
                     const username = sshUserInput.value.trim();
                     const port = parseInt(sshPortInput?.value || '22', 10) || 22;
-                    const envKey = (sshEnvInput.value || 'cc').trim() || 'cc';
-                    if (!host || !username) {
-                        markSshStatus('Host and user required to save.', 'error');
+                    const envKey = (sshEnvInput.value || '').trim();
+                    if (!host || !username || !envKey) {
+                        markSshStatus('Host, user, and env key required to save.', 'error');
                         return;
                     }
                     upsertSavedProfile({ host, username, port, envKey });
@@ -717,15 +728,21 @@
                 return false;
             }
 
-            const res = await window.ahmadIDE.setConnection('docker', { docker: fullConfig });
+            const setConnResult = await window.ahmadIDE.setConnection('docker', { docker: fullConfig });
 
-            if (res) { // Assuming setConnection returns something truthy or void on success (it's usually void but awaited)
+            if (setConnResult) { // Assuming setConnection returns something truthy or void on success (it's usually void but awaited)
                 // Persistence for last used
                 try { localStorage.setItem('ahmadIDE:lastContainerId', containerId); } catch (e) { }
 
                 const modeLabel = fullConfig.ydbPath ? 'Docker (configured)' : 'Docker (universal)';
                 setConnStatus(name ? `Docker: ${name}` : modeLabel, 'success');
                 appendOutput(`✓ Connected to ${name || containerId}`, terminalState);
+
+                // Auto-fetch routines to project if project is open
+                if (typeof window.autoFetchRoutinesAfterConnection === 'function') {
+                    appendOutput('Auto-fetching routines to project...', terminalState);
+                    await window.autoFetchRoutinesAfterConnection({ discovered: setConnResult?.discovered });
+                }
 
                 if (callbacks.loadRoutineList) {
                     await callbacks.loadRoutineList(routineState, editor);

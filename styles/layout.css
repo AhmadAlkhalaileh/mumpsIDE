@@ -240,7 +240,7 @@
     flex-direction: column;
     min-width: 0;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible; /* Allow tooltips to overflow */
 }
 
 /* Editor Area */
@@ -251,7 +251,7 @@
     gap: 0;
     padding: 0;
     min-height: 0;
-    overflow: hidden;
+    overflow: visible; /* Allow tooltips to overflow */
     background: var(--bg);
 }
 
@@ -300,4 +300,37 @@
 
 .bottom-panel {
     display: none;
+}
+
+/* ============================================
+   Layout Resizers
+   ============================================ */
+.layout-resizer {
+    position: absolute;
+    z-index: 9999;
+    background: transparent;
+    transition: background 0.2s;
+}
+
+.layout-resizer.horizontal {
+    width: 6px;
+    cursor: ew-resize;
+}
+
+.layout-resizer.vertical {
+    height: 6px;
+    cursor: ns-resize;
+}
+
+.layout-resizer:hover, .layout-resizer.resizing {
+    background: var(--accent);
+    opacity: 0.5;
+}
+
+.is-resizing {
+    user-select: none;
+    -webkit-user-select: none;
+}
+.is-resizing iframe {
+    pointer-events: none;
 }

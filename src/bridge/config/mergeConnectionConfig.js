@@ -1,9 +1,5 @@
 const {
-  DEFAULT_ENV_KEY,
-  DOCKER_DEFAULT_ENV_KEY,
-  deriveEnvKeyFromUsername,
-  buildSshPaths,
-  buildDockerPaths
+  deriveEnvKeyFromUsername
 } = require('./paths');
 
 let connectionConfig = null;
@@ -12,29 +8,36 @@ function setConnectionConfig(cfg) {
 }
 
 function mergeSshConfig(cfg = {}) {
-  const fallbackEnvKey = cfg.envKey || cfg.baseKey || cfg.namespace || connectionConfig.ssh?.envKey || DEFAULT_ENV_KEY;
-  const envKey = deriveEnvKeyFromUsername(cfg.username, fallbackEnvKey);
-  const ydbPath = cfg.ydbPath || connectionConfig.ssh?.ydbPath || '/opt/fis-gtm/YDB136';
-  const paths = buildSshPaths(envKey, ydbPath);
+  const hasEnvKey = Object.prototype.hasOwnProperty.call(cfg, 'envKey');
+  const explicitEnvKey = hasEnvKey ? (String(cfg.envKey || '').trim() || null) : null;
+
+  const fallbackEnvKey = String(cfg.baseKey || cfg.namespace || connectionConfig.ssh?.envKey || '').trim();
+  const derivedEnvKey = deriveEnvKeyFromUsername(cfg.username || connectionConfig.ssh?.username || '', fallbackEnvKey);
+  const envKey = explicitEnvKey || (derivedEnvKey ? derivedEnvKey : null);
+
+  const ydbPath = String(cfg.ydbPath || connectionConfig.ssh?.ydbPath || '/opt/fis-gtm/YDB136').trim();
   return {
     ...connectionConfig.ssh,
-    ...paths,
     ...cfg,
-    envKey
+    envKey,
+    ydbPath: ydbPath || null
   };
 }
 
 function mergeDockerConfig(cfg = {}) {
-  // Use envKey from config if provided, otherwise use default
-  const envKey = cfg.envKey || connectionConfig.docker?.envKey || DOCKER_DEFAULT_ENV_KEY;
-  // ydbPath is optional - if not provided, Docker works in universal mode
-  const ydbPath = cfg.ydbPath !== undefined ? cfg.ydbPath : connectionConfig.docker?.ydbPath;
-  const paths = buildDockerPaths(envKey, ydbPath);
+  const hasEnvKey = Object.prototype.hasOwnProperty.call(cfg, 'envKey');
+  const envKey = hasEnvKey
+    ? (String(cfg.envKey || '').trim() || null)
+    : (String(connectionConfig.docker?.envKey || '').trim() || null);
+
+  const hasYdbPath = Object.prototype.hasOwnProperty.call(cfg, 'ydbPath');
+  const rawYdbPath = hasYdbPath ? cfg.ydbPath : connectionConfig.docker?.ydbPath;
+  const ydbPath = rawYdbPath ? String(rawYdbPath).trim() : null;
   return {
     ...connectionConfig.docker,
-    ...paths,
     ...cfg,
-    envKey
+    envKey,
+    ydbPath
   };
 }
 

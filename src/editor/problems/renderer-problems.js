@@ -19,6 +19,19 @@
             || null;
         const setActiveDebugTab = deps?.setActiveDebugTab || (() => { });
         const getActiveDebugTab = deps?.getActiveDebugTab || (() => null);
+        let lastProblems = [];
+
+        const ensureProblemListDelegation = (listEl) => {
+            if (!listEl) return;
+            if (listEl.dataset.problemsDelegated === '1') return;
+            listEl.dataset.problemsDelegated = '1';
+            listEl.addEventListener('click', (e) => {
+                const li = e.target?.closest ? e.target.closest('li.problem-item') : null;
+                if (!li || !listEl.contains(li)) return;
+                const ln = parseInt(li.dataset.line || '0', 10);
+                if (ln) revealLine(ln);
+            });
+        };
 
         function updateProblemSummary(items) {
             const pill = document.getElementById('problemsSummary');
@@ -58,24 +71,15 @@
             }
         }
 
-        function renderProblems(items) {
-            const list = document.getElementById('problemsList');
-            if (!list) return;
-
+        const buildFragment = ({ items, trimmed } = {}) => {
             const problems = Array.isArray(items) ? items : [];
-            const limited = problems.slice(0, maxProblemItems);
-            const trimmed = problems.length > limited.length;
-
-            // Use DocumentFragment to batch DOM operations (reduces reflows)
             const fragment = document.createDocumentFragment();
 
-            if (!limited.length) {
+            if (!problems.length) {
                 const li = document.createElement('li');
                 li.textContent = 'No problems.';
                 fragment.appendChild(li);
-                list.innerHTML = '';
-                list.appendChild(fragment);
-                return;
+                return fragment;
             }
 
             const iconFor = (sev) => {
@@ -85,11 +89,11 @@
                 return { name: 'info', fallback: 'ℹ' };
             };
 
-            limited.forEach(item => {
+            problems.forEach(item => {
                 const li = document.createElement('li');
-                const sev = item.severity || 'info';
-                li.className = `problem-item ${sev.toLowerCase()}`;
-                li.dataset.line = item.line || '';
+                const sev = normalizeSeverity(item?.severity || 'info');
+                li.className = `problem-item ${sev}`;
+                li.dataset.line = item?.line || '';
 
                 const icon = document.createElement('span');
                 icon.className = 'problem-icon';
@@ -102,20 +106,17 @@
 
                 const text = document.createElement('span');
                 text.className = 'problem-text';
-                const lineInfo = item.line ? ` (line ${item.line})` : '';
-                const codeInfo = item.code ? ` [${item.code}]` : '';
-                const msg = item.message || '';
+                const lineInfo = item?.line ? ` (line ${item.line})` : '';
+                const codeInfo = item?.code ? ` [${item.code}]` : '';
+                const msg = item?.message || '';
                 text.textContent = `${sev}${codeInfo}: ${msg}${lineInfo}`;
                 li.title = `${sev.toUpperCase()}${codeInfo} ${msg}${lineInfo}`;
 
                 li.appendChild(icon);
                 li.appendChild(text);
-                li.onclick = () => {
-                    const ln = parseInt(li.dataset.line || '0', 10);
-                    if (ln) revealLine(ln);
-                };
                 fragment.appendChild(li);
             });
+
             if (trimmed) {
                 const li = document.createElement('li');
                 li.className = 'problem-item info';
@@ -123,13 +124,42 @@
                 fragment.appendChild(li);
             }
 
-            // Single DOM operation: clear and append all at once
-            list.innerHTML = '';
-            list.appendChild(fragment);
+            return fragment;
+        };
 
-            updateProblemSummary(limited);
+        const renderLastToDom = () => {
+            const primaryList = document.getElementById('problemsList') || document.getElementById('problemsListStandalone');
+            if (!primaryList) return;
+
+            const secondaryList = primaryList.id === 'problemsList'
+                ? document.getElementById('problemsListStandalone')
+                : document.getElementById('problemsList');
+
+            ensureProblemListDelegation(primaryList);
+            ensureProblemListDelegation(secondaryList);
+
+            const limited = lastProblems.slice(0, maxProblemItems);
+            const trimmed = lastProblems.length > limited.length;
+
+            primaryList.innerHTML = '';
+            primaryList.appendChild(buildFragment({ items: limited, trimmed }));
+            if (secondaryList) secondaryList.innerHTML = primaryList.innerHTML;
+
             setActiveDebugTab(getActiveDebugTab());
+        };
+
+        function renderProblems(items) {
+            lastProblems = Array.isArray(items) ? items : [];
+            updateProblemSummary(lastProblems);
+            renderLastToDom();
         }
+
+        // Ensure Problems UI renders even when panels are lazy-mounted.
+        try {
+            const fr = window.AhmadIDEModules?.app?.featureRegistry;
+            fr?.onMounted?.('debugPanel', () => renderLastToDom());
+            fr?.onMounted?.('problemsPanel', () => renderLastToDom());
+        } catch (_) { }
 
         return {
             renderProblems,

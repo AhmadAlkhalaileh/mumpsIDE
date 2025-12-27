@@ -354,7 +354,7 @@
                     profile = state.ssh.profiles.find(p => String(p.envKey) === key) || null;
                 }
                 if (selected === 'ssh:active' && active) profile = {
-                    envKey: String(active.envKey || 'cc'),
+                    envKey: String(active.envKey || '').trim(),
                     host: String(active.host || ''),
                     port: Number(active.port || 22) || 22,
                     username: String(active.username || '')
@@ -367,7 +367,7 @@
                     ['Host', profile?.host || active?.host || '—'],
                     ['User', profile?.username || active?.username || '—'],
                     ['Port', String(profile?.port || active?.port || 22)],
-                    ['Env', String(profile?.envKey || active?.envKey || 'cc')]
+                    ['Env', String(profile?.envKey || active?.envKey || '—')]
                 ]));
 
                 const actions = document.createElement('div');

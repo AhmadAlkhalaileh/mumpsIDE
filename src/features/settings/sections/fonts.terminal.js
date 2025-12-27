@@ -129,7 +129,7 @@
         preview.className = 'ui-settings-preview ui-fonts-preview';
         preview.dataset.filterText = 'preview terminal';
         const pre = document.createElement('pre');
-        pre.textContent = '$ echo \"Hello\"\\nHello\\n$';
+        pre.textContent = '$ echo "Hello"\nHello\n$';
         preview.appendChild(pre);
         previewCol.appendChild(preview);
 

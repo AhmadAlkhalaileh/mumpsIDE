@@ -1,5 +1,10 @@
 # Changelog: Universal Docker Support
 
+## Update - December 27, 2025
+
+- Removed hardcoded env-key defaults and legacy `/var/worldvista/prod/<envKey>` path building.
+- Paths are now discovered from `/var/worldvista/prod/common/vista-profile` when available.
+
 ## Changes Made - December 13, 2025
 
 ### Summary
@@ -18,25 +23,6 @@ Implemented **Universal Docker Mode** to allow Ahmad IDE to work with any Docker
 
 #### Added Universal Mode Support
 
-**Function: `buildDockerPaths()`**
-- NEW: Returns `null` for all paths when `ydbPath` is not provided
-- Enables universal mode where no YottaDB paths are required
-
-```javascript
-// Before: Always built paths
-function buildDockerPaths(envKey) {
-  return buildEnvPaths(envKey);
-}
-
-// After: Optional paths
-function buildDockerPaths(envKey, ydbPath = null) {
-  if (!ydbPath) {
-    return { ydbPath: null, gldPath: null, /* ... */ };
-  }
-  return { ydbPath, ...buildEnvPaths(envKey) };
-}
-```
-
 **Function: `mergeDockerConfig()`**
 - NEW: Accepts custom `envKey` and `ydbPath` from config
 - NEW: Supports optional YottaDB paths
@@ -44,16 +30,16 @@ function buildDockerPaths(envKey, ydbPath = null) {
 ```javascript
 // Before: Hard-coded envKey, always built paths
 function mergeDockerConfig(cfg = {}) {
-  const envKey = DOCKER_DEFAULT_ENV_KEY;
-  const paths = buildEnvPaths(envKey);
+  const envKey = null;
+  const paths = {};
   // ...
 }
 
 // After: Configurable, optional paths
 function mergeDockerConfig(cfg = {}) {
-  const envKey = cfg.envKey || connectionConfig.docker?.envKey || DOCKER_DEFAULT_ENV_KEY;
+  const envKey = cfg.envKey || connectionConfig.docker?.envKey || null;
   const ydbPath = cfg.ydbPath !== undefined ? cfg.ydbPath : connectionConfig.docker?.ydbPath;
-  const paths = buildDockerPaths(envKey, ydbPath);
+  const paths = {};
   // ...
 }
 ```
@@ -121,13 +107,13 @@ async createDirectoryInCurrentEnv(dirPath) {
 docker: {
   containerId: '8c21cf79fb67', // Hard-coded
   ydbPath: '/opt/fis-gtm/YDB136', // Hard-coded
-  ...buildEnvPaths(DOCKER_DEFAULT_ENV_KEY)
+  // ... legacy env-specific paths
 }
 
 // After:
 docker: {
   containerId: null, // Set when user selects container
-  envKey: DOCKER_DEFAULT_ENV_KEY,
+  envKey: null,
   ydbPath: null,  // null = universal mode
   gldPath: null,
   routinesPath: null,

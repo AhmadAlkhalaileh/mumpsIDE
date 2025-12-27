@@ -584,8 +584,14 @@
             </div>
         `,
         searchEverywhereDialog: `
-            <input class="search-everywhere-input" id="searchEverywhereInput" placeholder="Search Everywhere (files)">
-            <div class="search-everywhere-results" id="searchEverywhereResults">Press Shift twice to search…</div>
+            <div class="search-everywhere-header">
+                <span class="search-everywhere-icon">🔍</span>
+                <span class="search-everywhere-title">Search Everywhere</span>
+            </div>
+            <input class="search-everywhere-input" id="searchEverywhereInput" placeholder="Type routine name to search..." autocomplete="off" spellcheck="false">
+            <div class="search-everywhere-results" id="searchEverywhereResults">
+                <div class="search-everywhere-hint">Press Shift twice to search all routines...</div>
+            </div>
         `,
         patchTrackingPanel: `
             <div style="display: flex; flex-direction: column; height: 100%; background: var(--panel-2, #282a36); color: var(--text, #f8f8f2);">

@@ -68,12 +68,6 @@ class GitBlameService {
             return filePath; // No mapping configured
         }
 
-        // Check if file path looks like it's from Docker/remote
-        // Examples:
-        // - "docker:/localr/LRAPD1" (Monaco URI format)
-        // - "docker:/routines/LRAPD1" (Monaco URI format)
-        // - "/var/worldvista/prod/hakeem/localr/LRAPD1.m" (direct Docker path)
-        // - "LRAPD1.m" (just routine name)
 
         const raw = String(filePath || '').trim();
         if (!raw) return raw;

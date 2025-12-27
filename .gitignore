@@ -23,3 +23,9 @@ stage/
 # IDE
 .idea/
 .vscode/
+
+# Codex temporary artifacts
+.codex_tmp_step/
+.claude/
+.patch-tracking/
+

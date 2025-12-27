@@ -101,11 +101,118 @@
         }
 
         let formattingRegistered = false;
+        let foldingRegistered = false;
+
+        const stripComment = (line) => {
+            const s = String(line || '');
+            let inString = false;
+            for (let i = 0; i < s.length; i++) {
+                const ch = s[i];
+                if (ch === '"') inString = !inString;
+                if (ch === ';' && !inString) return s.slice(0, i);
+            }
+            return s;
+        };
+
+        const isTagLine = (line) => {
+            const s = String(line || '');
+            if (!s) return false;
+            if (s[0] === ';') return false;
+            if (/^\s/.test(s)) return false;
+            return /^[A-Za-z%][A-Za-z0-9]*/.test(s);
+        };
+
+        const isTopLevelQuitLine = (line) => {
+            const code = stripComment(line);
+            const trimmedLeft = String(code || '').trimStart();
+            if (!trimmedLeft) return false;
+            if (trimmedLeft.startsWith('.')) return false;
+            return /^(QUIT|Q)\b/i.test(trimmedLeft);
+        };
+
+        const hasQuitCommandInTagLine = (line) => {
+            const s = String(line || '');
+            if (!isTagLine(s)) return false;
+            const code = stripComment(s);
+            const m = code.match(/^([A-Za-z%][A-Za-z0-9]*)(\([^)]*\))?(.*)$/);
+            if (!m) return false;
+            const commandField = String(m[3] || '').trimStart();
+            if (!commandField) return false;
+            if (commandField.startsWith(';')) return false;
+            return /(?:^|\s)(QUIT|Q)\b/i.test(commandField);
+        };
+
+        const computeTagFoldingRanges = (lines) => {
+            const srcLines = Array.isArray(lines) ? lines : [];
+            const tagLines = [];
+            for (let i = 0; i < srcLines.length; i++) {
+                if (isTagLine(srcLines[i])) tagLines.push(i + 1); // 1-based line numbers
+            }
+
+            const out = [];
+            for (let i = 0; i < tagLines.length; i++) {
+                const startLine = tagLines[i];
+                const nextTagLine = tagLines[i + 1] || (srcLines.length + 1);
+                const endLine = Math.max(startLine, nextTagLine - 1);
+
+                let hasQuit = hasQuitCommandInTagLine(srcLines[startLine - 1] || '');
+                for (let ln = startLine + 1; ln <= endLine; ln++) {
+                    if (hasQuit) break;
+                    const lineText = srcLines[ln - 1] || '';
+                    if (isTopLevelQuitLine(lineText)) {
+                        hasQuit = true;
+                    }
+                }
+
+                if (hasQuit && endLine > startLine) {
+                    out.push({
+                        start: startLine,
+                        end: endLine
+                    });
+                }
+            }
+
+            return out;
+        };
+
         const formatMumpsText = (text, { tabSize = 4 } = {}) => {
             const norm = String(text ?? '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
             const lines = norm.split('\n');
 
             const trimRight = (s) => String(s || '').replace(/[ \t]+$/g, '');
+            const COMMANDS = new Set([
+                // Full commands
+                'BREAK', 'B',
+                'CLOSE', 'C',
+                'DO', 'D',
+                'ELSE', 'E',
+                'FOR', 'F',
+                'GOTO', 'G',
+                'HALT',
+                'HANG', 'H',
+                'IF', 'I',
+                'JOB', 'J',
+                'KILL', 'K',
+                'LOCK', 'L',
+                'MERGE', 'M',
+                'NEW', 'N',
+                'OPEN', 'O',
+                'QUIT', 'Q',
+                'READ', 'R',
+                'SET', 'S',
+                'USE', 'U',
+                'VIEW', 'V',
+                'WRITE', 'W',
+                'XECUTE', 'X',
+                // Common Z-commands (don’t try to be exhaustive)
+                'ZGOTO', 'ZG',
+                'ZWRITE', 'ZW',
+                'ZPRINT', 'ZP',
+                'ZBREAK', 'ZB',
+                'ZHALT', 'ZH',
+                'ZLINK', 'ZL'
+            ]);
+            const isCommandToken = (tok) => COMMANDS.has(String(tok || '').toUpperCase());
 
             const formatCommandField = (field) => {
                 const f = String(field || '').trimStart();
@@ -139,7 +246,9 @@
                     }
                 }
                 const fallback = clampInt(Number(tabSize) || 4, 1, 24);
-                return bestLen > 0 ? bestLen : fallback;
+                // MUMPS typically uses 1 leading space for the command field.
+                // If we cannot infer indentation from the text, default to 1.
+                return bestLen > 0 ? bestLen : 1;
             };
 
             const INDENT = ' '.repeat(detectIndentSize());
@@ -151,6 +260,19 @@
                 if (trimmed.startsWith(';')) return `${INDENT}${trimmed}`;
                 if (trimmed.startsWith('.')) return `${INDENT}${formatCommandField(trimmed)}`;
                 return `${INDENT}${formatCommandField(trimmed)}`;
+            };
+
+            const isLabelLikeToken = (raw) => {
+                const m = String(raw || '').match(/^([A-Za-z%][A-Za-z0-9]*)/);
+                if (!m) return { ok: false };
+                const name = m[1];
+                const after = String(raw).slice(name.length);
+                // Labels at column 1 must be followed by whitespace, params "(...)", comment ";", or EOL.
+                if (!after) return { ok: true, name, after: '' };
+                if (after.startsWith('(')) return { ok: true, name, after };
+                if (/^\s/.test(after)) return { ok: true, name, after };
+                if (after.startsWith(';')) return { ok: true, name, after };
+                return { ok: false };
             };
 
             const formatLine = (line) => {
@@ -166,7 +288,18 @@
                 // Lines that start with dot at column 1 are still command-field lines.
                 if (raw.startsWith('.')) return formatIndentedLine(raw);
 
-                // Label line: preserve spacing (only trim right).
+                const info = isLabelLikeToken(raw);
+                if (info.ok) {
+                    // If the label name is a command token, it's often a missing-indent command line.
+                    // Heuristic: treat it as a command line unless it clearly looks like a label-with-params.
+                    if (isCommandToken(info.name) && !String(info.after || '').startsWith('(')) {
+                        return formatIndentedLine(raw);
+                    }
+                    // Label line: preserve spacing (only trim right).
+                    return raw;
+                }
+
+                // Unknown top-level content: preserve.
                 return raw;
             };
 
@@ -255,6 +388,28 @@
 
             // Formatting (Format Code / Reformat)
             registerMumpsFormatting();
+
+            // Folding (Tags): fold tag blocks that have a top-level QUIT/Q.
+            if (!foldingRegistered && monacoRef?.languages?.registerFoldingRangeProvider) {
+                foldingRegistered = true;
+                monacoRef.languages.registerFoldingRangeProvider('mumps', {
+                    provideFoldingRanges: (model, context, token) => {
+                        try {
+                            const lineCount = model?.getLineCount?.() || 0;
+                            if (!lineCount) return [];
+                            const lines = [];
+                            for (let i = 1; i <= lineCount; i++) {
+                                lines.push(model.getLineContent(i));
+                            }
+                            const ranges = computeTagFoldingRanges(lines);
+                            const kind = monacoRef.languages.FoldingRangeKind?.Region;
+                            return ranges.map(r => (kind ? { ...r, kind } : r));
+                        } catch (_) {
+                            return [];
+                        }
+                    }
+                });
+            }
 
             // Refactor: Rename Symbol (F2)
             try {

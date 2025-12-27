@@ -565,17 +565,49 @@
             }
             if (resultsHost) resultsHost.textContent = 'Indexing project files…';
             if (!searchEverywhereState.index.length) {
-                const res = await window.ahmadIDE.listRoutines('');
-                if (res?.ok) {
-                    routinesCacheRef.value = res.routines || routinesCacheRef.value;
-                    // UNKNOWN – NEED DESIGN DECISION: non-project items in Search Everywhere (only routines are indexed here)
-                    searchEverywhereState.index = (res.routines || []).map(r => ({
+                // Search across ALL folders: localr, routines, and any others
+                const allRoutines = new Set();
+                const folders = ['localr', 'routines'];
+
+                for (const folder of folders) {
+                    try {
+                        const res = await withTimeout(
+                            window.ahmadIDE.listRoutines(`${folder}/`),
+                            8000,
+                            `List routines in ${folder}`
+                        );
+                        if (res?.ok && Array.isArray(res.routines)) {
+                            res.routines.forEach(r => allRoutines.add(r));
+                        }
+                    } catch (err) {
+                        console.warn(`Failed to list routines in ${folder}:`, err);
+                    }
+                }
+
+                // Fallback: also try listing without folder prefix to catch any missed routines
+                try {
+                    const res = await withTimeout(
+                        window.ahmadIDE.listRoutines(''),
+                        8000,
+                        'List all routines'
+                    );
+                    if (res?.ok && Array.isArray(res.routines)) {
+                        res.routines.forEach(r => allRoutines.add(r));
+                    }
+                } catch (err) {
+                    console.warn('Failed to list all routines:', err);
+                }
+
+                if (allRoutines.size > 0) {
+                    const routinesArray = Array.from(allRoutines);
+                    routinesCacheRef.value = routinesArray;
+                    searchEverywhereState.index = routinesArray.map(r => ({
                         path: r,
                         name: r.split('/').pop(),
                         folder: r.split('/')[0] || ''
                     }));
                 } else if (resultsHost) {
-                    resultsHost.textContent = res?.error || 'Unable to index project files.';
+                    resultsHost.textContent = 'Unable to index project files.';
                     return;
                 }
             }

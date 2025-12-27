@@ -1,6 +1,6 @@
 # Mumps Studio - Complete Documentation
 
-**Version:** 1.0.0
+**Version:** 2.0.0
 **Author:** Ahmad
 **Last Updated:** December 12, 2024
 
@@ -1855,6 +1855,6 @@ For technical details, see [API.md](API.md) and [ARCHITECTURE.md](ARCHITECTURE.m
 
 For screenshots, see [screenshots/](screenshots/) directory.
 
-**Version:** 1.0.0
+**Version:** 2.0.0
 **Last Updated:** December 12, 2024
 **Author:** Ahmad

@@ -13,7 +13,13 @@
         const openContextMenu = deps?.openContextMenu || window.AhmadIDEModules?.ui?.menu?.openContextMenu;
 
         const runAction = deps?.runMenuAction || (async (action, ctx) => {
-            if (typeof runMenuAction === 'function') return runMenuAction(action, ctx);
+            // Delegate to global runMenuAction if available, BUT skip specific actions 
+            // that are handled locally in this file (to avoid "Not Implemented" from global handler)
+            const localActions = ['smart-rename-tag', 'compare-with-release'];
+            if (typeof runMenuAction === 'function' && !localActions.includes(action)) {
+                return runMenuAction(action, ctx);
+            }
+
             const ed = getActiveEditor();
             switch (action) {
                 case 'cut':
@@ -38,6 +44,24 @@
                 }
                 case 'goto-declaration':
                     await goToDeclaration(ed, null, { silentIfMissing: false });
+                    return;
+                case 'smart-rename-tag':
+                    console.log('[Context Menu] Smart Rename action triggered');
+
+                    // Defensive check: ensure window.smartRenameProvider is available
+                    if (!window.smartRenameProvider) {
+                        console.error('[Context Menu] Smart Rename provider not initialized');
+                        showToast('error', 'Smart Rename', 'Feature not ready. Please reload the IDE.');
+                        return;
+                    }
+
+                    try {
+                        console.log('[Context Menu] Calling triggerSmartRenameTag...');
+                        await window.smartRenameProvider.triggerSmartRenameTag();
+                    } catch (err) {
+                        console.error('[Context Menu] Smart Rename error:', err);
+                        showToast('error', 'Smart Rename', `Error: ${err.message || 'Unknown error'}`);
+                    }
                     return;
                 case 'gitctx:add':
                 case 'gitctx:commit':
@@ -73,12 +97,19 @@
         const getContext = (editor) => {
             let hasDeclaration = false;
             let hasGlobalAtCursor = false;
+            let hasTagAtCursor = false;
+            let languageId = '';
             try {
                 if (parseRoutineReferenceAtPosition && editor) {
                     const model = editor.getModel?.();
                     const pos = editor.getPosition?.();
                     hasDeclaration = !!(model && pos && parseRoutineReferenceAtPosition(model, pos));
                 }
+            } catch (_) { }
+
+            try {
+                const model = editor?.getModel?.();
+                languageId = String(model?.getLanguageId?.() || '');
             } catch (_) { }
 
             // Check if there's a global variable at cursor (^NAME)
@@ -104,8 +135,36 @@
                 }
             } catch (_) { }
 
+            // Check if cursor/selection is on a MUMPS tag name (label at column 1)
+            try {
+                if (editor) {
+                    const Gen = window.AhmadIDEModules?.mumps?.MumpsTagHeaderGenerator || window.MumpsTagHeaderGenerator;
+                    if (Gen) {
+                        if (!getContext._tagHeaderGenerator) {
+                            const settingsService = window.AhmadIDEModules?.services?.settingsService;
+                            getContext._tagHeaderGenerator = new Gen({ showToast, settingsService });
+                        }
+                        hasTagAtCursor = !!getContext._tagHeaderGenerator.getTagAtCursor(editor);
+                    } else {
+                        const model = editor.getModel?.();
+                        const pos = editor.getPosition?.();
+                        if (model && pos) {
+                            const line = model.getLineContent(pos.lineNumber) || '';
+                            if (line && line[0] !== ' ' && line[0] !== '\t' && !line.trim().startsWith(';')) {
+                                const m = line.match(/^([A-Z%][A-Z0-9]*)/i);
+                                if (m) {
+                                    const nameLen = m[1].length;
+                                    if (pos.column >= 1 && pos.column <= nameLen + 1) hasTagAtCursor = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (_) { }
+
             const activePath = String(getActiveRoutine() || '').trim();
-            return { hasDeclaration, activePath, hasGlobalAtCursor };
+            const isMumps = languageId === 'mumps';
+            return { hasDeclaration, activePath, hasGlobalAtCursor, hasTagAtCursor, languageId, isMumps };
         };
 
         function bindEditorContextMenu(editor) {

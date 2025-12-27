@@ -115,9 +115,9 @@
       "autofix": false
     },
     "M020-SPACE-AFTER-COMMA": {
-      "severity": "warning",
-      "message": "Space after comma in argument list",
-      "description": "Style warning: consider removing spaces after commas in argument lists",
+      "severity": "error",
+      "message": "Space after comma not allowed",
+      "description": "MUMPS syntax does not allow spaces after commas in argument lists",
       "autofix": false
     },
     "M021-LABEL-AT-COLUMN1": {
@@ -127,9 +127,9 @@
       "autofix": false
     },
     "M022-COMMAND-INDENTATION": {
-      "severity": "error",
-      "message": "Executable lines must be indented under their label",
-      "description": "Commands associated with a label should start with at least one leading space",
+      "severity": "info",
+      "message": "Executable lines should be indented under their label",
+      "description": "Commands associated with a label should start with at least one leading space for better readability",
       "autofix": false
     },
     "M023-TRAILING-COMMA": {
@@ -140,8 +140,8 @@
     },
     "M024-EMPTY-ARGUMENT": {
       "severity": "error",
-      "message": "Empty argument between commas",
-      "description": "Each comma must be followed by a valid argument; remove extra commas",
+      "message": "Empty argument between commas in command",
+      "description": "Command arguments cannot be empty (e.g., WRITE \"a\",,! is invalid). Function parameters may have empty arguments (e.g., FUNC(1,,3) is valid).",
       "autofix": false
     },
     "M025-MISSING-COMMAND-SPACE": {
@@ -176,7 +176,7 @@
     "checkUnusedLabels": true,
     "enforceUppercase": true,
     "checkMagicNumbers": false,
-    "disallowSpaceAfterComma": false,
+    "disallowSpaceAfterComma": true,
     "enforceLabelIndentation": true,
     "enforceCommandIndentation": true,
     "checkUnreachableAfterQuit": true

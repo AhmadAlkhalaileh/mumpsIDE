@@ -181,6 +181,9 @@
                     { type: 'separator' },
                     { id: 'tools.shortcuts', label: 'Shortcuts…', action: 'shortcuts' },
                     { type: 'separator' },
+                    { id: 'tools.gotomap', label: 'GOTO Flow Map…', action: 'show-goto-map', icon: 'map', shortcut: 'Ctrl+Shift+G' },
+                    { id: 'tools.compare', label: 'Compare Routines…', action: 'compare-routines', icon: 'diff' },
+                    { type: 'separator' },
                     { id: 'tools.devtools', label: 'Toggle DevTools', action: 'toggle-devtools' }
                 ])
             },
@@ -240,17 +243,31 @@
             const hasDecl = !!ctx?.hasDeclaration;
             const activePath = String(ctx?.activePath || '').trim();
             const isMumpsFile = activePath && activePath.endsWith('.m');
+            const isMumps = !!ctx?.isMumps || !!isMumpsFile;
             const hasGlobal = !!ctx?.hasGlobalAtCursor;
+            const hasTagAtCursor = !!ctx?.hasTagAtCursor;
+
+            // Smart Rename: always enabled (works in Docker mode)
+            const canSmartRename = true; // Always available in fallback mode
+
             return withSeparatorCleanup([
                 { id: 'ed.cut', label: 'Cut', action: 'cut', icon: 'cut', shortcut: 'Ctrl+X' },
                 { id: 'ed.copy', label: 'Copy', action: 'copy', icon: 'copy', shortcut: 'Ctrl+C' },
                 { id: 'ed.paste', label: 'Paste', action: 'paste', icon: 'paste', shortcut: 'Ctrl+V' },
                 { type: 'separator' },
                 { id: 'ed.format', label: 'Format Code', action: 'reformat', icon: 'format' },
+                { id: 'ed.smartRename', label: 'Smart Rename Tag', action: 'smart-rename-tag', icon: 'edit', shortcut: 'Shift+Alt+F2' },
                 { id: 'ed.decl', label: 'Go to Declaration', action: 'goto-declaration', icon: 'arrow-right', disabled: !hasDecl },
                 { id: 'ed.usages', label: 'Find Usages', action: 'find-usages', icon: 'search', disabled: true },
                 { id: 'ed.globalRefs', label: 'Find Global References', action: 'mumps:find-global-references', icon: 'search', disabled: !hasGlobal },
                 { id: 'ed.globalImpact', label: 'Show Global Impact', action: 'mumps:show-global-impact', icon: 'graph', disabled: !hasGlobal },
+
+                { type: 'separator' },
+                { id: 'ed.gotoMap', label: 'Show GOTO Flow Map', action: 'show-goto-map', icon: 'map' },
+                ...(isMumps && hasTagAtCursor ? [
+                    { id: 'ed.tagHeader', label: 'Generate Tag Header', action: 'mumps:generate-tag-header', icon: 'comment' }
+                ] : []),
+                { id: 'ed.compare', label: 'Compare Routines…', action: 'compare-routines', icon: 'diff' },
                 { type: 'separator' },
                 { id: 'ed.comment', label: 'Toggle Comment', action: 'comment', icon: 'comment' },
                 { type: 'separator' },
@@ -315,7 +332,9 @@
                     ]
                 },
                 { type: 'separator' },
-                { id: 'prj.refresh', label: 'Refresh', action: 'prj:refresh', icon: 'refresh' }
+                { id: 'prj.refresh', label: 'Refresh', action: 'prj:refresh', icon: 'refresh' },
+                { type: 'separator' },
+                { id: 'prj.compare', label: 'Compare Routines…', action: 'compare-routines', icon: 'diff' }
             ]);
         });
 

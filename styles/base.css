@@ -576,3 +576,20 @@ body.perf-mode .btn:hover {
     color: var(--muted);
     font-weight: 600;
 }
+
+/* Collapsed bottom bar - when all panels hidden, show only icon strip */
+.bottom-bar-wrapper.collapsed {
+    height: auto !important;
+    max-height: 36px !important;
+    min-height: 36px !important;
+}
+
+.bottom-bar-wrapper.collapsed .tool-window-bar-bottom {
+    height: 36px !important;
+    max-height: 36px !important;
+    min-height: 36px !important;
+}
+
+.bottom-bar-wrapper.collapsed .tool-window-content.tool-window-bottom {
+    display: none !important;
+}

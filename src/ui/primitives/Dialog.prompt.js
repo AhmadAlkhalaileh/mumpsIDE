@@ -17,13 +17,16 @@
         const buildDialog = ({ title, message, variant = 'default', inputPlaceholder = '', showInput = false }) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'ui-dialog-layout';
+            wrapper.style.cssText = 'max-width:380px;width:380px;';
 
             const header = document.createElement('div');
             header.className = 'ui-dialog-header';
+            header.style.cssText = 'height:40px;padding:0 var(--ui-space-3);';
             const headerLeft = document.createElement('div');
             headerLeft.className = 'ui-dialog-header__left';
             const titleEl = document.createElement('div');
             titleEl.className = 'ui-dialog-title';
+            titleEl.style.cssText = 'font-size:13px;';
             titleEl.textContent = title || 'Confirm';
             headerLeft.appendChild(titleEl);
 
@@ -33,6 +36,7 @@
             closeBtn.className = 'ui-dialog-close';
             closeBtn.type = 'button';
             closeBtn.title = 'Close';
+            closeBtn.style.cssText = 'width:24px;height:24px;font-size:14px;';
             closeBtn.textContent = '✕';
             headerRight.appendChild(closeBtn);
 
@@ -40,10 +44,10 @@
             header.appendChild(headerRight);
 
             const body = document.createElement('div');
-            body.style.cssText = 'padding:var(--ui-space-6);min-width:420px;';
+            body.style.cssText = 'padding:var(--ui-space-3);';
 
             const msg = document.createElement('div');
-            msg.style.cssText = 'margin-bottom:var(--ui-space-4);color:var(--text);line-height:1.5;';
+            msg.style.cssText = 'margin-bottom:var(--ui-space-2);color:var(--text);line-height:1.4;font-size:12px;';
             msg.textContent = message || '';
             body.appendChild(msg);
 
@@ -56,6 +60,7 @@
 
             const footer = document.createElement('div');
             footer.className = 'ui-dialog-footer';
+            footer.style.cssText = 'padding:var(--ui-space-2) var(--ui-space-3);height:auto;min-height:42px;';
 
             wrapper.appendChild(header);
             wrapper.appendChild(body);
@@ -110,10 +115,24 @@
                     dialog.close('x');
                 });
 
+                // Add Enter key support
+                if (inputEl) {
+                    inputEl.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            resolve(inputEl.value || '');
+                            dialog.close('ok');
+                        }
+                    });
+                }
+
                 footer.appendChild(cancelBtn);
                 footer.appendChild(okBtn);
 
                 dialog.setContent(wrapper);
+                // Make the outer dialog container compact
+                dialog.dialog.style.width = '380px';
+                dialog.dialog.style.height = 'auto';
                 dialog.open();
 
                 requestAnimationFrame(() => inputEl?.focus?.());
@@ -166,6 +185,9 @@
                 footer.appendChild(okBtn);
 
                 dialog.setContent(wrapper);
+                // Make the outer dialog container compact
+                dialog.dialog.style.width = '380px';
+                dialog.dialog.style.height = 'auto';
                 dialog.open();
             });
         };

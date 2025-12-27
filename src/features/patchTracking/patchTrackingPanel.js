@@ -231,11 +231,11 @@ class PatchTrackingPanel {
                     </div>
                     <div style="margin-bottom: 12px;">
                         <label style="display: block; margin-bottom: 4px; font-size: 13px;">Localr Path:</label>
-                        <input type="text" id="localrPath" value="/var/worldvista/prod/hakeem/localr" style="width: 100%; padding: 8px; background: var(--ps-bg-secondary, #2f3141); border: 1px solid var(--ps-border, #44475a); border-radius: 4px; color: var(--ps-text-main, #f8f8f2);">
+                        <input type="text" id="localrPath" value="" placeholder="Leave empty to auto-detect from vista-profile" style="width: 100%; padding: 8px; background: var(--ps-bg-secondary, #2f3141); border: 1px solid var(--ps-border, #44475a); border-radius: 4px; color: var(--ps-text-main, #f8f8f2);">
                     </div>
                     <div style="margin-bottom: 0;">
                         <label style="display: block; margin-bottom: 4px; font-size: 13px;">Routines Path:</label>
-                        <input type="text" id="routinesPath" value="/var/worldvista/prod/hakeem/routines" style="width: 100%; padding: 8px; background: var(--ps-bg-secondary, #2f3141); border: 1px solid var(--ps-border, #44475a); border-radius: 4px; color: var(--ps-text-main, #f8f8f2);">
+                        <input type="text" id="routinesPath" value="" placeholder="Leave empty to auto-detect from vista-profile" style="width: 100%; padding: 8px; background: var(--ps-bg-secondary, #2f3141); border: 1px solid var(--ps-border, #44475a); border-radius: 4px; color: var(--ps-text-main, #f8f8f2);">
                     </div>
                 </div>
 

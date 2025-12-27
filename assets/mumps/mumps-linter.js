@@ -11,8 +11,9 @@
  *     - Trailing comma (end-of-line) is error.
  *     - Empty argument between commas is error.
  */
-const RE_LABEL_AT_COL1 = /^([A-Z%][A-Z0-9]*)\s*(\(|;|$)/i;
-const RE_LABEL_TRIM = RE_LABEL_AT_COL1;
+// Match label at column 1: label can be followed by space+command, params, comment, or EOL
+const RE_LABEL_AT_COL1 = /^([A-Z%][A-Z0-9]*)(\s+[A-Z]|\s*\(|\s*;|\s*$)/i;
+const RE_LABEL_TRIM = /^([A-Z%][A-Z0-9]*)\s*(\(|;|$)/i;
 const RE_DO_GOTO = /\b(?:DO|D|GOTO|G)\s+([A-Z%][A-Z0-9]*)/gi;
 
 class MUMPSLinter {
@@ -26,7 +27,7 @@ class MUMPSLinter {
             maxNestingDepth: 3,
             checkMagicNumbers: false,
             checkUnreachableAfterQuit: true,
-            disallowSpaceAfterComma: false, // IMPORTANT: space after comma is allowed by default
+            disallowSpaceAfterComma: true, // No spaces allowed after commas in MUMPS syntax
             enforceLabelIndentation: true,
             enforceCommandIndentation: true
         };
@@ -147,11 +148,13 @@ class MUMPSLinter {
 
             if (!trimmed || trimmed.startsWith(';')) continue;
 
+            // Check if line is a label at column 1 first
+            const isLabelAtColumn1 = RE_LABEL_AT_COL1.test(line);
+
+            // Extract first token for command checking (but only if not a label)
             const firstTokenMatch = trimmed.match(/^([A-Z%][A-Z0-9]*)/i);
             const firstToken = firstTokenMatch ? firstTokenMatch[1] : null;
-            const isCommandKeyword = firstToken ? this.isCommandToken(firstToken) : false;
-
-            const isLabelAtColumn1 = RE_LABEL_AT_COL1.test(line);
+            const isCommandKeyword = (!isLabelAtColumn1 && firstToken) ? this.isCommandToken(firstToken) : false;
 
             if (isLabelAtColumn1) {
                 // Proper label line
@@ -187,10 +190,14 @@ class MUMPSLinter {
                 newedVariables.clear();
             } else {
                 // Mis-indented label (not at col1, not a command)
+                // Don't flag QUIT commands (Q/QUIT) as mis-indented labels
+                const isQuitCommand = /^\s*Q(?:UIT)?(\s|$|;)/i.test(line);
+
                 if (
                     cfg.enforceLabelIndentation &&
                     leadingSpaces > 0 &&
                     !isCommandKeyword &&
+                    !isQuitCommand &&
                     RE_LABEL_TRIM.test(trimmed)
                 ) {
                     const meta = this.getRuleMeta(
@@ -208,17 +215,17 @@ class MUMPSLinter {
                     });
                 }
 
-                // Command indentation
+                // Command indentation (style preference, not an error)
                 if (cfg.enforceCommandIndentation) {
                     if (leadingSpaces === 0) {
                         const meta = this.getRuleMeta(
                             'M022-COMMAND-INDENTATION',
-                            'Executable lines must be indented under their label',
-                            'Commands associated with a label should be indented at least one character to the right'
+                            'Executable lines should be indented under their label',
+                            'Commands associated with a label should be indented at least one character to the right for better readability'
                         );
                         issues.push({
                             ruleId: 'M022',
-                            severity: (this.rules['M022-COMMAND-INDENTATION'] && this.rules['M022-COMMAND-INDENTATION'].severity) || 'error',
+                            severity: (this.rules['M022-COMMAND-INDENTATION'] && this.rules['M022-COMMAND-INDENTATION'].severity) || 'info',
                             line: lineNum,
                             column: 1,
                             message: meta.message,
@@ -239,32 +246,8 @@ class MUMPSLinter {
             }
         }
 
-        // Unused labels
-        if (this.config.checkUnusedLabels && calledLabels.size > 0) {
-            const labelRuleCode = 'M004-UNUSED-LABEL';
-            const labelMeta = this.getRuleMeta(
-                labelRuleCode,
-                'Label {label} is defined but never called',
-                'Defined label is never referenced by DO or GOTO'
-            );
-
-            definedLabels.forEach(label => {
-                if (
-                    !calledLabels.has(label) &&
-                    label !== 'MAIN' &&
-                    label !== firstLabelName
-                ) {
-                    issues.push({
-                        ruleId: 'M004',
-                        severity: (this.rules['M004-UNUSED-LABEL'] && this.rules['M004-UNUSED-LABEL'].severity) || 'info',
-                        line: this.findLabelLine(lines, label),
-                        column: 1,
-                        message: labelMeta.message.replace('{label}', label),
-                        description: labelMeta.description
-                    });
-                }
-            });
-        }
+        // M004 Unused labels check - DISABLED
+        // Labels may be called externally or used as entry points, so this check is not reliable
 
         const summary = {
             errors: issues.filter(i => i.severity === 'error').length,
@@ -302,19 +285,31 @@ class MUMPSLinter {
                         description: meta.description
                     });
                 } else if (matches.length > 1 && !matches.includes(upperCmd)) {
-                    const meta = this.getRuleMeta(
-                        'M027-AMBIGUOUS-COMMAND',
-                        "Ambiguous command abbreviation '{cmd}'",
-                        'Use a longer command name or the full keyword to avoid ambiguity'
-                    );
-                    issues.push({
-                        ruleId: 'M027',
-                        severity: (this.rules['M027-AMBIGUOUS-COMMAND'] && this.rules['M027-AMBIGUOUS-COMMAND'].severity) || 'warning',
-                        line: lineNum,
-                        column: line.indexOf(rawCmd) + 1,
-                        message: meta.message.replace('{cmd}', rawCmd),
-                        description: meta.description
-                    });
+                    // Special case: 'H' followed by a number is clearly HANG, not ambiguous
+                    let isAmbiguous = true;
+                    if (upperCmd === 'H') {
+                        // Check if followed by whitespace and a number (HANG timeout)
+                        const afterCmd = codePart.slice(cmdMatch.index + rawCmd.length);
+                        if (/^\s+\d/.test(afterCmd)) {
+                            isAmbiguous = false; // It's HANG with timeout
+                        }
+                    }
+
+                    if (isAmbiguous) {
+                        const meta = this.getRuleMeta(
+                            'M027-AMBIGUOUS-COMMAND',
+                            "Ambiguous command abbreviation '{cmd}'",
+                            'Use a longer command name or the full keyword to avoid ambiguity'
+                        );
+                        issues.push({
+                            ruleId: 'M027',
+                            severity: (this.rules['M027-AMBIGUOUS-COMMAND'] && this.rules['M027-AMBIGUOUS-COMMAND'].severity) || 'warning',
+                            line: lineNum,
+                            column: line.indexOf(rawCmd) + 1,
+                            message: meta.message.replace('{cmd}', rawCmd),
+                            description: meta.description
+                        });
+                    }
                 }
             }
         }
@@ -366,10 +361,22 @@ class MUMPSLinter {
             }
         }
 
-        // Mismatched parens
+        // Mismatched parens (skip strings)
         {
-            const openParen = (codePart.match(/\(/g) || []).length;
-            const closeParen = (codePart.match(/\)/g) || []).length;
+            let openParen = 0;
+            let closeParen = 0;
+            let inString = false;
+
+            for (let i = 0; i < codePart.length; i++) {
+                const ch = codePart[i];
+                if (ch === '"') {
+                    inString = !inString;
+                } else if (!inString) {
+                    if (ch === '(') openParen++;
+                    else if (ch === ')') closeParen++;
+                }
+            }
+
             if (openParen !== closeParen) {
                 const meta = this.getRuleMeta(
                     'M007-MISMATCHED-PARENS',
@@ -390,12 +397,12 @@ class MUMPSLinter {
             }
         }
 
-        // M020: space after comma (STYLE ONLY, and OFF by default)
+        // M020: space after comma (MUMPS syntax rule)
         if (this.config.disallowSpaceAfterComma) {
             const meta = this.getRuleMeta(
                 'M020-SPACE-AFTER-COMMA',
-                'Space after comma in argument list',
-                'Style warning: consider removing spaces after commas in argument lists'
+                'Space after comma not allowed',
+                'MUMPS syntax does not allow spaces after commas in argument lists'
             );
 
             let inString = false;
@@ -425,7 +432,7 @@ class MUMPSLinter {
                     ) {
                         issues.push({
                             ruleId: 'M020',
-                            severity: (this.rules['M020-SPACE-AFTER-COMMA'] && this.rules['M020-SPACE-AFTER-COMMA'].severity) || 'warning',
+                            severity: (this.rules['M020-SPACE-AFTER-COMMA'] && this.rules['M020-SPACE-AFTER-COMMA'].severity) || 'error',
                             line: lineNum,
                             column: i + 2,
                             message: meta.message,
@@ -453,6 +460,8 @@ class MUMPSLinter {
 
                 if (ch === '"') {
                     inString = !inString;
+                    // Include quotes as non-whitespace so commas before strings aren't flagged
+                    lastNonWs = { ch, index: i };
                     continue;
                 }
 
@@ -461,6 +470,7 @@ class MUMPSLinter {
                 }
             }
 
+            // Only flag if last non-whitespace char is a comma (not a quote or other char)
             if (lastNonWs && lastNonWs.ch === ',') {
                 const trimmedLine = line.trim();
                 const startOfCodeInLine = line.indexOf(trimmedLine);
@@ -478,14 +488,17 @@ class MUMPSLinter {
         }
 
         // Empty argument between commas (M024)
+        // NOTE: Empty arguments are VALID in function parameters (e.g., FUNC(1,,3))
+        //       but INVALID in command arguments (e.g., WRITE "a",,!)
         {
             const meta = this.getRuleMeta(
                 'M024-EMPTY-ARGUMENT',
-                'Empty argument between commas',
-                'Each comma must be followed by a valid argument; remove extra commas'
+                'Empty argument between commas in command',
+                'Command arguments cannot be empty; function parameters may have empty arguments'
             );
 
             let inString = false;
+            let parenDepth = 0;
             const raw = codePart;
 
             for (let i = 0; i < raw.length; i++) {
@@ -496,23 +509,29 @@ class MUMPSLinter {
                     continue;
                 }
 
-                if (!inString && ch === ',') {
-                    let j = i + 1;
-                    while (j < raw.length && (raw[j] === ' ' || raw[j] === '\t')) {
-                        j++;
-                    }
-                    if (j >= raw.length || raw[j] === ',' || raw[j] === ';') {
-                        const trimmedLine = line.trim();
-                        const startOfCodeInLine = line.indexOf(trimmedLine);
-                        const column = startOfCodeInLine + i + 1;
-                        issues.push({
-                            ruleId: 'M024',
-                            severity: (this.rules['M024-EMPTY-ARGUMENT'] && this.rules['M024-EMPTY-ARGUMENT'].severity) || 'error',
-                            line: lineNum,
-                            column,
-                            message: meta.message,
-                            description: meta.description
-                        });
+                if (!inString) {
+                    if (ch === '(') parenDepth++;
+                    else if (ch === ')') parenDepth--;
+
+                    // Only flag empty arguments OUTSIDE parentheses (command args)
+                    if (ch === ',' && parenDepth === 0) {
+                        let j = i + 1;
+                        while (j < raw.length && (raw[j] === ' ' || raw[j] === '\t')) {
+                            j++;
+                        }
+                        if (j >= raw.length || raw[j] === ',' || raw[j] === ';') {
+                            const trimmedLine = line.trim();
+                            const startOfCodeInLine = line.indexOf(trimmedLine);
+                            const column = startOfCodeInLine + i + 1;
+                            issues.push({
+                                ruleId: 'M024',
+                                severity: (this.rules['M024-EMPTY-ARGUMENT'] && this.rules['M024-EMPTY-ARGUMENT'].severity) || 'error',
+                                line: lineNum,
+                                column,
+                                message: meta.message,
+                                description: meta.description
+                            });
+                        }
                     }
                 }
             }

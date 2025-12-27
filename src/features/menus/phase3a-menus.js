@@ -40,15 +40,22 @@
         const registry = window.AhmadIDEModules?.app?.menuRegistry;
         if (!registry) return;
         const items = registry.get(menuId, ctxExtra);
+        const dispatch = window.AhmadIDEModules?.app?.runMenuAction || window.runMenuAction || null;
         const onAction = (action, ctx) => {
-            if (typeof runMenuAction === 'function') runMenuAction(action, ctxExtra || ctx || {});
+            if (typeof dispatch === 'function') {
+                try { dispatch(action, ctxExtra || ctx || {}); } catch (_) { }
+            }
         };
         const openPopover = window.AhmadIDEModules?.ui?.menu?.openPopover;
         if (typeof openPopover === 'function') {
             openPopover({ controller, anchorEl, items, ctx: ctxExtra, onAction });
             return;
         }
-        controller.openAtElement({ anchorEl, items, ctx: ctxExtra, onAction });
+        const ctrl = controller
+            || window.AhmadIDEModules?.ui?.menu?.controller
+            || window.AhmadIDEModules?.ui?.menu?.createMenuController?.({});
+        if (!ctrl || typeof ctrl.openAtElement !== 'function') return;
+        ctrl.openAtElement({ anchorEl, items, ctx: ctxExtra, onAction });
     };
 
     const bindToolbarMenus = (controller) => {
@@ -69,8 +76,13 @@
             vcsBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopImmediatePropagation();
+                const openVcsWidgetDrawer = window.AhmadIDEModules?.features?.menus?.openVcsWidgetDrawer;
                 const openVcsWidgetPopover = window.AhmadIDEModules?.features?.menus?.openVcsWidgetPopover;
                 const ctxExtra = { toolWindows: getToolWindowCtx() };
+                if (typeof openVcsWidgetDrawer === 'function') {
+                    openVcsWidgetDrawer({ anchorEl: vcsBtn, ctxExtra });
+                    return;
+                }
                 if (typeof openVcsWidgetPopover === 'function') {
                     openVcsWidgetPopover({ controller, anchorEl: vcsBtn, ctxExtra });
                     return;
@@ -82,8 +94,7 @@
 
     function bootstrap() {
         ensureConnectionsMenu();
-        const controller = window.AhmadIDEModules?.ui?.menu?.controller;
-        if (!controller) return;
+        const controller = window.AhmadIDEModules?.ui?.menu?.controller || null;
         bindToolbarMenus(controller);
     }
 

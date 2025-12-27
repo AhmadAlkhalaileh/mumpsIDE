@@ -26,134 +26,13 @@
     }
 
     // Theme presets (IDE shell + Monaco code themes)
-    const ideThemes = {
-        'jb-light': {
-            name: ' Light',
-            vars: {
-                '--bg': '#f5f7fb',
-                '--glass': 'rgba(255, 255, 255, 0.7)',
-                '--panel': '#ffffff',
-                '--panel-2': '#f4f6fb',
-                '--panel-strong': '#ffffff',
-                '--panel-soft': '#f5f7fb',
-                '--sidebar': '#f5f7fb',
-                '--rail-bg': '#eef1f7',
-                '--editor-bg': '#ffffff',
-                '--gutter-bg': '#f3f5f9',
-                '--terminal-bg': '#f8f9fb',
-                '--terminal-input-bg': '#edf0f7',
-                '--accent': '#3574f0',
-                '--accent-2': '#5b8def',
-                '--accent-blue': '#3574f0',
-                '--accent-green': '#3fb87f',
-                '--accent-orange': '#ed8b00',
-                '--accent-soft': 'rgba(53, 116, 240, 0.12)',
-                '--accent-soft-border': 'rgba(53, 116, 240, 0.24)',
-                '--text': '#1f232a',
-                '--text-bright': '#0f4c81',
-                '--muted': '#6a7280',
-                '--border': '#dfe3eb',
-                '--tree-selected': '#e6f0ff',
-                '--tree-selected-text': '#0f1b2d',
-                '--selection-bg': '#d9e4ff',
-                '--hover-bg': '#ecf0f7',
-                '--glow-1': 'rgba(53, 116, 240, 0.08)',
-                '--glow-2': 'rgba(91, 141, 239, 0.06)',
-                '--font-ui': 'Inter, \"Segoe UI\", \"SF Pro Display\", system-ui, sans-serif',
-                '--font-code': 'ui-monospace, \"SFMono-Regular\", \"Menlo\", \"Monaco\", \"Consolas\", \"Liberation Mono\", \"Courier New\", monospace',
-                '--font-size-ui': '13px',
-                '--font-size-code': '13px'
-            }
-        },
-        earth: {
-            name: 'Storm Dark',
-            vars: {
-                '--bg': '#282a36',
-                '--glass': 'rgba(40, 42, 54, 0.92)',
-                '--panel': '#2f3141',
-                '--panel-2': '#2b2d3a',
-                '--panel-strong': '#343746',
-                '--panel-soft': '#242631',
-                '--sidebar': '#2b2d3a',
-                '--rail-bg': '#2b2d3a',
-                '--editor-bg': '#282a36',
-                '--gutter-bg': '#282a36',
-                '--terminal-bg': '#282a36',
-                '--terminal-input-bg': '#2f3141',
-                '--accent': '#bd93f9',
-                '--accent-2': '#ff79c6',
-                '--accent-blue': '#8be9fd',
-                '--accent-green': '#50fa7b',
-                '--accent-orange': '#ffb86c',
-                '--accent-soft': 'rgba(189, 147, 249, 0.15)',
-                '--accent-soft-border': 'rgba(189, 147, 249, 0.35)',
-                '--text': '#f8f8f2',
-                '--text-bright': '#ffffff',
-                '--muted': '#6272a4',
-                '--border': '#44475a',
-                '--tree-selected': '#44475a',
-                '--tree-selected-text': '#f8f8f2',
-                '--selection-bg': '#44475a',
-                '--hover-bg': '#343746',
-                '--glow-1': 'rgba(189, 147, 249, 0.05)',
-                '--glow-2': 'rgba(139, 233, 253, 0.03)',
-                '--font-ui': 'Inter, \"Segoe UI\", \"SF Pro Display\", system-ui, sans-serif',
-                '--font-code': '\"ains Mono\", \"Fira Code\", ui-monospace, \"SFMono-Regular\", monospace',
-                '--font-size-ui': '13px',
-                '--font-size-code': '13px'
-            }
-        },
-        desert: {
-            name: 'Desert Contrast',
-            vars: {
-                '--bg': '#21160f',
-                '--glass': 'rgba(255,255,255,0.05)',
-                '--panel': 'rgba(42, 28, 20, 0.9)',
-                '--panel-2': 'rgba(52, 35, 24, 0.94)',
-                '--panel-strong': '#21160f',
-                '--panel-soft': '#2b1c14',
-                '--sidebar': '#2b1c14',
-                '--rail-bg': '#2f2017',
-                '--editor-bg': '#1f140e',
-                '--gutter-bg': '#1a100b',
-                '--terminal-bg': '#23160f',
-                '--terminal-input-bg': '#2e1e15',
-                '--accent': '#f0a35c',
-                '--accent-2': '#ffd59a',
-                '--accent-blue': '#4a9fe8',
-                '--accent-green': '#5fb865',
-                '--accent-orange': '#f0a35c',
-                '--accent-soft': 'rgba(240,163,92,0.20)',
-                '--accent-soft-border': 'rgba(240,163,92,0.32)',
-                '--text': '#f7ecde',
-                '--text-bright': '#ffd59a',
-                '--muted': '#c7b8a4',
-                '--border': 'rgba(255,255,255,0.1)',
-                '--tree-selected': '#2f4554',
-                '--tree-selected-text': '#ffffff',
-                '--selection-bg': '#214283',
-                '--hover-bg': '#3a2b22',
-                '--glow-1': 'rgba(240,163,92,0.10)',
-                '--glow-2': 'rgba(255,213,154,0.06)',
-                '--font-ui': 'Inter, \"Segoe UI\", \"SF Pro Display\", system-ui, sans-serif',
-                '--font-code': 'ui-monospace, \"SFMono-Regular\", \"Menlo\", \"Monaco\", \"Consolas\", \"Liberation Mono\", \"Courier New\", monospace',
-                '--font-size-ui': '13px',
-                '--font-size-code': '13px'
-            }
-        }
-    };
-    const defaultIdeTheme = 'earth';
-    const defaultCodeTheme = 'mumps-earth';
-    const codeThemes = ['mumps-light', 'mumps-earth', 'mumps-dark'];
-    let currentCodeTheme = (() => {
-        try {
-            const stored = localStorage.getItem('ahmadIDE:theme:code');
-            if (stored && codeThemes.includes(stored)) return stored;
-            return defaultCodeTheme;
-        } catch (e) {
-            return defaultCodeTheme;
-        }
-    })();
+    const createThemePresets = window.AhmadIDEModules?.renderer?.themes?.createThemePresets;
+    const themePresets = createThemePresets();
+    const ideThemes = themePresets.ideThemes;
+    const defaultIdeTheme = themePresets.defaultIdeTheme;
+    const defaultCodeTheme = themePresets.defaultCodeTheme;
+    const codeThemes = themePresets.codeThemes;
+    let currentCodeTheme = themePresets.currentCodeTheme;
     const collapsedTreeNodes = new Set();
     let activeEditor = null;
     // Terminal configuration (TODO: expose via Settings UI)
@@ -165,11 +44,19 @@
         escapeToEditor: true // If true and shortcuts are not overridden, Esc returns focus to editor
     };
     let envInfoCache = null;
-    const mumpsValidator = typeof MUMPSValidator !== 'undefined' ? new MUMPSValidator() : null;
-    const mumpsLinter = typeof MUMPSLinter !== 'undefined' ? new MUMPSLinter() : null;
+    const MUMPSValidatorCtor = (typeof window !== 'undefined' && window.MUMPSValidator)
+        ? window.MUMPSValidator
+        : (typeof MUMPSValidator !== 'undefined' ? MUMPSValidator : null);
+    const MUMPSLinterCtor = (typeof window !== 'undefined' && window.MUMPSLinter)
+        ? window.MUMPSLinter
+        : (typeof MUMPSLinter !== 'undefined' ? MUMPSLinter : null);
+
+    const mumpsValidator = MUMPSValidatorCtor ? new MUMPSValidatorCtor() : null;
+    const mumpsLinter = MUMPSLinterCtor ? new MUMPSLinterCtor() : null;
     const MUMPSLexerClass = typeof MUMPSLexer !== 'undefined' ? MUMPSLexer : null;
     const MUMPSParserClass = typeof MUMPSParser !== 'undefined' ? MUMPSParser : null;
     const registeredShortcuts = [];
+    let shortcutPrefsApi = null;
     const expandedArrayKeys = new Set(); // track expanded arrays in Locals panel
     let activeRoutineName = null; // for breakpoint grouping and labels
     let routineState = null; // shared routine state for search/navigation helpers
@@ -201,71 +88,13 @@
         }
     })();
 
-    // ========== MUMPS Reference Parser (shared utility) ==========
-    // Parse routine/tag reference at cursor position (supports TAG^RTN, ^RTN, DO TAG)
-    // MOVED TOP for visibility
-    function parseRoutineReferenceAtPosition(model, position) {
-        if (!model || !position) return null;
-        const lineContent = model.getLineContent(position.lineNumber) || '';
-        const column = position.column;
-
-        try {
-            // Pattern 1: TAG^ROUTINE or $$TAG^ROUTINE
-            const tagRoutineRx = /(\$\$)?([A-Z%][A-Z0-9]*)\^([A-Z%][A-Z0-9]+)/gi;
-            let m = null;
-            while ((m = tagRoutineRx.exec(lineContent))) {
-                const full = m[0];
-                const idx = m.index;
-                const endIdx = idx + full.length;
-                if (column >= idx + 1 && column <= endIdx + 1) {
-                    const tag = m[2] || '';
-                    const routine = m[3] || '';
-                    return { type: 'external', routine, tag };
-                }
-            }
-
-            // Pattern 2: ^ROUTINE (standalone)
-            const routineRx = /\^([A-Z%][A-Z0-9]+)/gi;
-            while ((m = routineRx.exec(lineContent))) {
-                const full = m[0];
-                const idx = m.index;
-                const endIdx = idx + full.length;
-                if (column >= idx + 1 && column <= endIdx + 1) {
-                    const routine = m[1] || '';
-                    return { type: 'external', routine, tag: '' };
-                }
-            }
-
-            // Pattern 3: $$TAG (local extrinsic) without ^ROUTINE
-            const localExtrinsicRx = /\$\$([A-Z%][A-Z0-9]*)(?!\^)/gi;
-            while ((m = localExtrinsicRx.exec(lineContent))) {
-                const full = m[0];
-                const idx = m.index;
-                const endIdx = idx + full.length;
-                if (column >= idx + 1 && column <= endIdx + 1) {
-                    return { type: 'local', tag: m[1] || '' };
-                }
-            }
-
-            // Pattern 4: D TAG, DO TAG (local tag call)
-            const localDoRx = /(?:^|\s)(?:D(?:O)?)\s+([A-Z%][A-Z0-9]*)(?=$|\s|,|\()/gi;
-            while ((m = localDoRx.exec(lineContent))) {
-                const full = m[0];
-                const tagName = m[1] || '';
-                const rel = full.lastIndexOf(tagName);
-                const idx = m.index + Math.max(0, rel);
-                const endIdx = idx + tagName.length;
-                if (column >= idx + 1 && column <= endIdx + 1) {
-                    return { type: 'local', tag: tagName };
-                }
-            }
-        } catch (err) {
-            // logger not defined this early? use console
-            console.warn('GOTO_DECLARATION_PARSE_ERROR', { line: position.lineNumber, column, message: err?.message });
-        }
-
-        return null;
+    // Declaration navigation moved to src/renderer/editor/declarationNavigation.js
+    const declarationNavigation = window.AhmadIDEModules?.renderer?.editor?.declarationNavigation;
+    if (!declarationNavigation) {
+        logger.error('DECLARATION_NAV_MODULE_MISSING', { path: './src/renderer/editor/declarationNavigation.js' });
+        throw new Error('Declaration navigation module missing: ./src/renderer/editor/declarationNavigation.js');
     }
+    const parseRoutineReferenceAtPosition = declarationNavigation.parseRoutineReferenceAtPosition;
     // Phase 3A: menus are now rendered by the unified ui.menu controller + MenuBar,
     // with menu definitions sourced from src/app/registries/menuRegistry.js.
     const clickEl = (id) => {
@@ -364,6 +193,60 @@
             case 'goto-declaration':
                 try { await goToDeclaration(editor, null, { silentIfMissing: false }); } catch (_) { }
                 return;
+            case 'show-goto-map': {
+                if (typeof window.showMumpsGotoMap === 'function') {
+                    try { window.showMumpsGotoMap(); } catch (_) { }
+                    return;
+                }
+
+                // Fallback: attempt late init if the integration module loaded after the editor.
+                const initMumpsLinterEnhancements = window.AhmadIDEModules?.mumps?.initMumpsLinterEnhancements;
+                if (typeof initMumpsLinterEnhancements === 'function' && typeof window.monaco !== 'undefined') {
+                    try {
+                        initMumpsLinterEnhancements({
+                            monacoRef: window.monaco,
+                            getActiveEditor: () => editor || activeEditor || null,
+                            showToast: (typeof showToast === 'function') ? showToast : (() => { })
+                        });
+                    } catch (_) { }
+                }
+
+                if (typeof window.showMumpsGotoMap === 'function') {
+                    try { window.showMumpsGotoMap(); } catch (_) { }
+                    return;
+                }
+
+                notImplemented('GOTO Flow Map');
+                return;
+            }
+            case 'mumps:generate-tag-header': {
+                const ed = editor || activeEditor || null;
+                if (!ed) {
+                    try { showToast?.('info', 'Tag Header', 'No active editor'); } catch (_) { }
+                    return;
+                }
+
+                try {
+                    const generator = window.mumpsTagHeaderGenerator;
+                    if (generator?.generateTagHeader) {
+                        generator.generateTagHeader(ed);
+                        return;
+                    }
+
+                    const Gen = window.AhmadIDEModules?.mumps?.MumpsTagHeaderGenerator || window.MumpsTagHeaderGenerator;
+                    if (!Gen) {
+                        notImplemented('Generate Tag Header');
+                        return;
+                    }
+
+                    const settingsService = window.AhmadIDEModules?.services?.settingsService;
+                    const showToastFn = (typeof showToast === 'function') ? showToast : (() => { });
+                    new Gen({ showToast: showToastFn, settingsService }).generateTagHeader(ed);
+                } catch (err) {
+                    try { showToast?.('error', 'Tag Header', err?.message || 'Failed to generate tag header'); } catch (_) { }
+                }
+                return;
+            }
             case 'mumps:find-global-references':
             case 'mumps:show-global-impact':
                 {
@@ -622,130 +505,28 @@
                 }
                 return;
             default:
+                // Delegated to legacy/global handlers?
+                if (window.AhmadIDEModules?.actions?.runAction) {
+                    if (await window.AhmadIDEModules.actions.runAction(action, ctx)) return;
+                }
+
+                // Delegate to global menuActions.js (which renderer.js shadows locally)
+                if (typeof window.runMenuAction === 'function' && window.runMenuAction !== runMenuAction) {
+                    try {
+                        await window.runMenuAction(action, ctx);
+                        return;
+                    } catch (e) {
+                        console.error('[Delegated Action Failed]', action, e);
+                    }
+                }
+
                 notImplemented(action);
         }
     }
 
     async function saveAllOpenTabs({ terminalState } = {}) {
-        const termState = terminalState || globalTerminalState || null;
-        const tabs = Array.isArray(openTabs) ? openTabs : [];
-
-        const dirty = tabs.filter((t) => {
-            if (!t) return false;
-            if (!t.isDirty) return false;
-            if (String(t.kind || 'routine') !== 'routine') return false;
-            if (t.readOnly) return false;
-            return true;
-        });
-
-        if (!dirty.length) {
-            try { showToast('info', 'Save All', 'No unsaved changes'); } catch (_) { }
-            return;
-        }
-
-        try { appendOutput(`💾 Save All: ${dirty.length} file(s)…`, termState); } catch (_) { }
-
-        const validator = window._mumpsValidator || mumpsValidator || null;
-        let savedCount = 0;
-        let failedCount = 0;
-
-        for (const tab of dirty) {
-            const tabId = tab.id;
-            const rawName = String(tab.path || tab.name || '').trim();
-            if (!rawName) {
-                failedCount += 1;
-                continue;
-            }
-
-            const model = tabModels?.get?.(tabId) || null;
-            const code = model?.getValue ? model.getValue() : String(tab.content || '');
-
-            let nameToSave = rawName;
-            if (validator) {
-                const routineNameOnly = nameToSave.includes('/') ? nameToSave.split('/').pop() : nameToSave;
-                const check = validator.validateRoutineName(String(routineNameOnly || '').toUpperCase());
-                if (!check?.valid) {
-                    const msg = check?.errors?.join?.('; ') || 'Invalid routine name';
-                    try { appendOutput(`✗ Skip ${rawName}: ${msg}`, termState); } catch (_) { }
-                    try { showToast('error', 'Save All', `${rawName}: ${msg}`); } catch (_) { }
-                    failedCount += 1;
-                    continue;
-                }
-                nameToSave = nameToSave.toUpperCase();
-            }
-
-            let res = null;
-            try {
-                res = await window.ahmadIDE.saveRoutine(nameToSave, code);
-            } catch (err) {
-                const msg = String(err?.message || err || 'Save failed').trim();
-                try { appendOutput(`✗ Save failed ${rawName}: ${msg}`, termState); } catch (_) { }
-                failedCount += 1;
-                continue;
-            }
-
-            if (!res?.ok) {
-                const msg = String(res?.error || res?.stderr || 'Save failed').trim();
-                try { appendOutput(`✗ Save failed ${rawName}: ${msg}`, termState); } catch (_) { }
-                failedCount += 1;
-                continue;
-            }
-
-            const savedPath = res.folder ? `${res.folder}/${res.routine}` : (res.routine || nameToSave);
-            tab.name = res.routine || tab.name;
-            tab.path = savedPath || tab.path;
-            tab.folder = res.folder || tab.folder;
-            if (tab.state) tab.state.current = savedPath || tab.state.current;
-
-            try { markTabDirty(tabId, false, { deferRender: true }); } catch (_) { tab.isDirty = false; }
-
-            try {
-                await window.ahmadIDE.zlinkRoutine(savedPath);
-                appendOutput(`✓ Saved ${savedPath} (ZLINK)`, termState);
-            } catch (_) {
-                try { appendOutput(`✓ Saved ${savedPath}`, termState); } catch (_) { }
-            }
-
-            savedCount += 1;
-        }
-
-        try { renderTabs(); } catch (_) { }
-
-        if (savedCount > 0) {
-            const msg = failedCount ? `Saved ${savedCount} · ${failedCount} failed` : `Saved ${savedCount}`;
-            try { showToast('success', 'Save All', msg); } catch (_) { }
-            try {
-                if (globalRoutineState && activeEditor) {
-                    // Refresh project tree once (not per file).
-                    loadRoutineList(globalRoutineState, activeEditor, '');
-                }
-            } catch (_) { }
-        } else {
-            try { showToast('error', 'Save All', 'Nothing was saved'); } catch (_) { }
-        }
+        return saveAllOpenTabsImpl({ terminalState });
     }
-    const coreShortcutMap = {
-        'ctrl+n': { label: 'Go to File', action: 'goto-file' },
-        'ctrl+shift+n': { label: 'Go to File (Alt)', action: 'goto-file' },
-        'ctrl+f': { label: 'Find in File', action: 'find' },
-        'ctrl+h': { label: 'Replace', action: 'replace' },
-        'ctrl+shift+f': { label: 'Find in Path (Current Folder)', action: 'find-in-folder' },
-        'ctrl+shift+r': { label: 'Replace in Path (Current Folder)', action: 'replace-in-folder' },
-        'ctrl+s': { label: 'Save', action: 'save' },
-        'ctrl+shift+s': { label: 'Save All', action: 'save-all' },
-        'ctrl+enter': { label: 'Run', action: 'run' },
-        'ctrl+b': { label: 'Toggle Sidebar', action: 'toggle-sidebar' },
-        'ctrl+l': { label: 'Go to Line', action: 'goto-line' },
-        'ctrl+d': { label: 'Duplicate Line', action: 'duplicate-line' },
-        'ctrl+/': { label: 'Toggle Comment', action: 'comment' },
-        'ctrl+w': { label: 'Expand Selection', action: 'expand-selection' },
-        'ctrl+shift+w': { label: 'Shrink Selection', action: 'shrink-selection' },
-        'ctrl+tab': { label: 'Next Tab', action: 'tab-next' },
-        'ctrl+shift+tab': { label: 'Previous Tab', action: 'tab-prev' },
-        'ctrl+f4': { label: 'Close Tab', action: 'tab:close' },
-        'ctrl+shift+t': { label: 'New Terminal Tab', action: 'terminal-new-tab' },
-        'alt+f12': { label: 'Toggle Terminal', action: 'toggle-terminal' }
-    };
     const findReplaceState = {
         mode: 'find',
         options: { matchCase: false, wholeWords: false, regex: false },
@@ -758,11 +539,10 @@
         open: false
     };
     let routinesCache = [];
-    let lastShiftTap = 0;
     let shortcutDefaults = {};
     let routineFilterTerm = '';
     let activeDebugTab = 'tab-breakpoints';
-    const maxLintTextLength = 20000;  // Skip linting for files > 20KB
+    const maxLintTextLength = 200000;  // Skip linting for files > 200KB
     const maxProblemItems = 100;  // Limit problems panel for performance
     const RE_DQUOTE = /\"/g;
     const RE_PAREN_OPEN = /\(/g;
@@ -897,6 +677,15 @@
 
     let currentProject = null;
 
+    const createProjectTreeWiring = window.AhmadIDEModules?.renderer?.project?.createProjectTreeWiring;
+    const projectTreeWiring = createProjectTreeWiring({
+        deps: {
+            $,
+            showToast,
+            getActiveEditor: () => activeEditor
+        }
+    });
+
     function loadProjectIntoTree(projectData) {
         currentProject = projectData;
         window.currentProject = projectData;
@@ -906,307 +695,95 @@
                 gitRepoManager.setProject(root).catch(() => { });
             }
         } catch (_) { }
-        const host = $('#projectTree');
-        if (!host.length) {
-            return;
-        }
-        host.empty();
-
-        if (!projectData || !projectData.projectPath) {
-            host.append('<div class="tree-item">Error: Invalid project data</div>');
-            return;
-        }
-
-        // Add project root (always expanded)
-        const projectName = projectData.projectPath.split('/').pop();
-        const projectRoot = $('<div class="tree-item folder"></div>')
-            .css({
-                'padding-left': '4px',
-                'font-weight': 'bold',
-                'margin-bottom': '4px'
-            })
-            .html('<span class="folder-icon">[-]</span> ' + projectName);
-        host.append(projectRoot);
-
-        // Helper function to create a collapsible routine folder
-        function createRoutineFolder(folderName, routines, paddingLeft = 16) {
-            const folderContainer = $('<div></div>');
-            const folder = $('<div class="tree-item folder"></div>')
-                .css({
-                    'padding-left': `${paddingLeft}px`,
-                    'cursor': 'pointer',
-                    'user-select': 'none'
-                })
-                .html(`<span class="folder-icon">[+]</span> ${folderName}/`)
-                .data('expanded', false);
-
-            const folderContent = $('<div class="folder-content"></div>')
-                .css('display', 'none');
-
-            if (routines && routines.length > 0) {
-                routines.forEach(routine => {
-                    // Remove .m extension if present
-                    const routineName = routine.replace('.m', '');
-                    const routineItem = $('<div class="tree-item file"></div>')
-                        .css({
-                            'padding-left': `${paddingLeft + 16}px`,
-                            'cursor': 'pointer'
-                        })
-                        .text('  [M] ' + routineName)
-                        .on('click', async function () {
-                            const fullPath = `${folderName}/${routineName}`;
-                            try {
-                                const result = await window.ahmadIDE.readRoutine(fullPath);
-                                if (result.ok) {
-                                    if (activeEditor) {
-                                        // Use setValue (faster than creating new model)
-                                        activeEditor.setValue(result.code);
-
-                                        // FORCE theme re-application to trigger immediate color rendering
-                                        const currentTheme = activeEditor._themeService?._theme?.themeName || 'mumps-dark';
-                                        monaco.editor.setTheme(currentTheme);
-
-                                        // Force layout and render
-                                        activeEditor.layout();
-                                        activeEditor.render(true);
-
-                                        showToast('success', 'Loaded', fullPath);
-                                    } else {
-                                        showToast('error', 'Error', 'No editor available');
-                                    }
-                                } else {
-                                    showToast('error', 'Failed', result.error || 'Load failed');
-                                }
-                            } catch (err) {
-                                showToast('error', 'Error', err.message);
-                            }
-                        });
-
-                    folderContent.append(routineItem);
-                });
-            } else {
-                folderContent.append(
-                    $('<div class="tree-item"></div>')
-                        .css({
-                            'padding-left': `${paddingLeft + 16}px`,
-                            'opacity': '0.5',
-                            'font-style': 'italic'
-                        })
-                        .text('(empty)')
-                );
-            }
-
-            folder.on('click', function () {
-                const expanded = $(this).data('expanded');
-                if (expanded) {
-                    $(this).find('.folder-icon').text('[+]');
-                    folderContent.slideUp(200);
-                    $(this).data('expanded', false);
-                } else {
-                    $(this).find('.folder-icon').text('[-]');
-                    folderContent.slideDown(200);
-                    $(this).data('expanded', true);
-                }
-            });
-
-            folderContainer.append(folder).append(folderContent);
-            return folderContainer;
-        }
-
-        // localr folder
-        const localrFolder = createRoutineFolder('localr', projectData.structure.localr || []);
-        host.append(localrFolder);
-
-        // routines folder
-        const routinesFolder = createRoutineFolder('routines', projectData.structure.routines || []);
-        host.append(routinesFolder);
+        projectTreeWiring.renderProjectIntoTree(projectData);
     }
 
     // Expose for dialogs/external modules
     window.loadProjectIntoTree = loadProjectIntoTree;
 
-    function toGitPathspec(inputPath) {
-        const raw = String(inputPath || '').trim();
-        if (!raw) return '';
-        if (raw === '.') return '.';
+    // Auto-fetch routines after connection (if project is open)
+    window.autoFetchRoutinesAfterConnection = async function(options = {}) {
+        const { showMessage = true, discovered } = options;
+
+        console.log('[Auto-Fetch] ========================================');
+        console.log('[Auto-Fetch] Checking if routines should be auto-fetched');
+        console.log('[Auto-Fetch] Current project:', currentProject?.projectPath);
+        console.log('[Auto-Fetch] Discovered paths:', discovered);
+
+        if (!currentProject || !currentProject.projectPath) {
+            console.log('[Auto-Fetch] No project open, skipping auto-fetch');
+            console.log('[Auto-Fetch] ========================================');
+            return { ok: false, reason: 'no_project' };
+        }
+
+        if (!discovered || !discovered.ok) {
+            console.warn('[Auto-Fetch] No paths discovered from vista-profile, attempting fetch anyway...');
+            console.log('[Auto-Fetch] This may work if paths are configured manually');
+        }
+
+        const routinesPath = `${currentProject.projectPath}/routines`;
+        console.log('[Auto-Fetch] Target routines path:', routinesPath);
 
         try {
-            const repoState = gitRepoManager?.getState ? gitRepoManager.getState() : null;
-            const repoRoot = String(repoState?.repoRoot || '').trim();
-            const projectRoot = String(currentProject?.projectPath || '').trim();
-            if (!repoRoot || !projectRoot) return raw;
+            if (showMessage && typeof showToast === 'function') {
+                showToast('info', 'Auto-Fetch', 'Retrieving routines from connection...');
+            }
 
-            const path = require('path');
-            const abs = path.isAbsolute(raw) ? raw : path.join(projectRoot, raw);
-            const rel = path.relative(repoRoot, abs);
-            if (!rel || rel.startsWith('..')) return raw;
-            return rel.split(path.sep).join('/');
-        } catch (_) {
-            return raw;
+            console.log('[Auto-Fetch] Calling fetchRoutineDirectoriesToLocal...');
+            const result = await window.ahmadIDE.fetchRoutineDirectoriesToLocal(routinesPath);
+
+            console.log('[Auto-Fetch] Fetch result:', result);
+
+            if (result.ok) {
+                console.log('[Auto-Fetch] ✓ Routines fetched successfully');
+
+                // Refresh project tree to show new routines
+                console.log('[Auto-Fetch] Refreshing project tree...');
+                try {
+                    if (typeof window.ahmadIDE.openProject === 'function') {
+                        const refreshResult = await window.ahmadIDE.openProject(currentProject.projectPath);
+                        console.log('[Auto-Fetch] Project refresh result:', refreshResult);
+                        if (refreshResult?.ok && refreshResult?.data) {
+                            loadProjectIntoTree(refreshResult.data);
+                            console.log('[Auto-Fetch] ✓ Project tree refreshed');
+                        }
+                    }
+                } catch (refreshError) {
+                    console.warn('[Auto-Fetch] Failed to refresh project tree:', refreshError);
+                }
+
+                if (showMessage && typeof showToast === 'function') {
+                    showToast('success', 'Auto-Fetch', 'Routines retrieved successfully');
+                }
+                console.log('[Auto-Fetch] ========================================');
+                return { ok: true };
+            } else {
+                console.error('[Auto-Fetch] ✗ Fetch failed:', result.error);
+                if (showMessage && typeof showToast === 'function') {
+                    showToast('error', 'Auto-Fetch', result.error || 'Failed to fetch routines');
+                }
+                console.log('[Auto-Fetch] ========================================');
+                return { ok: false, error: result.error };
+            }
+        } catch (error) {
+            console.error('[Auto-Fetch] Exception:', error);
+            console.error('[Auto-Fetch] Stack trace:', error.stack);
+            if (showMessage && typeof showToast === 'function') {
+                showToast('error', 'Auto-Fetch', error.message || 'Failed to fetch routines');
+            }
+            console.log('[Auto-Fetch] ========================================');
+            return { ok: false, error: error.message };
         }
+    };
+
+    let diffActionsApi = null;
+
+    function toGitPathspec(inputPath) {
+        return diffActionsApi.toGitPathspec(inputPath);
     }
 
     async function openDiffTab(opts = {}) {
-        const tabIcon = (() => {
-            try {
-                const icons = window.AhmadIDEModules?.ui?.icons?.map || {};
-                return icons.git || icons.format || '';
-            } catch (_) {
-                return '';
-            }
-        })();
-
-        const st = gitRepoManager?.getState ? gitRepoManager.getState() : null;
-        if (!st) {
-            showToast('error', 'Diff', 'Git state is not ready');
-            return { ok: false, error: 'Git state not ready' };
-        }
-        if (st.gitDisabled) {
-            showToast('info', 'Diff', 'Git is disabled for this project');
-            return { ok: false, error: 'Git disabled' };
-        }
-        if (!st.gitAvailable) {
-            showToast('error', 'Diff', st.lastError || 'Git is not available');
-            return { ok: false, error: st.lastError || 'Git unavailable' };
-        }
-        if (!st.repoDetected || !st.repoRoot) {
-            showToast('info', 'Diff', st.lastError || 'No Git repository detected');
-            return { ok: false, error: st.lastError || 'No repo detected' };
-        }
-
-        const kind = String(opts.kind || '').trim() || 'worktree';
-        const pathIn = String(opts.path || '').trim();
-        if (!pathIn) {
-            showToast('error', 'Diff', 'No file selected');
-            return { ok: false, error: 'No path provided' };
-        }
-
-        const repoRoot = String(opts.repoRoot || st.repoRoot || '').trim();
-        const staged = !!opts.staged;
-        const status = String(opts.status || '').trim();
-        const oldPath = String(opts.oldPath || '').trim();
-        const commitHash = String(opts.commitHash || '').trim();
-        const parents = Array.isArray(opts.parents) ? opts.parents.filter(Boolean) : [];
-        const parentHash = String(opts.parentHash || parents[0] || '').trim();
-        const ignoreWhitespace = !!opts.ignoreWhitespace;
-
-        const escapeArg = (val) => String(val || '').replace(/"/g, '\\"');
-        const q = (val) => `"${escapeArg(val)}"`;
-        const baseName = (pathIn.split('/').pop() || pathIn).trim() || pathIn;
-
-        const pathspecs = [];
-        if (oldPath && oldPath !== pathIn) pathspecs.push(oldPath);
-        pathspecs.push(pathIn);
-        const pathSpecArgs = pathspecs.map(q).join(' ');
-        const wsFlag = ignoreWhitespace ? ' -w' : '';
-
-        let cmd = '';
-        let key = '';
-        let title = `${baseName} (Diff)`;
-
-        if (kind === 'commit') {
-            if (!commitHash) {
-                showToast('error', 'Diff', 'No commit selected');
-                return { ok: false, error: 'No commit hash provided' };
-            }
-            if (parentHash) {
-                cmd = `git diff --no-color -M${wsFlag} ${parentHash} ${commitHash} -- ${pathSpecArgs}`;
-            } else {
-                // Root commit (no parent): git show produces a diff against the empty tree.
-                cmd = `git show --no-color -M${wsFlag} --format= ${commitHash} -- ${pathSpecArgs}`;
-            }
-            key = `diff:commit:${repoRoot}:${commitHash}:${pathIn}`;
-        } else if (kind === 'worktree') {
-            const stageKey = staged ? 'staged' : 'worktree';
-            key = `diff:${stageKey}:${repoRoot}:${pathIn}`;
-            if (status === '?' && !staged) {
-                // Untracked file: git diff won't show it; use a no-index diff from /dev/null.
-                try {
-                    const pathMod = require('path');
-                    const abs = pathMod.isAbsolute(pathIn) ? pathIn : pathMod.join(repoRoot, pathIn);
-                    const nullDev = (typeof process !== 'undefined' && process.platform === 'win32') ? 'NUL' : '/dev/null';
-                    cmd = `git diff --no-index --no-color${wsFlag} -- ${nullDev} ${q(abs)}`;
-                } catch (_) {
-                    cmd = '';
-                }
-            } else {
-                cmd = staged
-                    ? `git diff --no-color -M${wsFlag} --staged -- ${pathSpecArgs}`
-                    : `git diff --no-color -M${wsFlag} -- ${pathSpecArgs}`;
-            }
-        } else {
-            showToast('error', 'Diff', `Unsupported diff kind: ${kind}`);
-            return { ok: false, error: `Unsupported diff kind: ${kind}` };
-        }
-
-        if (!cmd) {
-            showToast('error', 'Diff', 'Unable to build diff command');
-            return { ok: false, error: 'No diff command' };
-        }
-
-        let res = null;
-        try {
-            res = await (gitRepoManager?.runGit ? gitRepoManager.runGit(cmd, { silent: true }) : window.ahmadIDE.git(cmd));
-        } catch (err) {
-            showToast('error', 'Diff', err?.message || 'Git diff failed');
-            return { ok: false, error: err?.message || 'Git diff failed' };
-        }
-
-        if (!res?.ok) {
-            const message = res?.error || res?.stderr || 'Git diff failed';
-            let normalized = message;
-            try {
-                if (typeof normalizeGitError === 'function') normalized = normalizeGitError(message, 'Git diff failed');
-            } catch (_) { }
-            showToast('error', 'Diff', normalized);
-            return { ok: false, error: message };
-        }
-
-        let diffText = String(res.stdout || '');
-        if (!diffText.trim()) {
-            diffText = 'No changes.\n';
-        }
-
-        if (typeof createCustomTab !== 'function') {
-            showToast('error', 'Diff', 'Tab system unavailable');
-            return { ok: false, error: 'Tab system unavailable' };
-        }
-
-        const meta = {
-            kind,
-            repoRoot,
-            path: pathIn,
-            oldPath,
-            status,
-            staged,
-            commitHash,
-            parents,
-            parentHash,
-            ignoreWhitespace,
-            source: String(opts.source || '').trim()
-        };
-
-        const tab = createCustomTab({
-            key,
-            title,
-            content: diffText,
-            language: 'plaintext',
-            icon: tabIcon,
-            kind: 'diff',
-            readOnly: true,
-            meta
-        });
-
-        if (tab) {
-            tab.diffAnchors = computeDiffAnchors(diffText);
-            // If this diff tab was already active, the tab system won't re-fire activation;
-            // keep the diff toolbar + split viewer in sync anyway.
-            try { syncDiffToolbar(tab); } catch (_) { }
-            try { syncDiffTabViewer(tab); } catch (_) { }
-            return { ok: true, tabId: tab.id };
-        }
-
-        return { ok: false, error: 'Failed to create diff tab' };
+        return diffActionsApi.openDiffTab(opts);
     }
 
     let globalTerminalState = null;
@@ -1249,6 +826,18 @@
         sendCtrlC,
         applyFontSettings
     } = terminalManager;
+
+    const createDockerUi = window.AhmadIDEModules?.renderer?.docker?.createDockerUi;
+    if (!createDockerUi) {
+        logger.error('DOCKER_UI_MODULE_MISSING', { path: './src/renderer/docker/dockerUi.js' });
+        throw new Error('Docker UI module missing: ./src/renderer/docker/dockerUi.js');
+    }
+    const dockerUi = createDockerUi({
+        deps: {
+            appendOutput,
+            loadRoutineList: (...args) => loadRoutineList(...args)
+        }
+    });
 
     // New PhpStorm-like Terminal tool window (real shell via node-pty in main).
     let terminalToolApi = null;
@@ -1320,7 +909,7 @@
         applyFontSettingsToRuntime(settings);
     });
 
-    const mumpsFileIconSvg = `<svg width="16" height="16" viewBox="0 0 16 16"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f0a35c"/><stop offset="100%" stop-color="#d67f3c"/></linearGradient></defs><rect width="16" height="16" rx="3" fill="url(#mg)"/><text x="4" y="12" font-size="10" font-weight="bold" fill="#19100c" font-family="monospace">M</text></svg>`;
+    const mumpsFileIconSvg = `<svg width="16" height="16" viewBox="0 0 16 16"><defs><linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#f0a35c"/><stop offset="100%" stop-color="#d67f3c"/></linearGradient></defs><rect width="16" height="16" rx="3" fill="url(#mg)"/><text x="8" y="11.5" text-anchor="middle" font-size="8" font-weight="bold" fill="#19100c" font-family="monospace">MS</text></svg>`;
 
     // ============================================
     // -style Tab Management
@@ -1387,6 +976,49 @@
     const bindTabKeyboardShortcuts = tabManager.bindTabKeyboardShortcuts;
     const renderTabs = tabManager.renderTabs;
 
+    // Expose tab manager globally for other modules (e.g., Smart Rename)
+    window.tabManager = tabManager;
+    window.AhmadIDEModules.tabs = window.AhmadIDEModules.tabs || {};
+    window.AhmadIDEModules.tabs.getOpenTabs = () => openTabs;
+    window.AhmadIDEModules.tabs.markTabDirty = markTabDirty;
+    window.AhmadIDEModules.tabs.renderTabs = renderTabs;
+
+    const createSaveAllOpenTabs = window.AhmadIDEModules?.renderer?.tabs?.createSaveAllOpenTabs;
+    if (!createSaveAllOpenTabs) {
+        logger.error('SAVE_ALL_TABS_MODULE_MISSING', { path: './src/renderer/tabs/saveAllOpenTabs.js' });
+        throw new Error('Save All tabs module missing: ./src/renderer/tabs/saveAllOpenTabs.js');
+    }
+    const saveAllOpenTabsImpl = createSaveAllOpenTabs({
+        deps: {
+            showToast,
+            appendOutput,
+            getGlobalTerminalState: () => globalTerminalState,
+            getOpenTabs: () => openTabs,
+            getTabModels: () => tabModels,
+            mumpsValidator,
+            markTabDirty,
+            renderTabs,
+            loadRoutineList,
+            getGlobalRoutineState: () => globalRoutineState,
+            getActiveEditor: () => activeEditor
+        }
+    });
+
+    const goToDeclaration = declarationNavigation.createGoToDeclaration({
+        deps: {
+            dbgLog,
+            logger,
+            showToast,
+            findOpenTab,
+            switchTab,
+            createTab,
+            mumpsLocalTagResolver,
+            getActiveEditor: () => activeEditor,
+            getDbgStateRef: () => dbgStateRef,
+            getActiveRoutine: () => getActiveRoutine()
+        }
+    });
+
     function getActiveTab() {
         try {
             return openTabs.find(t => t.id === activeTabId) || null;
@@ -1406,260 +1038,34 @@
     }
 
     // Diff toolbar in the main editor action bar (shown only for diff tabs).
-    let diffToolbarEl = null;
-    let diffToolbarWired = false;
-
     // Split diff viewer overlay (replaces plain-text diff tabs rendering).
-    let diffTabViewerEl = null;
-    let diffTabRenderer = null;
-    let diffTabScrollSyncing = false;
+    const createDiffTabUi = window.AhmadIDEModules?.features?.git?.diffTabUi?.createDiffTabUi;
+    const {
+        computeDiffAnchors,
+        syncDiffToolbar,
+        syncDiffTabViewer,
+        handleEditorTabActivated,
+        handleEditorTabClosed
+    } = createDiffTabUi({
+        getActiveTab,
+        isDiffTab,
+        openDiffTab,
+        getActiveEditor: () => activeEditor
+    });
 
-    function ensureDiffTabRenderer() {
-        if (diffTabRenderer?.render) return diffTabRenderer;
-        try {
-            const perfUi = window.AhmadIDEModules?.features?.git?.perfUi;
-            if (perfUi?.createDiffRenderer) {
-                diffTabRenderer = perfUi.createDiffRenderer({
-                    leftId: 'diffTabLeft',
-                    rightId: 'diffTabRight',
-                    maxLines: 12000
-                });
-            }
-        } catch (_) { }
-        return diffTabRenderer;
-    }
-
-    function ensureDiffTabViewer() {
-        if (diffTabViewerEl) return diffTabViewerEl;
-        const frame = document.querySelector('.editor-frame');
-        if (!frame) return null;
-
-        diffTabViewerEl = document.createElement('div');
-        diffTabViewerEl.id = 'diffTabViewer';
-        diffTabViewerEl.className = 'diff-tab-viewer hidden';
-        diffTabViewerEl.innerHTML = `
-            <div class="git-diff-grid" role="region" aria-label="Diff view">
-                <div class="git-diff-pane" id="diffTabLeft" aria-label="Original"></div>
-                <div class="git-diff-pane" id="diffTabRight" aria-label="Modified"></div>
-            </div>
-        `;
-        frame.appendChild(diffTabViewerEl);
-
-        // Keep both panes scrolled together (IntelliJ-style)
-        const left = diffTabViewerEl.querySelector('#diffTabLeft');
-        const right = diffTabViewerEl.querySelector('#diffTabRight');
-        if (left && right) {
-            const sync = (src, dst) => () => {
-                if (diffTabScrollSyncing) return;
-                diffTabScrollSyncing = true;
-                try {
-                    dst.scrollTop = src.scrollTop;
-                    dst.scrollLeft = src.scrollLeft;
-                } finally {
-                    diffTabScrollSyncing = false;
-                }
-            };
-            left.addEventListener('scroll', sync(left, right), { passive: true });
-            right.addEventListener('scroll', sync(right, left), { passive: true });
+    const createDiffActions = window.AhmadIDEModules?.renderer?.git?.createDiffActions;
+    diffActionsApi = createDiffActions({
+        deps: {
+            getGitRepoManager: () => gitRepoManager,
+            getCurrentProject: () => currentProject,
+            showToast,
+            normalizeGitError: (...args) => normalizeGitError(...args),
+            createCustomTab,
+            computeDiffAnchors,
+            syncDiffToolbar,
+            syncDiffTabViewer
         }
-
-        // Reuse the Git perf diff renderer (two-column, colored).
-        ensureDiffTabRenderer();
-
-        return diffTabViewerEl;
-    }
-
-    function syncDiffTabViewer(tab) {
-        const viewer = ensureDiffTabViewer();
-        const editorHost = document.getElementById('editor');
-        if (!viewer || !editorHost) return;
-
-        const show = isDiffTab(tab);
-        viewer.classList.toggle('hidden', !show);
-        editorHost.classList.toggle('hidden', show);
-
-        if (!show) {
-            // Editor was hidden; force layout once visible.
-            try { activeEditor?.layout?.(); } catch (_) { }
-            return;
-        }
-
-        const left = document.getElementById('diffTabLeft');
-        const right = document.getElementById('diffTabRight');
-        const text = String(tab?.content || '');
-
-        const renderer = ensureDiffTabRenderer();
-        if (renderer?.render) {
-            renderer.render(text);
-        } else {
-            // Fallback: show unified diff as plain text in both panes.
-            if (left) left.textContent = text || 'No changes.\n';
-            if (right) right.textContent = text || 'No changes.\n';
-        }
-
-        // Reset scroll on activation (keeps panes aligned).
-        if (left) left.scrollTop = 0;
-        if (right) right.scrollTop = 0;
-    }
-
-    function computeDiffAnchors(diffText) {
-        const anchors = [];
-        const lines = String(diffText || '').split('\n');
-        for (let i = 0; i < lines.length; i += 1) {
-            const line = lines[i];
-            if (line.startsWith('@@') || line.startsWith('diff --git')) {
-                anchors.push(i + 1);
-            }
-        }
-        return anchors;
-    }
-
-    function ensureDiffToolbar() {
-        const host = document.querySelector('.action-bar .actions');
-        if (!host) return null;
-        if (!diffToolbarEl) {
-            diffToolbarEl = document.createElement('div');
-            diffToolbarEl.id = 'diffToolbar';
-            diffToolbarEl.className = 'diff-toolbar hidden';
-            diffToolbarEl.innerHTML = `
-                <button class="btn ghost diff-toolbar-btn" type="button" id="diffPrevChangeBtn" title="Previous change">Prev</button>
-                <button class="btn ghost diff-toolbar-btn" type="button" id="diffNextChangeBtn" title="Next change">Next</button>
-                <div class="toolbar-separator" aria-hidden="true"></div>
-                <button class="btn ghost diff-toolbar-btn" type="button" id="diffIgnoreWhitespaceBtn" title="Ignore whitespace">Ignore WS</button>
-                <select class="diff-parent-select hidden" id="diffParentSelect" title="Compare with parent"></select>
-            `;
-            host.prepend(diffToolbarEl);
-        }
-        if (!diffToolbarWired) {
-            diffToolbarWired = true;
-            diffToolbarEl.querySelector('#diffPrevChangeBtn')?.addEventListener('click', () => navigateDiffChange(-1));
-            diffToolbarEl.querySelector('#diffNextChangeBtn')?.addEventListener('click', () => navigateDiffChange(1));
-            diffToolbarEl.querySelector('#diffIgnoreWhitespaceBtn')?.addEventListener('click', () => toggleDiffWhitespace());
-            diffToolbarEl.querySelector('#diffParentSelect')?.addEventListener('change', (e) => {
-                const tab = getActiveTab();
-                if (!isDiffTab(tab)) return;
-                const meta = tab?.meta || {};
-                const parentHash = String(e?.target?.value || '').trim();
-                if (!parentHash) return;
-                openDiffTab({ ...meta, parentHash, source: 'diff-parent-select' }).catch(() => { });
-            });
-        }
-        return diffToolbarEl;
-    }
-
-    function syncDiffToolbar(tab) {
-        const el = ensureDiffToolbar();
-        if (!el) return;
-        if (!isDiffTab(tab)) {
-            el.classList.add('hidden');
-            return;
-        }
-
-        el.classList.remove('hidden');
-        const ignoreBtn = el.querySelector('#diffIgnoreWhitespaceBtn');
-        const parentSelect = el.querySelector('#diffParentSelect');
-        const meta = tab?.meta || {};
-        const ignore = !!meta.ignoreWhitespace;
-        if (ignoreBtn) {
-            ignoreBtn.classList.toggle('active', ignore);
-            ignoreBtn.textContent = ignore ? 'Ignore WS: On' : 'Ignore WS';
-        }
-        if (parentSelect) {
-            const parents = Array.isArray(meta.parents) ? meta.parents.filter(Boolean) : [];
-            if (parents.length > 1) {
-                parentSelect.classList.remove('hidden');
-                parentSelect.innerHTML = '';
-                parents.forEach((hash, idx) => {
-                    const opt = document.createElement('option');
-                    opt.value = hash;
-                    opt.textContent = idx === 0 ? `Parent 1 (${hash.slice(0, 7)})` : `Parent ${idx + 1} (${hash.slice(0, 7)})`;
-                    parentSelect.appendChild(opt);
-                });
-                const selected = String(meta.parentHash || parents[0] || '').trim();
-                if (selected) parentSelect.value = selected;
-            } else {
-                parentSelect.classList.add('hidden');
-            }
-        }
-    }
-
-    function navigateDiffChange(direction) {
-        const tab = getActiveTab();
-        if (!isDiffTab(tab)) return;
-
-        // If the split diff viewer is active, scroll it to the next/prev hunk.
-        const viewer = diffTabViewerEl;
-        const leftPane = document.getElementById('diffTabLeft');
-        const rightPane = document.getElementById('diffTabRight');
-        if (viewer && !viewer.classList.contains('hidden') && leftPane && rightPane) {
-            const anchors = Array.from(leftPane.querySelectorAll('.diff-hunk'));
-            if (!anchors.length) return;
-            const cur = leftPane.scrollTop;
-            let targetEl = null;
-            if (direction > 0) {
-                targetEl = anchors.find((el) => el.offsetTop > cur + 2) || anchors[0];
-            } else {
-                for (let i = anchors.length - 1; i >= 0; i -= 1) {
-                    if (anchors[i].offsetTop < cur - 2) {
-                        targetEl = anchors[i];
-                        break;
-                    }
-                }
-                if (!targetEl) targetEl = anchors[anchors.length - 1];
-            }
-            if (!targetEl) return;
-            const top = Math.max(0, targetEl.offsetTop - 12);
-            leftPane.scrollTop = top;
-            rightPane.scrollTop = top;
-            return;
-        }
-
-        // Fallback: plain-text diff in Monaco editor.
-        const editor = activeEditor;
-        if (!editor) return;
-        const anchors = Array.isArray(tab.diffAnchors) ? tab.diffAnchors : [];
-        if (!anchors.length) return;
-        const pos = editor.getPosition?.();
-        const curLine = pos?.lineNumber || 1;
-        let target = null;
-        if (direction > 0) {
-            target = anchors.find((n) => n > curLine) || anchors[0];
-        } else {
-            for (let i = anchors.length - 1; i >= 0; i -= 1) {
-                if (anchors[i] < curLine) {
-                    target = anchors[i];
-                    break;
-                }
-            }
-            if (!target) target = anchors[anchors.length - 1];
-        }
-        if (!target) return;
-        editor.setPosition?.({ lineNumber: target, column: 1 });
-        editor.revealLineInCenter?.(target);
-        editor.focus?.();
-    }
-
-    function toggleDiffWhitespace() {
-        const tab = getActiveTab();
-        if (!isDiffTab(tab)) return;
-        const meta = tab?.meta || {};
-        openDiffTab({ ...meta, ignoreWhitespace: !meta.ignoreWhitespace, source: 'diff-ignore-ws' }).catch(() => { });
-    }
-
-    function handleEditorTabActivated(tab) {
-        syncDiffToolbar(tab);
-        syncDiffTabViewer(tab);
-    }
-
-    function handleEditorTabClosed(_tab) {
-        // When the last tab closes there is no "tab activated" event,
-        // so ensure diff UI is reset (hide split viewer + diff toolbar).
-        try {
-            const active = getActiveTab();
-            syncDiffToolbar(active);
-            syncDiffTabViewer(active);
-        } catch (_) { }
-    }
+    });
 
     // Breakpoints / Debugger moved to src/editor/debug/renderer-debug.js
     const createDebugManager = window.AhmadIDEModules?.debug?.createDebugManager;
@@ -2039,7 +1445,19 @@
             getActiveEditor: () => activeEditor,
             parseRoutineReferenceAtPosition,
             getActiveRoutine,
-            runMenuAction: (action, ctx) => runMenuAction(action, ctx),
+            // Do NOT pass runMenuAction for smart-rename-tag; let local handler execute
+            runMenuAction: (action, ctx) => {
+                if (action === 'smart-rename-tag') {
+                    // Handle locally
+                    if (window.smartRenameProvider) {
+                        return window.smartRenameProvider.triggerSmartRenameTag();
+                    } else {
+                        showToast('error', 'Smart Rename', 'Provider not initialized. Reload IDE.');
+                        return;
+                    }
+                }
+                return runMenuAction(action, ctx);
+            },
             runGitContextAction: (...args) => runGitContextAction(...args),
             goToDeclaration: (...args) => goToDeclaration(...args)
         }
@@ -2283,182 +1701,22 @@
         return editorContextMenuManager.bindEditorContextMenu(editor);
     }
 
-    async function goToDeclaration(editor, position = null, options = {}) {
-        const { silentIfMissing = false } = options;
-        const ed = editor || activeEditor;
-        if (!ed) return false;
-
-        const model = ed.getModel();
-        const pos = position || ed.getPosition();
-        if (!model || !pos) return false;
-
-        // CRITICAL: DO NOT modify debug state during navigation
-        // This function is for editor-only code navigation
-        // If a debug session is active, it should NOT be paused/resumed/altered
-        // by user clicking on routine references
-        dbgLog('[editor] goToDeclaration (NAV ONLY)', { line: pos.lineNumber, column: pos.column, hasActiveDebug: !!dbgStateRef?.sessionId });
-        logger.debug('GOTO_DECLARATION_NAV_ONLY', { line: pos.lineNumber, hasActiveDebug: !!dbgStateRef?.sessionId });
-
-        const ref = parseRoutineReferenceAtPosition(model, pos);
-        if (!ref) {
-            logger.warn('GOTO_DECLARATION_NOT_FOUND', { line: pos.lineNumber, column: pos.column });
-            if (!silentIfMissing) {
-                showToast('info', 'Go to Declaration', 'No symbol under cursor');
-            }
-            return false;
-        }
-
-        const revealTagInEditor = (targetEditor, tag) => {
-            if (!targetEditor || !tag) return false;
-            const targetModel = targetEditor.getModel();
-            if (!targetModel) return false;
-            const viaCache = mumpsLocalTagResolver?.getTagLine?.(targetModel, tag);
-            const line = viaCache || null;
-            if (line) {
-                targetEditor.revealLineInCenter(line);
-                targetEditor.setPosition({ lineNumber: line, column: 1 });
-                return true;
-            }
-            // Fallback scan (should be rare)
-            const lineCount = targetModel.getLineCount();
-            for (let i = 1; i <= lineCount; i++) {
-                const lineContent = targetModel.getLineContent(i).trim();
-                if (new RegExp(`^${tag}(?:\\s|;|\\()`, 'i').test(lineContent)) {
-                    targetEditor.revealLineInCenter(i);
-                    targetEditor.setPosition({ lineNumber: i, column: 1 });
-                    return true;
-                }
-            }
-            return false;
-        };
-
-        if (ref.type === 'external') {
-            const routine = ref.routine;
-            const tag = ref.tag || '';
-            try {
-                const existingTab = findOpenTab(routine);
-                if (existingTab) {
-                    switchTab(existingTab.id);
-                } else {
-                    const readRes = await window.ahmadIDE.readRoutine(routine);
-                    if (!readRes?.ok) {
-                        logger.warn('GOTO_DECLARATION_LOAD_FAIL', { routine, error: readRes?.error });
-                        showToast('error', 'Go to Declaration', `Could not load ${routine}: ${readRes?.error || 'Unknown error'}`);
-                        return false;
-                    }
-                    createTab(routine, readRes.code || '');
-                }
-            } catch (err) {
-                logger.warn('GOTO_DECLARATION_OPEN_FAIL', { routine: ref.routine, error: err?.message });
-                showToast('error', 'Go to Declaration', err.message || `Failed to open ${routine}`);
-                return false;
-            }
-
-            setTimeout(() => {
-                const targetEditor = activeEditor || ed;
-                if (tag && targetEditor) {
-                    const found = revealTagInEditor(targetEditor, tag);
-                    if (!found && !silentIfMissing) {
-                        logger.warn('GOTO_DECLARATION_TAG_NOT_FOUND', { routine, tag });
-                        showToast('info', 'Go to Declaration', `Tag ${tag} not found in ${routine}`);
-                    }
-                }
-            }, 50);
-
-            const jumpLabel = tag ? `${tag}^${routine}` : routine;
-            showToast('success', 'Navigated', jumpLabel);
-            return true;
-        }
-
-        if (ref.type === 'local') {
-            const found = revealTagInEditor(ed, ref.tag);
-            if (found) {
-                showToast('success', 'Navigated', `Tag: ${ref.tag}`);
-            } else if (!silentIfMissing) {
-                logger.warn('GOTO_DECLARATION_TAG_NOT_FOUND', { routine: getActiveRoutine(), tag: ref.tag });
-                showToast('info', 'Go to Declaration', `Tag ${ref.tag} not found in this routine`);
-            }
-            return found;
-        }
-
-        return false;
+    const createShortcutPrefs = window.AhmadIDEModules?.renderer?.shortcuts?.createShortcutPrefs;
+    if (!createShortcutPrefs) {
+        logger.error('SHORTCUT_PREFS_MODULE_MISSING', { path: './src/renderer/shortcuts/shortcutPrefs.js' });
+        throw new Error('Shortcuts prefs module missing: ./src/renderer/shortcuts/shortcutPrefs.js');
     }
+    shortcutPrefsApi = createShortcutPrefs({ state: { registeredShortcuts } });
 
-    function loadShortcutPrefs() {
-        try {
-            const key = 'ahmadIDE:shortcutBindings';
-            const raw = localStorage.getItem(key);
-            if (raw) return JSON.parse(raw) || {};
-        } catch (_) { }
+    function loadShortcutPrefs() { return shortcutPrefsApi.loadShortcutPrefs(); }
 
-        // Legacy migration: numeric map used by Monaco bindings only.
-        try {
-            const legacyRaw = localStorage.getItem('ahmadIDE:shortcuts');
-            if (!legacyRaw) return {};
-            const parsed = JSON.parse(legacyRaw);
-            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-            const vals = Object.values(parsed);
-            const looksNumeric = vals.length > 0 ? vals.every(v => typeof v === 'number') : false;
-            if (!looksNumeric) return {};
-            try {
-                localStorage.setItem('ahmadIDE:shortcutBindings', JSON.stringify(parsed));
-            } catch (_) { }
-            return parsed;
-        } catch (_) {
-            return {};
-        }
-    }
+    function persistShortcutPrefs(map) { return shortcutPrefsApi.persistShortcutPrefs(map); }
 
-    function persistShortcutPrefs(map) {
-        try {
-            localStorage.setItem('ahmadIDE:shortcutBindings', JSON.stringify(map || {}));
-        } catch (e) {
-            // ignore storage failures
-        }
-    }
+    function keyCodeFromToken(tok) { return shortcutPrefsApi.keyCodeFromToken(tok); }
 
-    function keyCodeFromToken(tok) {
-        if (!tok) return null;
-        const upper = tok.toUpperCase();
-        if (upper.length === 1 && upper >= 'A' && upper <= 'Z') {
-            return monaco.KeyCode['Key' + upper];
-        }
-        const funcMatch = upper.match(/^F([1-9]|1[0-2])$/);
-        if (funcMatch) {
-            return monaco.KeyCode['F' + funcMatch[1]];
-        }
-        if (upper === 'ENTER' || upper === 'RETURN') return monaco.KeyCode.Enter;
-        return null;
-    }
+    function parseShortcutString(str) { return shortcutPrefsApi.parseShortcutString(str); }
 
-    function parseShortcutString(str) {
-        if (!str || typeof str !== 'string') return null;
-        const tokens = str.split('+').map(t => t.trim()).filter(Boolean);
-        let binding = 0;
-        let keyToken = null;
-        tokens.forEach(tok => {
-            const upper = tok.toUpperCase();
-            if (upper === 'CTRL' || upper === 'CMD' || upper === 'CONTROL') {
-                binding |= monaco.KeyMod.CtrlCmd;
-            } else if (upper === 'SHIFT') {
-                binding |= monaco.KeyMod.Shift;
-            } else if (upper === 'ALT' || upper === 'OPTION') {
-                binding |= monaco.KeyMod.Alt;
-            } else if (upper === 'WIN' || upper === 'META') {
-                binding |= monaco.KeyMod.WinCtrl;
-            } else {
-                keyToken = upper;
-            }
-        });
-        const keyCode = keyCodeFromToken(keyToken);
-        if (!keyCode) return null;
-        return binding | keyCode;
-    }
-
-    function applyShortcutBinding(editor, actionId, binding, handler) {
-        if (!editor || !handler || !binding) return;
-        editor.addCommand(binding, handler);
-    }
+    function applyShortcutBinding(editor, actionId, binding, handler) { return shortcutPrefsApi.applyShortcutBinding(editor, actionId, binding, handler); }
 
     // Search (Find/Replace in Path + Search Everywhere) moved to src/editor/search/renderer-search.js
     const createSearchManager = window.AhmadIDEModules?.search?.createSearchManager;
@@ -2511,48 +1769,13 @@
         renderSearchEverywhereResults
     } = searchManager;
 
-    function describeBinding(binding) {
-        if (!binding && binding !== 0) return 'Unbound';
-        const parts = [];
-        if (binding & monaco.KeyMod.CtrlCmd) parts.push('Ctrl');
-        if (binding & monaco.KeyMod.Shift) parts.push('Shift');
-        if (binding & monaco.KeyMod.Alt) parts.push('Alt');
-        if (binding & monaco.KeyMod.WinCtrl) parts.push('Meta');
+    // Expose search functions globally for menu actions
+    window.searchManager = searchManager;
+    window.openSearchEverywhere = openSearchEverywhere;
 
-        const keyPart = binding & 0xff;
-        const keyNames = Object.keys(monaco.KeyCode).filter(k => monaco.KeyCode[k] === keyPart);
-        const keyName = keyNames.length ? keyNames[0].replace(/^Key/, '') : '';
-        if (keyName) parts.push(keyName);
-        return parts.join('+') || 'Unbound';
-    }
+    function describeBinding(binding) { return shortcutPrefsApi.describeBinding(binding); }
 
-    function renderShortcutsPanel() {
-        const list = document.getElementById('shortcutsList');
-        if (!list) return;
-        list.innerHTML = '';
-        if (!registeredShortcuts.length) {
-            const li = document.createElement('li');
-            li.textContent = 'No shortcuts registered.';
-            list.appendChild(li);
-            return;
-        }
-        registeredShortcuts.forEach(sc => {
-            const li = document.createElement('li');
-            li.className = 'problem-item info shortcuts-list';
-            const icon = document.createElement('span');
-            icon.className = 'problem-icon';
-            icon.textContent = '⌨';
-            const text = document.createElement('span');
-            text.className = 'problem-text';
-            text.textContent = `${sc.label} — ${describeBinding(sc.binding)}`;
-            li.appendChild(icon);
-            li.appendChild(text);
-            li.onclick = () => {
-                navigator.clipboard?.writeText(`${sc.label} :: ${describeBinding(sc.binding)}`).catch(() => { });
-            };
-            list.appendChild(li);
-        });
-    }
+    function renderShortcutsPanel() { return shortcutPrefsApi.renderShortcutsPanel(); }
 
     function openShortcutsPanel() {
         // Legacy implementation replaced by dialog registry
@@ -2598,12 +1821,23 @@
         }
     }
 
-    const normalizeGitError = (text, fallback = 'Git command failed') => {
-        if (/not a git repository/i.test(text || '')) {
-            return 'Git is not configured for this project';
+    const createGitQuickActions = window.AhmadIDEModules?.renderer?.git?.createGitQuickActions;
+    if (!createGitQuickActions) {
+        logger.error('GIT_QUICK_ACTIONS_MODULE_MISSING', { path: './src/renderer/git/gitQuickActions.js' });
+        throw new Error('Git Quick Actions module missing: ./src/renderer/git/gitQuickActions.js');
+    }
+    const gitQuickActionsApi = createGitQuickActions({
+        deps: {
+            logger,
+            showToast,
+            gitRepoManager,
+            toGitPathspec,
+            openGitToolWindow: (...args) => openGitToolWindow(...args),
+            openCommitToolWindow: (...args) => openCommitToolWindow(...args)
         }
-        return text || fallback;
-    };
+    });
+
+    const normalizeGitError = (...args) => gitQuickActionsApi.normalizeGitError(...args);
 
     let openGitToolWindow = (opts = {}) => {
         // Use new tool window system - Git is on the bottom bar
@@ -2629,82 +1863,11 @@
         toggleToolWindowPanel('terminalToolPanel', 'bottom');
     }
 
-    const gitOutputGlobal = (text) => {
-        const out = document.getElementById('gitOutput');
-        if (out) {
-            out.textContent += `${text}\n`;
-            out.scrollTop = out.scrollHeight;
-        }
-    };
+    const gitOutputGlobal = (...args) => gitQuickActionsApi.gitOutputGlobal(...args);
 
-    async function runGitQuickCmd(cmd, { toastLabel = 'Git', silent = false } = {}) {
-        logger.info('GIT_COMMAND', { cmd, toastLabel });
-        if (!silent) gitOutputGlobal(`$ ${cmd}`);
-        const res = await (gitRepoManager?.runGit ? gitRepoManager.runGit(cmd) : window.ahmadIDE.git(cmd));
-        if (res.ok) {
-            if (!silent) {
-                if (res.stdout) gitOutputGlobal(res.stdout);
-                if (res.stderr) gitOutputGlobal(res.stderr);
-            }
-            logger.info('GIT_COMMAND_SUCCESS', { cmd, stdout: res.stdout?.slice(0, 200), stderr: res.stderr?.slice(0, 200) });
-        } else {
-            const message = normalizeGitError(res.error || res.stderr);
-            if (!silent) gitOutputGlobal(`✗ ${message}`);
-            showToast('error', toastLabel, message);
-            logger.error('GIT_COMMAND_FAIL', { cmd, error: message, stderr: res.stderr });
-        }
-        return res;
-    }
+    async function runGitQuickCmd(cmd, { toastLabel = 'Git', silent = false } = {}) { return gitQuickActionsApi.runGitQuickCmd(cmd, { toastLabel, silent }); }
 
-    async function runGitContextAction(action, path) {
-        const target = path || '.';
-        const gitPath = toGitPathspec(target) || target;
-        const safe = String(gitPath).replace(/"/g, '\\"');
-        const setPath = (val) => {
-            const input = document.getElementById('gitDiffPath');
-            if (input) input.value = val;
-        };
-        const focusCommit = () => {
-            const msg = document.getElementById('gitCommitMessage');
-            msg?.focus();
-        };
-        const refresh = () => document.getElementById('gitStatusBtn')?.click();
-        logger.info('GIT_CONTEXT_ACTION', { action, target });
-
-        switch (action) {
-            case 'add':
-                openGitToolWindow();
-                await runGitQuickCmd(`git add -- "${safe}"`, { toastLabel: 'Git Add' });
-                refresh();
-                return;
-            case 'commit':
-                openCommitToolWindow();
-                setPath(gitPath);
-                await runGitQuickCmd(`git add -- "${safe}"`, { toastLabel: 'Commit File' });
-                showToast('info', 'Commit File', 'File staged. Enter a commit message in Git tool window.');
-                focusCommit();
-                refresh();
-                return;
-            case 'history':
-                openGitToolWindow();
-                setPath(gitPath);
-                await runGitQuickCmd(`git log --oneline -- "${safe}"`, { toastLabel: 'Git History' });
-                document.getElementById('gitLogBtn')?.click();
-                return;
-            case 'compare':
-                openGitToolWindow();
-                setPath(gitPath);
-                document.getElementById('gitDiffFileBtn')?.click();
-                return;
-            case 'rollback':
-                openGitToolWindow();
-                await runGitQuickCmd(`git checkout -- "${safe}"`, { toastLabel: 'Rollback' });
-                refresh();
-                return;
-            default:
-                showToast('info', 'UNKNOWN – NEED DESIGN DECISION', `Git action ${action} not wired`);
-        }
-    }
+    async function runGitContextAction(action, path) { return gitQuickActionsApi.runGitContextAction(action, path); }
 
     function toggleSidebar() {
         // Toggle the left tool window (Project panel) using new -style layout
@@ -2760,305 +1923,30 @@
     }
 
     function wireMenuBar(editor, routineState, terminalState) {
-        const buildMenuBar = () => {
-            const host = document.getElementById('mainMenu');
-            if (!host) {
-                logger.error('MENU_HOST_MISSING', { selector: '#mainMenu' });
-                return;
-            }
-
-            const menuRegistry = window.AhmadIDEModules?.app?.menuRegistry;
-            const createMenuController = window.AhmadIDEModules?.ui?.menu?.createMenuController;
-            const createMenuBar = window.AhmadIDEModules?.ui?.menu?.createMenuBar;
-
-            if (!menuRegistry || !createMenuController || !createMenuBar) {
-                logger.error('MENU_SYSTEM_MISSING', {
-                    menuRegistry: !!menuRegistry,
-                    createMenuController: !!createMenuController,
-                    createMenuBar: !!createMenuBar
-                });
-                return;
-            }
-
-            const menus = menuRegistry.get('menubar');
-            if (!menus || menus.length === 0) {
-                logger.error('MENU_REGISTRY_EMPTY', { id: 'menubar' });
-                return;
-            }
-
-            const controller = createMenuController({});
-            const panelVisible = (panelId) => {
-                const el = document.getElementById(panelId);
-                if (!el) return false;
-                if (el.classList.contains('hidden')) return false;
-                const hostEl = el.closest?.('#leftToolWindow, #rightToolWindow, #bottomToolWindow');
-                if (!hostEl) return true;
-                return !hostEl.classList.contains('hidden');
-            };
-
-            const menuBar = createMenuBar({
-                host,
-                menus,
-                controller,
-                onAction: async (action, menuCtx) => {
-                    await runMenuAction(action, {
-                        ...(menuCtx || {}),
-                        editor,
-                        routineState,
-                        terminalState
-                    });
-                },
-                getContext: () => ({
-                    toolWindows: {
-                        panels: {
-                            projectPanel: panelVisible('projectPanel'),
-                            structurePanel: panelVisible('structurePanel'),
-                            commitPanel: panelVisible('commitPanel'),
-                            terminalToolPanel: panelVisible('terminalToolPanel'),
-                            terminalPanel: panelVisible('terminalPanel'),
-                            debugPanel: panelVisible('debugPanel'),
-                            problemsPanel: panelVisible('problemsPanel'),
-                            gitToolPanel: panelVisible('gitToolPanel'),
-                            extensionsPanel: panelVisible('extensionsPanel'),
-                            servicesPanel: panelVisible('servicesPanel'),
-                            patchTrackingPanel: panelVisible('patchTrackingPanel')
-                        }
-                    }
-                })
-            });
-
-            menuBar.mount();
-        };
-
-        buildMenuBar();
+        const createMenuBarWiring = window.AhmadIDEModules?.renderer?.menu?.createMenuBarWiring;
+        const menuBarWiring = createMenuBarWiring({ deps: { logger, runMenuAction } });
+        return menuBarWiring.wireMenuBar(editor, routineState, terminalState);
     }
 
+    const createGlobalShortcutsBinder = window.AhmadIDEModules?.renderer?.shortcuts?.createGlobalShortcutsBinder;
+    const globalShortcutsBinder = createGlobalShortcutsBinder({
+        deps: {
+            closeFindReplaceDialog,
+            closeSearchEverywhere,
+            runMenuAction,
+            terminalConfig,
+            getGlobalRoutineState: () => globalRoutineState,
+            getGlobalTerminalState: () => globalTerminalState,
+            getActiveEditor: () => activeEditor,
+            canSaveActiveTab,
+            showToast,
+            saveAllOpenTabs,
+            saveRoutineFlow
+        }
+    });
+
     function bindGlobalShortcuts() {
-        if (bindGlobalShortcuts.__bound) return;
-        bindGlobalShortcuts.__bound = true;
-
-        const KEYMAP_STORAGE_KEY = 'ahmadIDE:keymap';
-
-        const normalizeComboFromEvent = (e) => {
-            const rawKey = String(e.key || '');
-            const key = rawKey.toLowerCase();
-
-            // Ignore bare modifier presses here (handled separately for Shift+Shift).
-            if (key === 'shift' || key === 'control' || key === 'alt' || key === 'meta') return null;
-
-            const parts = [];
-            if (e.ctrlKey || e.metaKey) parts.push('ctrl');
-            if (e.shiftKey) parts.push('shift');
-            if (e.altKey) parts.push('alt');
-
-            const keyPart = (key === ' ') ? 'space' : key;
-            parts.push(keyPart);
-            return parts.join('+');
-        };
-
-        const normalizeKeyStringToCombo = (str) => {
-            const raw = String(str || '').trim();
-            if (!raw) return null;
-            const compact = raw.toLowerCase().replace(/\s+/g, '');
-            if (compact === 'shift+shift') return 'shift+shift';
-
-            const tokens = raw.split('+').map(t => t.trim()).filter(Boolean);
-            if (!tokens.length) return null;
-
-            const mods = { ctrl: false, shift: false, alt: false };
-            let keyTok = null;
-
-            for (const tok of tokens) {
-                const t = tok.toLowerCase();
-                if (t === 'ctrl' || t === 'control' || t === 'cmd' || t === 'command' || t === 'meta' || t === 'win') {
-                    mods.ctrl = true;
-                    continue;
-                }
-                if (t === 'shift') {
-                    mods.shift = true;
-                    continue;
-                }
-                if (t === 'alt' || t === 'option') {
-                    mods.alt = true;
-                    continue;
-                }
-                keyTok = t;
-            }
-
-            if (!keyTok) return null;
-
-            const keyAlias = {
-                esc: 'escape',
-                escape: 'escape',
-                enter: 'enter',
-                return: 'enter',
-                space: 'space',
-                tab: 'tab',
-                backspace: 'backspace',
-                del: 'delete',
-                delete: 'delete',
-                up: 'arrowup',
-                arrowup: 'arrowup',
-                down: 'arrowdown',
-                arrowdown: 'arrowdown',
-                left: 'arrowleft',
-                arrowleft: 'arrowleft',
-                right: 'arrowright',
-                arrowright: 'arrowright'
-            };
-
-            const keyPart = keyAlias[keyTok] || keyTok;
-            const parts = [];
-            if (mods.ctrl) parts.push('ctrl');
-            if (mods.shift) parts.push('shift');
-            if (mods.alt) parts.push('alt');
-            parts.push(keyPart);
-            return parts.join('+');
-        };
-
-        const loadUserKeymap = () => {
-            try {
-                const raw = localStorage.getItem(KEYMAP_STORAGE_KEY);
-                if (!raw) return [];
-                const parsed = JSON.parse(raw);
-                if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return [];
-                const out = [];
-                for (const cat of Object.keys(parsed)) {
-                    const group = parsed[cat];
-                    if (!group || typeof group !== 'object' || Array.isArray(group)) continue;
-                    for (const actionId of Object.keys(group)) {
-                        const sc = group[actionId];
-                        const key = String(sc?.key || '').trim();
-                        if (!key) continue;
-                        out.push({ actionId, key });
-                    }
-                }
-                return out;
-            } catch (_) {
-                return [];
-            }
-        };
-
-        let comboToAction = new Map();
-        let doubleShiftAction = 'search-everywhere';
-
-        const rebuildShortcutMap = () => {
-            doubleShiftAction = 'search-everywhere';
-            const m = new Map();
-
-            // Core defaults
-            Object.keys(coreShortcutMap || {}).forEach((combo) => {
-                const act = coreShortcutMap[combo]?.action;
-                if (act) m.set(combo, act);
-            });
-
-            // User overrides / additions
-            const user = loadUserKeymap();
-            user.forEach((it) => {
-                const combo = normalizeKeyStringToCombo(it.key);
-                if (!combo) return;
-                if (combo === 'shift+shift') {
-                    doubleShiftAction = it.actionId;
-                    return;
-                }
-                m.set(combo, it.actionId);
-            });
-
-            comboToAction = m;
-        };
-
-        rebuildShortcutMap();
-        window.addEventListener('ahmadIDE:keymap-changed', rebuildShortcutMap);
-
-        const isTerminalTarget = (el) => {
-            if (!el) return false;
-            return !!el.closest?.('#terminalToolViewport')
-                || !!el.closest?.('#terminalViewport')
-                || !!el.closest?.('.xterm');
-        };
-
-        const isMonacoTarget = (el) => {
-            if (!el) return false;
-            return !!el.closest?.('.monaco-editor');
-        };
-
-        const isEditableTarget = (el) => {
-            if (!el) return false;
-            const tag = (el.tagName || '').toLowerCase();
-            const editable = el.isContentEditable;
-            return editable || tag === 'input' || tag === 'textarea' || tag === 'select';
-        };
-
-        const handler = async (e) => {
-            const key = String(e.key || '').toLowerCase();
-            if (key !== 'shift') lastShiftTap = 0;
-
-            // Escape closes global search dialogs (no-op if not open).
-            if (key === 'escape') {
-                try { closeFindReplaceDialog?.(); } catch (_) { }
-                try { closeSearchEverywhere?.(); } catch (_) { }
-                return;
-            }
-
-            // Double-Shift (Search Everywhere by default; configurable in keymap).
-            if (!e.ctrlKey && !e.metaKey && !e.altKey && key === 'shift') {
-                if (e.repeat) return;
-                const now = Date.now();
-                if (now - lastShiftTap <= 420) {
-                    lastShiftTap = 0;
-                    if (!doubleShiftAction) return;
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
-                    await runMenuAction(doubleShiftAction);
-                    return;
-                }
-                lastShiftTap = now;
-                return;
-            }
-
-            const combo = normalizeComboFromEvent(e);
-            if (!combo) return;
-            const action = comboToAction.get(combo);
-            if (!action) return;
-            const isSave = action === 'save';
-            const isSaveAll = action === 'save-all';
-
-            // When terminal is focused, prefer terminal input like JetBrains (but keep toolwindow toggles).
-            if (isTerminalTarget(e.target) && terminalConfig.overrideIdeShortcuts) {
-                const allowInTerminal = action === 'toggle-terminal' || action === 'terminal-new-tab' || action === 'terminal';
-                if (!isSave && !allowInTerminal) return;
-            }
-
-            if (isEditableTarget(e.target) && !isSave && !isMonacoTarget(e.target)) {
-                const hasModifier = e.ctrlKey || e.metaKey || e.altKey;
-                const isFunctionKey = /^f([1-9]|1[0-2])$/.test(key);
-                if (!hasModifier && !isFunctionKey) return;
-            }
-
-            // Handle Save directly to avoid conflicts with Monaco.
-            if (isSave || isSaveAll) {
-                e.preventDefault();
-                e.stopImmediatePropagation();
-                if (globalRoutineState && globalTerminalState && activeEditor) {
-                    if (!canSaveActiveTab()) {
-                        showToast('info', 'Diff', 'Diff tabs are read-only');
-                        return;
-                    }
-                    if (isSaveAll) {
-                        await saveAllOpenTabs({ terminalState: globalTerminalState });
-                    } else {
-                        await saveRoutineFlow(activeEditor, globalRoutineState, globalTerminalState);
-                    }
-                }
-                return;
-            }
-
-            e.preventDefault();
-            e.stopImmediatePropagation();
-            await runMenuAction(action);
-        };
-
-        window.addEventListener('keydown', handler, true);
+        return globalShortcutsBinder.bindGlobalShortcuts();
     }
 
     // --- Shared debug controls (hoisted) ---
@@ -3094,185 +1982,50 @@
         bottom: { visible: true, activePanel: 'terminalToolPanel' }
     };
 
+    const createToolWindowManager = window.AhmadIDEModules?.renderer?.toolWindows?.createToolWindowManager;
+    const toolWindowManager = createToolWindowManager({
+        state: { toolWindowState },
+        deps: {
+            logger,
+            getGlobalTerminalState: () => globalTerminalState,
+            refreshTerminalLayout,
+            focusTerminal,
+            getTerminalToolApi: () => terminalToolApi,
+            getOpenGitToolWindow: () => openGitToolWindow,
+            getOpenCommitToolWindow: () => openCommitToolWindow
+        }
+    });
+
     function ensureBottomPanel(panelId) {
-        const state = toolWindowState.bottom;
-        if (!state) return;
-        if (state.visible && state.activePanel === panelId) return;
-        toggleToolWindowPanel(panelId, 'bottom');
+        return toolWindowManager.ensureBottomPanel(panelId);
     }
 
     function setActiveToolWindow(panelId) {
-        // Legacy support - map to new structure
-        const btn = document.querySelector(`.tool-window-stripe-btn[data-panel="${panelId}"]`);
-        if (btn) {
-            const position = btn.getAttribute('data-position');
-            toggleToolWindowPanel(panelId, position);
-        }
+        return toolWindowManager.setActiveToolWindow(panelId);
     }
 
     function toggleToolWindowPanel(panelId, position) {
-        const state = toolWindowState[position];
-        if (!state) return;
-        logger.info('TOOLWINDOW_TOGGLE', { panelId, position, visible: state.visible, activePanel: state.activePanel });
-
-        const contentArea = document.getElementById(`${position}ToolWindow`);
-        const buttons = document.querySelectorAll(`.tool-window-stripe-btn[data-position="${position}"]`);
-
-        // If clicking the same panel, toggle visibility (bottom keeps stripe visible)
-        if (state.activePanel === panelId && state.visible) {
-            state.visible = false;
-            state.activePanel = null;
-            if (position === 'bottom') {
-                if (contentArea) contentArea.classList.add('hidden'); // Use hidden to collapse fully
-                const bottomPanels = ['terminalToolPanel', 'terminalPanel', 'debugPanel', 'problemsPanel', 'comparePanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel', 'globalImpactPanel', 'patchTrackingPanel'];
-                bottomPanels.forEach(id => {
-                    const el = document.getElementById(id);
-                    if (el) el.classList.add('hidden');
-                });
-            } else {
-                if (contentArea) contentArea.classList.add('hidden');
-            }
-            buttons.forEach(b => b.classList.remove('active'));
-            try {
-                window.dispatchEvent(new CustomEvent('ahmadIDE:toolwindow-hidden', { detail: { panelId, position } }));
-            } catch (_) { }
-            return;
-        }
-
-        // Lazy-mount heavy panels on first open to reduce DOM/layout/paint cost.
-        try {
-            window.AhmadIDEModules?.app?.featureRegistry?.ensureById?.(panelId);
-        } catch (_) {
-            // ignore mount failures
-        }
-
-        // Show the content area and switch panels
-        state.visible = true;
-        state.activePanel = panelId;
-        if (contentArea) {
-            contentArea.classList.remove('hidden');
-            if (position === 'bottom') {
-                contentArea.classList.remove('collapsed');
-            }
-        }
-
-        // Update button states
-        buttons.forEach(b => {
-            b.classList.toggle('active', b.getAttribute('data-panel') === panelId);
-        });
-
-        // Show/hide panels within the content area
-        const panels = contentArea ? contentArea.querySelectorAll('.tool-window-panel') : [];
-        panels.forEach(p => {
-            p.classList.toggle('hidden', p.id !== panelId);
-        });
-
-        // Handle bottom panels specially (they're in bottom-panels-container)
-        if (position === 'bottom') {
-            const bottomPanels = ['terminalToolPanel', 'terminalPanel', 'debugPanel', 'problemsPanel', 'comparePanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel', 'globalImpactPanel', 'patchTrackingPanel'];
-            bottomPanels.forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.classList.toggle('hidden', id !== panelId);
-            });
-        }
-
-        // Special handling for problems panel
-        if (panelId === 'problemsPanel') {
-            const src = document.getElementById('problemsList');
-            const dst = document.getElementById('problemsListStandalone');
-            if (src && dst) dst.innerHTML = src.innerHTML;
-        }
-
-        if (panelId === 'terminalPanel' && state.visible && globalTerminalState) {
-            refreshTerminalLayout(globalTerminalState);
-            setTimeout(() => focusTerminal(), 10);
-        }
-        if (panelId === 'terminalToolPanel' && state.visible) {
-            setTimeout(() => {
-                try { terminalToolApi?.fit?.(); } catch (_) { }
-                try { terminalToolApi?.focus?.(); } catch (_) { }
-            }, 10);
-        }
-
-        try {
-            window.dispatchEvent(new CustomEvent('ahmadIDE:toolwindow-activated', { detail: { panelId, position } }));
-        } catch (_) { }
+        return toolWindowManager.toggleToolWindowPanel(panelId, position);
     }
 
     function bindToolWindows() {
-        // Bind new -style tool window stripe buttons
-        const stripeButtons = document.querySelectorAll('.tool-window-stripe-btn');
-        stripeButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const panelId = btn.getAttribute('data-panel');
-                const position = btn.getAttribute('data-position');
-                if (panelId === 'terminalToolPanel') {
-                    if (terminalToolApi?.openTerminalToolWindow) {
-                        terminalToolApi.openTerminalToolWindow({ source: 'stripe' });
-                    } else {
-                        toggleToolWindowPanel('terminalToolPanel', 'bottom');
-                    }
-                    return;
-                }
-                if (panelId === 'gitToolPanel') {
-                    openGitToolWindow({ source: 'stripe' });
-                    return;
-                }
-                if (panelId === 'commitPanel') {
-                    openCommitToolWindow({ source: 'stripe' });
-                    return;
-                }
-                toggleToolWindowPanel(panelId, position);
-            });
-        });
-
-        // Bind hide buttons in tool window headers
-        document.querySelectorAll('.hide-panel-btn, #hideProjectBtn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const panel = btn.closest('.tool-window-panel');
-                if (panel) {
-                    const panelId = panel.id;
-                    const stripeBtn = document.querySelector(`.tool-window-stripe-btn[data-panel="${panelId}"]`);
-                    if (stripeBtn) {
-                        const position = stripeBtn.getAttribute('data-position');
-                        toggleToolWindowPanel(panelId, position);
-                    }
-                }
-            });
-        });
-
-        // Initialize: show left (project) and bottom (terminal) by default
-        toolWindowState.left.visible = true;
-        toolWindowState.left.activePanel = 'projectPanel';
-        toolWindowState.bottom.visible = true;
-        toolWindowState.bottom.activePanel = 'terminalToolPanel';
-        toolWindowState.right.visible = false;
-
-        // Set initial UI state
-        document.getElementById('leftToolWindow')?.classList.remove('hidden');
-        document.getElementById('rightToolWindow')?.classList.add('hidden');
-        document.getElementById('bottomToolWindow')?.classList.remove('hidden');
-
-        // Hide non-active bottom panels
-        ['terminalPanel', 'debugPanel', 'problemsPanel', 'comparePanel', 'servicesPanel', 'gitToolPanel', 'extensionsPanel'].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.classList.add('hidden');
-        });
-        document.getElementById('terminalToolPanel')?.classList.remove('hidden');
-
-        // Ensure default bottom panel is mounted (Terminal is default).
-        try { window.AhmadIDEModules?.app?.featureRegistry?.ensureById?.('terminalToolPanel'); } catch (_) { }
-        try { window.dispatchEvent(new CustomEvent('ahmadIDE:toolwindow-activated', { detail: { panelId: 'terminalToolPanel', position: 'bottom' } })); } catch (_) { }
-
-        // Legacy binding for old toolwindow-btn (if any still exist)
-        const legacyButtons = document.querySelectorAll('.toolwindow-btn');
-        legacyButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const target = btn.getAttribute('data-panel');
-                setActiveToolWindow(target);
-            });
-        });
+        return toolWindowManager.bindToolWindows();
     }
+
+    // Statusbar: clicking Problems opens the Problems tool window.
+    try {
+        const problemsSummaryEl = document.getElementById('problemsSummary');
+        if (problemsSummaryEl && !problemsSummaryEl.dataset.mideOpenProblemsWired) {
+            problemsSummaryEl.dataset.mideOpenProblemsWired = '1';
+            problemsSummaryEl.setAttribute('title', 'Open Problems (Alt+6)');
+            problemsSummaryEl.setAttribute('aria-label', 'Open Problems (Alt+6)');
+            problemsSummaryEl.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try { ensureBottomPanel('problemsPanel'); } catch (_) { }
+            });
+        }
+    } catch (_) { }
 
     function setActiveDebugTab(tabId) {
         activeDebugTab = tabId || activeDebugTab;
@@ -3394,6 +2147,13 @@
             const mumpsAutoData = await loadAutocompleteData();
             registerMumpsCompletion(mumpsAutoData);
             registerMumpsHover();
+            try {
+                const fileman = window.AhmadIDEModules?.mumps?.fileman;
+                const settingsService = window.AhmadIDEModules?.services?.settingsService;
+                fileman?.registerHoverProvider?.({ monaco, settingsService });
+            } catch (err) {
+                console.error('[MUMPS] FileMan hover docs error:', err);
+            }
 
             // Ensure settings + custom fonts are applied before Monaco measures text.
             try {
@@ -3420,6 +2180,7 @@
                 value: sampleMumps(),
                 language: 'mumps',
                 theme: currentCodeTheme || defaultCodeTheme,
+                tabCompletion: 'onlySnippets',
                 fontSize: codeFontSize,
                 fontFamily: codeFont,
                 fontLigatures: codeLigatures,
@@ -3443,9 +2204,14 @@
                 renderValidationDecorations: 'on',
                 quickSuggestions: { other: true, comments: false, strings: false },
                 suggestOnTriggerCharacters: true,
-                folding: false,  // Disable code folding for performance
+                suggest: {
+                    snippetsPreventQuickSuggestions: false,  // Allow snippets in quick suggestions
+                    showSnippets: true
+                },
+                folding: true,
+                foldingStrategy: 'auto',
                 foldingHighlight: false,
-                showFoldingControls: 'never',
+                showFoldingControls: 'always',
                 occurrencesHighlight: 'singleFile',  // Highlight all occurrences of selected word
                 renderWhitespace: 'none',  // Don't render whitespace
                 overviewRulerBorder: false,
@@ -3463,6 +2229,15 @@
                 inlayHints: { enabled: 'off' },  // Disable inlay hints
                 stickyScroll: { enabled: false },  // Disable sticky scroll
                 guides: { indentation: true, highlightActiveIndentation: true, bracketPairs: false },  // Visual guides (lightweight)
+
+                // Fix UI Layout Issues
+                fixedOverflowWidgets: false,  // Revert: positioning issue (appearing in center). Handle clipping via CSS.
+                find: {
+                    addExtraSpaceOnTop: false,  // Overlay search widget instead of shifting content down
+                    autoFindInSelection: 'multiline',
+                    seedSearchStringFromSelection: 'selection'
+                },
+
                 accessibilitySupport: 'off',  // Reduce accessibility overhead
                 cursorSmoothCaretAnimation: 'off',  // Disable cursor animation
                 rulers: [
@@ -3503,7 +2278,7 @@
                             for (let line = range.startLineNumber; line <= range.endLineNumber; line++) {
                                 try {
                                     model.tokenization.forceTokenization(line);
-                                } catch (e) {}
+                                } catch (e) { }
                             }
                         }
                         editor.render(true);
@@ -3519,123 +2294,159 @@
             globalTerminalState = terminalState;
             updateTerminalStatusPill();
 
-            // Add -style context menu actions
-            editor.addAction({
-                id: 'cut',
-                label: 'Cut',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX],
-                run: (ed) => {
-                    document.execCommand('cut');
-                }
-            });
+            // Editor -style context menu actions moved to src/renderer/editor/editorMonacoActions.js
+            const createEditorMonacoActions = window.AhmadIDEModules?.renderer?.editor?.createEditorMonacoActions;
+            if (!createEditorMonacoActions) {
+                logger.error('EDITOR_MONACO_ACTIONS_MODULE_MISSING', { path: './src/renderer/editor/editorMonacoActions.js' });
+                throw new Error('Editor Monaco Actions module missing: ./src/renderer/editor/editorMonacoActions.js');
+            }
+            const editorMonacoActionsApi = createEditorMonacoActions();
+            editorMonacoActionsApi.registerEditorActions(editor);
 
-            editor.addAction({
-                id: 'copy',
-                label: 'Copy',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC],
-                run: (ed) => {
-                    document.execCommand('copy');
-                }
-            });
+            // Initialize Smart Rename Provider
+            const createMumpsSmartRenameProvider = window.AhmadIDEModules?.mumps?.createMumpsSmartRenameProvider;
 
-            editor.addAction({
-                id: 'paste',
-                label: 'Paste',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV],
-                run: (ed) => {
-                    document.execCommand('paste');
-                }
-            });
+            if (createMumpsSmartRenameProvider) {
+                try {
+                    console.log('[Smart Rename] Initializing provider...');
+                    const smartRenameProvider = createMumpsSmartRenameProvider({
+                        deps: {
+                            getMonaco: () => monaco,
+                            getCallIndexer: () => window.globalCallIndexer || null,
+                            getActiveEditor: () => activeEditor,
+                            showToast
+                        }
+                    });
 
-            editor.addAction({
-                id: 'selectAll',
-                label: 'Select All',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyA],
-                run: (ed) => {
-                    ed.setSelection(ed.getModel().getFullModelRange());
-                }
-            });
+                    const initialized = smartRenameProvider.initialize ? smartRenameProvider.initialize() : true;
 
-            // Note: Ctrl+S is handled by global keydown handler to avoid conflicts
+                    // Always set the provider (works in fallback mode even if full init fails)
+                    window.smartRenameProvider = smartRenameProvider;
 
-            editor.addAction({
-                id: 'commentLine',
-                label: 'Comment Line',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Slash],
-                run: (ed) => {
-                    ed.trigger('keyboard', 'editor.action.commentLine', {});
-                }
-            });
+                    // Always register Monaco action (works in both modes)
+                    if (smartRenameProvider.registerMonacoAction) {
+                        smartRenameProvider.registerMonacoAction(editor);
+                    }
 
-            editor.addAction({
-                id: 'formatDocument',
-                label: 'Reformat Code',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyL],
-                run: (ed) => {
-                    ed.trigger('keyboard', 'editor.action.formatDocument', {});
+                    if (initialized) {
+                        logger.info('SMART_RENAME_INITIALIZED', { initialized: true, mode: 'full+fallback' });
+                        console.log('[Smart Rename] Provider initialized and registered globally.');
+                    } else {
+                        logger.warn('SMART_RENAME_FALLBACK_ONLY', { initialized: false, mode: 'fallback-only' });
+                        console.warn('[Smart Rename] Provider initialized in fallback mode.');
+                    }
+                } catch (err) {
+                    logger.error('SMART_RENAME_INIT_ERROR', { error: err.message, stack: err.stack });
+                    console.error('[Smart Rename] Critical initialization error:', err);
+                    // Ensure partial object exists to prevent UI crashes in context menu
+                    window.smartRenameProvider = {
+                        triggerSmartRenameTag: async () => {
+                            showToast('error', 'Smart Rename', 'Feature failed to initialize. Please reload.');
+                        }
+                    };
                 }
-            });
+            } else {
+                logger.error('SMART_RENAME_MODULE_MISSING', { hint: 'Check script includes in index.html' });
+                console.error('[Smart Rename] Module factory not found. Scripts may be missing.');
+            }
 
-            editor.addAction({
-                id: 'gotoLine',
-                label: 'Go to Line...',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyG],
-                run: (ed) => {
-                    ed.trigger('keyboard', 'editor.action.gotoLine', {});
-                }
-            });
+            // Initialize Enhanced Linter Features
+            const initMumpsLinterEnhancements = window.AhmadIDEModules?.mumps?.initMumpsLinterEnhancements;
 
-            editor.addAction({
-                id: 'findReplace',
-                label: 'Find and Replace...',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR],
-                run: (ed) => {
-                    ed.trigger('keyboard', 'editor.action.startFindReplaceAction', {});
+            if (initMumpsLinterEnhancements) {
+                try {
+                    console.log('[Linter] Initializing enhanced linter features...');
+                    initMumpsLinterEnhancements({
+                        monacoRef: monaco,
+                        getActiveEditor: () => activeEditor,
+                        showToast
+                    });
+                    console.log('[Linter] ✓ Enhanced linter features initialized');
+                } catch (err) {
+                    console.error('[Linter] Failed to initialize enhancements:', err);
                 }
-            });
+            } else {
+                console.warn('[Linter] Enhanced linter module not found');
+            }
 
-            editor.addAction({
-                id: 'deleteLineAction',
-                label: 'Delete Line',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyY],
-                run: (ed) => {
-                    ed.trigger('keyboard', 'editor.action.deleteLines', {});
-                }
-            });
+            // Initialize MUMPS Features (Snippets, NEW autocomplete, Compare, Quick Fix)
+            const MumpsSnippetsService = window.AhmadIDEModules?.mumps?.MumpsSnippetsService;
+            const MumpsNewAutocompleteProvider = window.AhmadIDEModules?.mumps?.MumpsNewAutocompleteProvider;
+            const MumpsRoutineCompare = window.AhmadIDEModules?.mumps?.MumpsRoutineCompare;
+            const MumpsQuickFixProvider = window.AhmadIDEModules?.mumps?.MumpsQuickFixProvider;
 
-            editor.addAction({
-                id: 'duplicateLine',
-                label: 'Duplicate Line',
-                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyD],
-                run: (ed) => {
-                    const selection = ed.getSelection();
-                    const lineNumber = selection.startLineNumber;
-                    const lineContent = ed.getModel().getLineContent(lineNumber);
-                    const position = { lineNumber: lineNumber, column: 1 };
-                    ed.executeEdits('duplicate-line', [{
-                        range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-                        text: lineContent + '\n'
-                    }]);
+            // Quick Fix Provider for linter autofixes
+            if (MumpsQuickFixProvider) {
+                try {
+                    const quickFixProvider = new MumpsQuickFixProvider(monaco);
+                    quickFixProvider.register();
+                    window.mumpsQuickFix = quickFixProvider;
+                    console.log('[MUMPS] ✓ Quick Fix provider initialized');
+                } catch (err) {
+                    console.error('[MUMPS] Quick Fix error:', err);
                 }
-            });
+            }
 
-            editor.addAction({
-                id: 'moveLineUp',
-                label: 'Move Line Up',
-                keybindings: [monaco.KeyMod.Alt | monaco.KeyMod.Shift | monaco.KeyCode.UpArrow],
-                run: (ed) => {
-                    ed.trigger('keyboard', 'editor.action.moveLinesUpAction', {});
-                }
-            });
 
-            editor.addAction({
-                id: 'moveLineDown',
-                label: 'Move Line Down',
-                keybindings: [monaco.KeyMod.Alt | monaco.KeyMod.Shift | monaco.KeyCode.DownArrow],
-                run: (ed) => {
-                    ed.trigger('keyboard', 'editor.action.moveLinesDownAction', {});
+            if (MumpsSnippetsService) {
+                try {
+                    const snippetsService = new MumpsSnippetsService({
+                        settingsService: window.AhmadIDEModules?.services?.settingsService,
+                        showToast
+                    });
+                    snippetsService.registerCompletionProvider(monaco);
+                    window.mumpsSnippets = snippetsService;
+                    console.log('[MUMPS] ✓ Snippets service initialized');
+                } catch (err) {
+                    console.error('[MUMPS] Snippets error:', err);
                 }
-            });
+            }
+
+            if (MumpsNewAutocompleteProvider) {
+                try {
+                    const newAutocomplete = new MumpsNewAutocompleteProvider({
+                        monaco,
+                        settingsService: window.AhmadIDEModules?.services?.settingsService,
+                        showToast
+                    });
+                    newAutocomplete.register();
+                    window.mumpsNewAutocomplete = newAutocomplete;
+                    console.log('[MUMPS] ✓ NEW autocomplete initialized');
+                } catch (err) {
+                    console.error('[MUMPS] NEW autocomplete error:', err);
+                }
+            }
+
+            // Tag Header Generator - generates individual tag documentation headers
+            const MumpsTagHeaderGenerator = window.AhmadIDEModules?.mumps?.MumpsTagHeaderGenerator;
+            if (MumpsTagHeaderGenerator) {
+                try {
+                    const tagHeaderGenerator = new MumpsTagHeaderGenerator({
+                        showToast,
+                        settingsService: window.AhmadIDEModules?.services?.settingsService
+                    });
+                    tagHeaderGenerator.registerCommand(editor, monaco);
+                    window.mumpsTagHeaderGenerator = tagHeaderGenerator;
+                    console.log('[MUMPS] ✓ Tag header generator initialized');
+                } catch (err) {
+                    console.error('[MUMPS] Tag header generator error:', err);
+                }
+            }
+
+            if (MumpsRoutineCompare) {
+                try {
+                    const routineCompare = new MumpsRoutineCompare({
+                        monaco,
+                        ahmadIDE: window.ahmadIDE,
+                        showToast
+                    });
+                    window.mumpsCompare = routineCompare;
+                    window.compareRoutines = (leftRoutine, rightRoutine) => routineCompare.compare(leftRoutine, rightRoutine);
+                    console.log('[MUMPS] ✓ Routine compare initialized');
+                } catch (err) {
+                    console.error('[MUMPS] Routine compare error:', err);
+                }
+            }
 
             const dbgState = {
                 sessionId: null,
@@ -3655,99 +2466,34 @@
 
             applyCodeTheme(currentCodeTheme || defaultCodeTheme);
             bindThemeSelectors(editor);
-            const shortcutPrefs = loadShortcutPrefs();
-            shortcutDefaults = {
-                // Existing shortcuts
-                'duplicate-line': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyD,
-                'run-code': monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-                'lint-code': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyL,
-                'toggle-sidebar': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB,
-                'toggle-terminal': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyJ,
-                'new-terminal': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyT,
-
-                //  Navigation shortcuts
-                'goto-file': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyN,
-                'goto-line': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyG,
-                'recent-files': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyE,
-
-                //  Editing shortcuts
-                'delete-line': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyY,
-                'comment-line': monaco.KeyMod.CtrlCmd | monaco.KeyCode.Slash,
-                'extend-selection': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyW,
-
-                //  Search shortcuts
-                'find': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF,
-                'replace': monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR,
-                'find-in-folder': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF,
-                'replace-in-folder': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyR,
-
-                //  Code shortcuts
-                'format-code': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyL,
-                'optimize-imports': monaco.KeyMod.CtrlCmd | monaco.KeyMod.Alt | monaco.KeyCode.KeyO,
-
-                //  Refactoring
-                'rename': monaco.KeyCode.F2,
-
-                //  Tool Windows (Alt+Number)
-                'tool-project': monaco.KeyMod.Alt | monaco.KeyCode.Digit1,
-                'tool-favorites': monaco.KeyMod.Alt | monaco.KeyCode.Digit2,
-                'tool-find': monaco.KeyMod.Alt | monaco.KeyCode.Digit3,
-                'tool-run': monaco.KeyMod.Alt | monaco.KeyCode.Digit4,
-                'tool-debug': monaco.KeyMod.Alt | monaco.KeyCode.Digit5,
-                'tool-todo': monaco.KeyMod.Alt | monaco.KeyCode.Digit6, // Problems
-                'tool-structure': monaco.KeyMod.Alt | monaco.KeyCode.Digit7,
-                'tool-services': monaco.KeyMod.Alt | monaco.KeyCode.Digit8,
-                'tool-git': monaco.KeyMod.Alt | monaco.KeyCode.Digit9,
-                'tool-commit': monaco.KeyMod.Alt | monaco.KeyCode.Digit0,
-                'tool-terminal': monaco.KeyMod.Alt | monaco.KeyCode.F12
+            const wireEditorKeybindings = window.AhmadIDEModules?.renderer?.shortcuts?.wireEditorKeybindings;
+            if (!wireEditorKeybindings) {
+                logger.error('EDITOR_KEYBINDINGS_MODULE_MISSING', { path: './src/renderer/shortcuts/editorKeybindings.js' });
+                throw new Error('Editor Keybindings module missing: ./src/renderer/shortcuts/editorKeybindings.js');
+            }
+            const terminalToolApiRef = {
+                get value() { return terminalToolApi; }
             };
-            const dupBinding = shortcutPrefs['duplicate-line'] || shortcutDefaults['duplicate-line'];
-            const dupHandler = () => duplicateLine(editor);
-            editor.addCommand(dupBinding, dupHandler);
-            registerKeybinding(editor, 'Duplicate Line', 'duplicate-line', dupHandler, shortcutDefaults['duplicate-line']);
-            registerKeybinding(editor, 'Run', 'run-code', () => clickEl('runBtn'), shortcutDefaults['run-code']);
-            registerKeybinding(editor, 'Lint', 'lint-code', () => clickEl('lintBtn'), shortcutDefaults['lint-code']);
-            registerKeybinding(editor, 'Toggle Sidebar', 'toggle-sidebar', () => toggleSidebar(), shortcutDefaults['toggle-sidebar']);
-            registerKeybinding(editor, 'Toggle Terminal', 'toggle-terminal', () => toggleTerminal(), shortcutDefaults['toggle-terminal']);
-            registerKeybinding(editor, 'New Terminal', 'new-terminal', () => {
-                terminalToolApi?.openTerminalToolWindow?.({ source: 'shortcut:new-terminal' });
-                terminalToolApi?.newTab?.().catch?.(() => { });
-            }, shortcutDefaults['new-terminal']);
-
-            //  Navigation shortcuts
-            registerKeybinding(editor, 'Go to File', 'goto-file', () => openSearchEverywhere(''), shortcutDefaults['goto-file']);
-            registerKeybinding(editor, 'Go to Line', 'goto-line', () => editor.trigger('keyboard', 'editor.action.gotoLine', null), shortcutDefaults['goto-line']);
-            registerKeybinding(editor, 'Recent Files', 'recent-files', () => showToast('info', 'Recent Files', 'Feature coming soon'), shortcutDefaults['recent-files']);
-
-            //  Editing shortcuts
-            registerKeybinding(editor, 'Delete Line', 'delete-line', () => editor.trigger('keyboard', 'editor.action.deleteLines', null), shortcutDefaults['delete-line']);
-            registerKeybinding(editor, 'Comment Line', 'comment-line', () => editor.trigger('keyboard', 'editor.action.commentLine', null), shortcutDefaults['comment-line']);
-            registerKeybinding(editor, 'Extend Selection', 'extend-selection', () => editor.trigger('keyboard', 'editor.action.smartSelect.expand', null), shortcutDefaults['extend-selection']);
-
-            //  Search shortcuts
-            registerKeybinding(editor, 'Find', 'find', () => editor.trigger('keyboard', 'actions.find', null), shortcutDefaults['find']);
-            registerKeybinding(editor, 'Replace', 'replace', () => editor.trigger('keyboard', 'editor.action.startFindReplaceAction', null), shortcutDefaults['replace']);
-            registerKeybinding(editor, 'Find in Files', 'find-in-folder', () => openFindReplaceDialog('find', getSelectedText()), shortcutDefaults['find-in-folder']);
-            registerKeybinding(editor, 'Replace in Files', 'replace-in-folder', () => openFindReplaceDialog('replace', getSelectedText()), shortcutDefaults['replace-in-folder']);
-
-            //  Code shortcuts
-            registerKeybinding(editor, 'Format Code', 'format-code', () => editor.trigger('keyboard', 'editor.action.formatDocument', null), shortcutDefaults['format-code']);
-            registerKeybinding(editor, 'Optimize Imports', 'optimize-imports', () => showToast('info', 'Optimize Imports', 'Feature coming soon'), shortcutDefaults['optimize-imports']);
-
-            //  Refactoring
-            registerKeybinding(editor, 'Rename', 'rename', () => editor.trigger('keyboard', 'editor.action.rename', null), shortcutDefaults['rename']);
-
-            //  Tool Windows (Alt+Number to toggle panels)
-            registerKeybinding(editor, 'Tool: Project', 'tool-project', () => toggleToolWindowPanel('projectPanel', 'left'), shortcutDefaults['tool-project']);
-            registerKeybinding(editor, 'Tool: Find', 'tool-find', () => openFindReplaceDialog('find', ''), shortcutDefaults['tool-find']);
-            registerKeybinding(editor, 'Tool: Run', 'tool-run', () => toggleToolWindowPanel('terminalPanel', 'bottom'), shortcutDefaults['tool-run']);
-            registerKeybinding(editor, 'Tool: Debug', 'tool-debug', () => toggleToolWindowPanel('debugPanel', 'bottom'), shortcutDefaults['tool-debug']);
-            registerKeybinding(editor, 'Tool: Problems', 'tool-todo', () => toggleToolWindowPanel('problemsPanel', 'bottom'), shortcutDefaults['tool-todo']);
-            registerKeybinding(editor, 'Tool: Structure', 'tool-structure', () => toggleToolWindowPanel('structurePanel', 'left'), shortcutDefaults['tool-structure']);
-            registerKeybinding(editor, 'Tool: Services', 'tool-services', () => toggleToolWindowPanel('servicesPanel', 'bottom'), shortcutDefaults['tool-services']);
-            registerKeybinding(editor, 'Tool: Git', 'tool-git', () => openGitToolWindow({ source: 'shortcut' }), shortcutDefaults['tool-git']);
-            registerKeybinding(editor, 'Tool: Commit', 'tool-commit', () => openCommitToolWindow({ source: 'shortcut' }), shortcutDefaults['tool-commit']);
-            registerKeybinding(editor, 'Tool: Terminal', 'tool-terminal', () => toggleTerminal(), shortcutDefaults['tool-terminal']);
+            wireEditorKeybindings({
+                deps: {
+                    editor,
+                    loadShortcutPrefs,
+                    setShortcutDefaults: (v) => { shortcutDefaults = v; },
+                    duplicateLine,
+                    registerKeybinding,
+                    clickEl,
+                    toggleSidebar,
+                    toggleTerminal,
+                    terminalToolApiRef,
+                    openSearchEverywhere,
+                    showToast,
+                    openFindReplaceDialog,
+                    getSelectedText,
+                    toggleToolWindowPanel,
+                    openGitToolWindow: (...args) => openGitToolWindow(...args),
+                    openCommitToolWindow: (...args) => openCommitToolWindow(...args)
+                }
+            });
 
             renderProjectTree([], routineState, editor);
             // Initialize empty tab bar
@@ -3768,7 +2514,7 @@
                     if (globalTerminalState) {
                         refreshTerminalLayout(globalTerminalState, { resizeSession: true });
                     }
-                }, 100); // Debounce 100ms
+                }, 200); // Debounce 200ms - increased to reduce lag
             });
             try {
                 window.AhmadIDEModules?.services?.extensionsService?.start?.();
@@ -3776,66 +2522,19 @@
             initExtensionsView();
 
             // -style search bindings
-            updateFindScopeLabels();
-            document.getElementById('findReplaceToggleBtn')?.addEventListener('click', () => {
-                const nextMode = findReplaceState.mode === 'replace' ? 'find' : 'replace';
-                toggleFindMode(nextMode);
-                executeFindReplacePreview(false);
-            });
-            document.getElementById('closeFindDialog')?.addEventListener('click', closeFindReplaceDialog);
-            // Legacy overlay removed - dialog handles backdrop clicks
-            document.getElementById('replaceAllBtn')?.addEventListener('click', confirmAndReplaceAll);
-            document.getElementById('findQueryInput')?.addEventListener('input', () => searchDebounce(() => executeFindReplacePreview(false), 200));
-            document.getElementById('findQueryInput')?.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') executeFindReplacePreview(false);
-                if (e.key === 'Escape') closeFindReplaceDialog();
-            });
-            document.getElementById('replaceQueryInput')?.addEventListener('input', () => {
-                if (findReplaceState.mode === 'replace') {
-                    searchDebounce(() => executeFindReplacePreview(false), 280);
-                }
-            });
-            document.getElementById('replaceQueryInput')?.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') executeFindReplacePreview(e.ctrlKey || e.metaKey);
-                if (e.key === 'Escape') closeFindReplaceDialog();
-            });
-            ['findCaseOption', 'findWholeOption', 'findRegexOption'].forEach(id => {
-                document.getElementById(id)?.addEventListener('change', () => executeFindReplacePreview(false));
-            });
-            document.getElementById('findDialog')?.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    if (findReplaceState.mode === 'replace' && e.ctrlKey) {
-                        confirmAndReplaceAll();
-                    } else {
-                        executeFindReplacePreview(false);
-                    }
-                }
-                if (e.key === 'Escape') closeFindReplaceDialog();
-            });
-
-            // Legacy overlay removed - dialog handles backdrop clicks
-            const searchEverywhereInput = document.getElementById('searchEverywhereInput');
-            searchEverywhereInput?.addEventListener('input', () => renderSearchEverywhereResults(searchEverywhereInput.value));
-            searchEverywhereInput?.addEventListener('keydown', async (e) => {
-                const resultsHost = document.getElementById('searchEverywhereResults');
-                const items = resultsHost?.querySelectorAll('.search-everywhere-item') || [];
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    searchEverywhereState.selectedIndex = Math.min(items.length - 1, searchEverywhereState.selectedIndex + 1);
-                    renderSearchEverywhereResults(searchEverywhereInput.value);
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    searchEverywhereState.selectedIndex = Math.max(0, searchEverywhereState.selectedIndex - 1);
-                    renderSearchEverywhereResults(searchEverywhereInput.value);
-                } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    const refreshedItems = document.getElementById('searchEverywhereResults')?.querySelectorAll('.search-everywhere-item') || [];
-                    const active = refreshedItems[searchEverywhereState.selectedIndex];
-                    const path = active?.dataset?.path;
-                    if (path) openSearchEverywhereResult(path);
-                } else if (e.key === 'Escape') {
-                    closeSearchEverywhere();
-                }
+            const wireSearchBindings = window.AhmadIDEModules?.renderer?.search?.wireSearchBindings;
+            wireSearchBindings({
+                updateFindScopeLabels,
+                findReplaceState,
+                toggleFindMode,
+                executeFindReplacePreview,
+                closeFindReplaceDialog,
+                confirmAndReplaceAll,
+                searchDebounce,
+                renderSearchEverywhereResults,
+                searchEverywhereState,
+                openSearchEverywhereResult,
+                closeSearchEverywhere
             });
 
             // Global shortcuts are handled centrally in bindGlobalShortcuts().
@@ -3877,77 +2576,15 @@
             validateMumps(editor.getModel());
             // Removed duplicate validation - already called on line 3902
 
-            // --- Status Bar Updates ---
-            const updateStatusBar = () => {
-                const position = editor.getPosition();
-                if (position) {
-                    const lineCol = document.getElementById('lineColInfo');
-                    if (lineCol) {
-                        lineCol.textContent = `Ln ${position.lineNumber}, Col ${position.column}`;
-                    }
+            const createStatusBarWiring = window.AhmadIDEModules?.renderer?.status?.createStatusBarWiring;
+            const statusBarWiring = createStatusBarWiring({
+                deps: {
+                    getGitRepoManager: () => gitRepoManager,
+                    getCurrentProject: () => currentProject
                 }
-            };
-
-            // Update status bar on cursor position change
-            editor.onDidChangeCursorPosition(updateStatusBar);
-            updateStatusBar(); // Initial update
-
-            const setBranchDisplay = (branchName) => {
-                const label = (branchName && branchName.trim()) ? branchName.trim() : 'Git';
-                const branchEl = document.getElementById('gitBranch');
-                if (branchEl) {
-                    branchEl.innerHTML = `<span class="icon">⎇</span> ${label}`;
-                }
-                const vcsToggle = document.getElementById('vcsWidgetBtn');
-                if (vcsToggle) {
-                    const hint = label === 'Git' ? 'Git' : `Git: ${label}`;
-                    vcsToggle.title = hint;
-                    vcsToggle.setAttribute('aria-label', hint);
-                    vcsToggle.dataset.branch = label;
-                }
-                const vcsLabel = document.getElementById('vcsWidgetLabel');
-                if (vcsLabel) {
-                    vcsLabel.textContent = label;
-                }
-            };
-
-            const fetchCurrentBranch = async () => {
-                try {
-                    const repoState = gitRepoManager?.getState ? gitRepoManager.getState() : null;
-                    if (repoState?.gitDisabled) return null;
-                    if (repoState && !repoState.gitAvailable) return null;
-                    if (repoState && !repoState.repoDetected) {
-                        setBranchDisplay('Git');
-                        return null;
-                    }
-
-                    if (currentProject && currentProject.projectPath) {
-                        const branchRes = await (gitRepoManager?.runGit
-                            ? gitRepoManager.runGit('git branch --show-current')
-                            : window.ahmadIDE.git('git branch --show-current'));
-                        if (branchRes?.ok && branchRes.stdout) {
-                            const name = branchRes.stdout.trim();
-                            setBranchDisplay(name || 'Git');
-                            return name || 'Git';
-                        }
-                    }
-                } catch (_) { }
-                return null;
-            };
-
-            // Keep branch / tooltip in sync with repo detection changes.
-            try {
-                gitRepoManager?.subscribe?.((s) => {
-                    if (!s || s.gitDisabled || !s.gitAvailable || !s.repoDetected) {
-                        setBranchDisplay('Git');
-                        return;
-                    }
-                    fetchCurrentBranch().catch(() => { });
-                });
-            } catch (_) { }
-
-            // Update Git branch if in a git repo
-            fetchCurrentBranch();
+            });
+            const statusBarApi = statusBarWiring.wireStatusBar(editor);
+            const fetchCurrentBranch = statusBarApi.fetchCurrentBranch;
 
             // --- Env info ---
             const envInfo = await window.ahmadIDE.getEnv();
@@ -3960,360 +2597,84 @@
             wireMenuBar(editor, routineState, terminalState);
 
             // --- Run & Debug buttons ---
-            const runConfigState = {
-                active: 'run-current',
-                labels: {
-                    'run-current': 'Current file (Run)',
-                    'debug-current': 'Current file (Debug)'
-                }
-            };
-
-            const runConfigMenu = document.getElementById('runConfigMenu');
-            if (runConfigMenu) runConfigMenu.remove();
-            const runConfigBtn = document.getElementById('runConfigBtn');
-            const runConfigTitleEl = document.getElementById('runConfigTitle');
-            const runBtnEl = document.getElementById('runBtn');
-            const debugStartBtnEl = document.getElementById('debugStartBtn');
-
-            const formatRunConfigTitle = (label) => {
-                const raw = String(label || '').trim();
-                if (!raw) return raw;
-                // "Current file (Run)" -> "Current file" (PhpStorm-style config label)
-                const noParen = raw.replace(/\s*\([^)]*\)\s*$/, '').trim();
-                return noParen || raw;
-            };
-
-            const setRunConfig = (id) => {
-                if (!runConfigState.labels[id]) return;
-                runConfigState.active = id;
-                const label = runConfigState.labels[id];
-                if (runConfigBtn) {
-                    runConfigBtn.title = label;
-                    runConfigBtn.setAttribute('aria-label', label);
-                }
-                if (runConfigTitleEl) {
-                    runConfigTitleEl.textContent = formatRunConfigTitle(label);
-                }
-                if (runBtnEl) {
-                    runBtnEl.title = `${label} (Ctrl+Enter)`;
-                }
-                if (runConfigMenu) {
-                    runConfigMenu.querySelectorAll('.run-config-item').forEach((item) => {
-                        const cfg = item.getAttribute('data-config');
-                        item.classList.toggle('active', cfg === id);
-                    });
-                }
-            };
-
-            window.AhmadIDEModules = window.AhmadIDEModules || {};
-            window.AhmadIDEModules.app = window.AhmadIDEModules.app || {};
-            window.AhmadIDEModules.app.runConfig = window.AhmadIDEModules.app.runConfig || {};
-            window.AhmadIDEModules.app.runConfig.getActive = () => runConfigState.active;
-            window.AhmadIDEModules.app.runConfig.setActive = (id) => setRunConfig(id);
-            window.AhmadIDEModules.app.refreshRoutines = async () => {
-                try {
-                    if (!routinesManager || !routineState || !editor) return false;
-                    const search = document.getElementById('routineSearch')?.value || '';
-                    await loadRoutineList(routineState, editor, search);
-                    return true;
-                } catch (_) {
-                    return false;
-                }
-            };
-
-            const shouldDebugForRun = () => {
-                const bps = getBpLines();
-                const hasBps = bps.length > 0;
-                const debugArmed = dbgState.debugModeEnabled;
-                const explicitDebugCfg = runConfigState.active === 'debug-current';
-                // Only start debugger when it's armed (Debug button) AND a breakpoint exists,
-                // or when explicitly selecting the debug run config with at least one breakpoint.
-                return (debugArmed && hasBps) || (explicitDebugCfg && hasBps);
-            };
-
-            // Initialize defaults
-            setRunConfig(runConfigState.active);
-
-            // RUN: If debug mode enabled, start debugging. Otherwise, run normally.
-            if ($) {
-                $('#runBtn').on('click', async () => {
-                    // Lint code - only errors block execution (warnings/info allowed)
-                    const code = editor.getValue();
-                    const linter = window._mumpsLinter || mumpsLinter;
-                    if (hasLintRules(linter)) {
-                        const lintResult = linter.lint(code || '', { mode: 'create' });
-                        applyLintMarkers(editor.getModel(), lintResult.issues || []);
-                        renderProblems((lintResult.issues || []).map(i => ({
-                            message: i.message || i.description || '',
-                            severity: i.severity || 'info',
-                            line: i.line || null,
-                            code: i.ruleId || i.code || null
-                        })));
-                        const summary = lintResult.summary || { errors: 0, warnings: 0, info: 0 };
-                        if (summary.errors > 0) {
-                            appendOutput(
-                                `✗ Cannot run: ${summary.errors} error(s) found`,
-                                terminalState
-                            );
-                            return;
-                        }
-                    } else {
-                        // Fallback to existing marker check
-                        const markers = monaco.editor.getModelMarkers({ owner: 'mumps-check' }) || [];
-                        if (markers.length) {
-                            const m = markers[0];
-                            appendOutput(
-                                `✗ Cannot run: ${m.message} (line ${m.startLineNumber})`,
-                                terminalState
-                            );
-                            return;
-                        }
-                    }
-
-                    const bpLines = getBpLines();
-                    const debugActive = shouldDebugForRun();
-
-                    // If debug mode enabled, check if session already ready
-                    if (debugActive) {
-                        // Check if debugger is already initialized and waiting
-                        if (currentDebugSession && currentDebugSession.ready && !currentDebugSession.currentLine) {
-                            // Debugger is ready, send Continue to start execution
-                            logger.debug('[RUN] Debugger already ready, sending Continue command');
-                            await debugContinue();
-                        } else {
-                            // Start new debug session
-                            debugStartBtnEl?.classList.add('active');
-                            dbgState.debugModeEnabled = true;
-                            await startDebugSession(editor, dbgState, terminalState, debugBar, bpLines);
-                        }
-                    } else {
-                        // Normal execution (no debugging)
-                        const res = await runMumpsCode(editor, terminalState);
-                        if (!res || !res.ok) {
-                            await stopDebug(editor, dbgState, terminalState, debugBar);
-                        }
-                    }
-                });
-
-                // DEBUG BUTTON: arm/disarm debugger (Run starts it)
-                $('#debugStartBtn').on('click', () => {
-                    const $btn = $('#debugStartBtn');
-                    // If a session is active, stop it
-                    if (currentDebugSession && currentDebugSession.id) {
-                        debugStop();
-                        return;
-                    }
-                    dbgState.debugModeEnabled = !dbgState.debugModeEnabled;
-                    if (dbgState.debugModeEnabled) {
-                        const bpLines = getBpLines();
-                        if (bpLines.length === 0) {
-                            appendOutput('⚠️  Debug armed, but no breakpoints set. Run will execute normally.', terminalState);
-                        } else {
-                            appendOutput('✅ Debug armed. Click Run to start debugging.', terminalState);
-                        }
-                    } else {
-                        appendOutput('🛑 Debug disarmed. Run will execute normally.', terminalState);
-                    }
-                    updateDebugButtonState();
-                });
-            }
-
-            const wireRunOutputHeader = () => {
-                const panelEl = document.getElementById('terminalPanel');
-                if (!panelEl || panelEl.dataset.runOutputWired === '1') return;
-
-                const clearBtn = document.getElementById('terminalClearBtn');
-                const newTabBtn = document.getElementById('terminalNewTabBtn');
-                const hideBtn = document.getElementById('terminalHideBtn');
-                const menuBtn = document.getElementById('terminalMenuBtn');
-                const dropdownBtn = document.getElementById('terminalDropdownBtn');
-
-                // Not mounted yet.
-                if (!clearBtn && !newTabBtn && !hideBtn && !menuBtn && !dropdownBtn) return;
-                panelEl.dataset.runOutputWired = '1';
-
-                clearBtn?.addEventListener('click', () => clearOutput(terminalState));
-                newTabBtn?.addEventListener('click', () => addTerminalTab(terminalState).catch(() => { }));
-                hideBtn?.addEventListener('click', () => toggleToolWindowPanel('terminalPanel', 'bottom'));
-
-                const openRunMenu = (anchorEl) => {
-                    const menu = window.AhmadIDEModules?.ui?.menu;
-                    const controller = menu?.controller || menu?.createMenuController?.({});
-                    if (!controller?.openAtElement) return;
-                    controller.openAtElement({
-                        anchorEl,
-                        items: [
-                            { id: 'run.new', label: 'New Run Tab', action: 'run:new-tab' },
-                            { id: 'run.clear', label: 'Clear Output', action: 'run:clear' },
-                            { type: 'separator' },
-                            { id: 'run.hide', label: 'Hide', action: 'run:hide' }
-                        ],
-                        ctx: {},
-                        onAction: async (action) => {
-                            switch (action) {
-                                case 'run:new-tab':
-                                    await addTerminalTab(terminalState);
-                                    return;
-                                case 'run:clear':
-                                    clearOutput(terminalState);
-                                    return;
-                                case 'run:hide':
-                                    toggleToolWindowPanel('terminalPanel', 'bottom');
-                                    return;
-                            }
-                        }
-                    });
-                };
-
-                const bindMenuBtn = (btn) => {
-                    if (!btn) return;
-                    btn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        openRunMenu(btn);
-                    });
-                };
-
-                bindMenuBtn(menuBtn);
-                bindMenuBtn(dropdownBtn);
-            };
-
-            wireRunOutputHeader();
-            try {
-                window.AhmadIDEModules?.app?.featureRegistry?.onMounted?.('terminalPanel', () => wireRunOutputHeader());
-            } catch (_) { }
-
-            // Initialize -style terminal header
-            const initTerminalHeader = window.AhmadIDEModules?.terminal?.initTerminalHeader;
-            if (initTerminalHeader) {
-                const headerCtrl = initTerminalHeader();
-                if (window.AhmadIDEModules?.terminal) {
-                    window.AhmadIDEModules.terminal.terminalHeaderCtrl = headerCtrl;
-                }
-            }
-
-            $('#saveRoutineBtn').on('click', async () => {
-                if (!canSaveActiveTab()) {
-                    showToast('info', 'Diff', 'Diff tabs are read-only');
-                    return;
-                }
-                await saveRoutineFlow(editor, routineState, terminalState);
-            });
-            $('#undoBtn').on('click', () => {
-                editor.trigger('keyboard', 'undo', {});
-            });
-            $('#redoBtn').on('click', () => {
-                editor.trigger('keyboard', 'redo', {});
-            });
-            $('#newRoutineBtn').on('click', async () => {
-                await newRoutineFlow(editor, routineState, terminalState);
-            });
-
-            $('#lintBtn').on('click', async () => {
-                const code = editor.getValue();
-                appendOutput('🧹 Linting...', terminalState);
-                const linter = window._mumpsLinter || mumpsLinter;
-                if (hasLintRules(linter)) {
-                    const res = linter.lint(code || '', { mode: 'edit' });
-                    applyLintMarkers(editor.getModel(), res.issues || []);
-                    renderProblems((res.issues || []).map(i => ({
-                        message: i.message || i.description || '',
-                        severity: i.severity || 'info',
-                        line: i.line || null,
-                        code: i.ruleId || i.code || null
-                    })));
-                    const summary = res.summary || { errors: 0, warnings: 0, info: 0 };
-                    appendOutput(`✓ Lint: ${summary.errors} errors, ${summary.warnings} warnings, ${summary.info} info`, terminalState);
-                } else {
-                    const res = await window.ahmadIDE.lint(code);
-                    if (res.ok) {
-                        appendOutput(`✓ ${res.summary}`, terminalState);
-                        renderProblems([{ message: res.summary, severity: 'info' }]);
-                    } else {
-                        appendOutput(`✗ Lint error: ${res.error || res.stderr}`, terminalState);
-                        renderProblems([{ message: res.error || 'Lint failed', severity: 'error' }]);
-                    }
+            const createRunDebugButtonsWiring = window.AhmadIDEModules?.renderer?.run?.createRunDebugButtonsWiring;
+            const runDebugButtonsWiring = createRunDebugButtonsWiring({
+                deps: {
+                    loadRoutineList,
+                    routinesManager,
+                    logger,
+                    appendOutput,
+                    mumpsLinter,
+                    hasLintRules,
+                    applyLintMarkers,
+                    renderProblems,
+                    debugContinue,
+                    startDebugSession,
+                    runMumpsCode,
+                    debugStop,
+                    updateDebugButtonState,
+                    clearOutput,
+                    addTerminalTab,
+                    toggleToolWindowPanel,
+                    currentDebugSessionRef
                 }
             });
 
-            connectionsManager.wireConnectionsPanel({ editor, routineState, terminalState });
+            runDebugButtonsWiring.wireRunDebugButtons($, editor, routineState, terminalState, dbgState, debugBar, getBpLines);
 
-            // Auto-connect check (Docker default)
-            setTimeout(() => {
-                connectionsManager.checkForAutoConnect?.({ editor, routineState, terminalState }, {
+            const createEditorToolbarWiring = window.AhmadIDEModules?.renderer?.editor?.createEditorToolbarWiring;
+            const editorToolbarWiring = createEditorToolbarWiring({
+                deps: {
+                    canSaveActiveTab,
+                    showToast,
+                    saveRoutineFlow,
+                    newRoutineFlow,
+                    appendOutput,
+                    mumpsLinter,
+                    hasLintRules,
+                    applyLintMarkers,
+                    renderProblems
+                }
+            });
+            editorToolbarWiring.wireEditorToolbar($, editor, routineState, terminalState);
+
+            const createPostMonacoWiring = window.AhmadIDEModules?.renderer?.startup?.createPostMonacoWiring;
+            const postMonacoWiring = createPostMonacoWiring({
+                deps: {
+                    connectionsManager,
                     appendOutput,
                     setConnStatus,
-                    closeConnectionsPanel: () => {
-                        const panel = document.getElementById('connectionsPanel');
-                        if (panel) panel.classList.add('hidden');
-                        const overlay = document.getElementById('connectionsOverlay');
-                        if (overlay) overlay.classList.add('hidden');
-                    },
-                    loadRoutineList: async (rs, ed) => {
-                        await loadRoutineList(rs, ed, document.getElementById('routineSearch')?.value || '', null);
-                    }
-                });
-            }, 500);
-
-            document.getElementById('closeShortcutsBtn')?.addEventListener('click', closeShortcutsPanel);
-            // Legacy overlay removed - dialog handles backdrop clicks
-            document.getElementById('saveShortcutBtn')?.addEventListener('click', () => {
-                const input = document.getElementById('shortcutInput');
-                const select = document.getElementById('shortcutSelect');
-                if (!input || !select) return;
-                const actionId = select.value;
-                const parsed = parseShortcutString(input.value);
-                if (!parsed) {
-                    appendOutput('✗ Invalid shortcut. Use format like Ctrl+D or Ctrl+Shift+L', terminalState);
-                    return;
+                    loadRoutineList: (...args) => loadRoutineList(...args),
+                    closeShortcutsPanel,
+                    parseShortcutString,
+                    loadShortcutPrefs,
+                    persistShortcutPrefs,
+                    registeredShortcuts,
+                    applyShortcutBinding,
+                    renderShortcutsPanel,
+                    setCollapseStateAll,
+                    getActiveEditor: () => activeEditor,
+                    renderBreakpoints,
+                    decorateBreakpoints,
+                    settingsPanelManager,
+                    projectCreateManager,
+                    gitToolWindowManager,
+                    setDebugButtons,
+                    renderProjectTreeLoading,
+                    renderProjectTree,
+                    showToast,
+                    renderLocals,
+                    renderStack,
+                    renderDebugConsole,
+                    resetDebugUI,
+                    ctrlHoverManager
                 }
-                const prefs = loadShortcutPrefs();
-                prefs[actionId] = parsed;
-                persistShortcutPrefs(prefs);
-                const target = registeredShortcuts.find(s => s.actionId === actionId);
-                if (target) {
-                    applyShortcutBinding(editor, actionId, parsed, target.handler);
-                    target.binding = parsed;
-                }
-                appendOutput(`✓ Shortcut updated: ${actionId} -> ${input.value}`, terminalState);
-                renderShortcutsPanel();
             });
-            document.getElementById('expandAllBtn')?.addEventListener('click', () => setCollapseStateAll(false));
-            document.getElementById('collapseAllBtn')?.addEventListener('click', () => setCollapseStateAll(true));
-            document.getElementById('bpClearAllBtn')?.addEventListener('click', () => {
-                dbgState.breakpoints?.clear();
-                renderBreakpoints(dbgState);
-                decorateBreakpoints(activeEditor, dbgState);
+            postMonacoWiring.wirePostMonacoWiring(editor, routineState, terminalState, dbgState, fetchCurrentBranch, (gitToolWindowApi) => {
+                openGitToolWindow = gitToolWindowApi.openGitToolWindow;
+                openCommitToolWindow = gitToolWindowApi.openCommitToolWindow;
+                openGitPanel = gitToolWindowApi.openGitPanel;
             });
-            document.getElementById('gitClearBtn')?.addEventListener('click', () => {
-                const out = document.getElementById('gitOutput');
-                if (out) out.textContent = 'Git ready.';
-            });
-            settingsPanelManager.wireSettingsPanel();
-            projectCreateManager.wireNewProjectPanel();
-
-            const gitToolWindowApi = gitToolWindowManager.wireGitToolWindow({ fetchCurrentBranch });
-            openGitToolWindow = gitToolWindowApi.openGitToolWindow;
-            openCommitToolWindow = gitToolWindowApi.openCommitToolWindow;
-            openGitPanel = gitToolWindowApi.openGitPanel;
-
-            // --- Initial debug / UI state ---
-            setDebugButtons(false);
-            renderProjectTreeLoading('Loading routines…');
-            loadRoutineList(routineState, editor).catch((err) => {
-                console.error('ROUTINE_LIST_INIT_FAIL', err);
-                renderProjectTree([], routineState, editor);
-                showToast('error', 'Routines', err?.message || 'Failed to load routines');
-            });
-            // Run Output (legacy terminal) is lazy: only create tabs when Run is triggered
-            // or when the Run tool window is opened. Avoid early init because the panel
-            // template isn't mounted while hidden, which can cause "Missing terminal container".
-            renderBreakpoints(dbgState);
-            renderLocals({});
-            renderStack([]);
-            renderDebugConsole([]);
-            resetDebugUI();
-            ctrlHoverManager.bindCtrlHoverAndGutter(editor, dbgState);
         });
     }
 
@@ -4353,111 +2714,11 @@
     }
 
     function renderDocker(containers, routineState, editor, opts) {
-        const host = document.getElementById('dockerList');
-        if (!host) return;
-        const collapseEl = opts instanceof Element
-            ? opts
-            : (opts && opts.collapseEl instanceof Element ? opts.collapseEl : null);
-        const onSelect = opts && typeof opts.onSelect === 'function' ? opts.onSelect : null;
-        host.innerHTML = '';
-        if (!containers || !containers.length) {
-            host.textContent = 'No running containers.';
-            return;
-        }
-        // Load saved Docker config once
-        let dockerConfig = {};
-        try {
-            dockerConfig = JSON.parse(localStorage.getItem('ahmadIDE:dockerConfig') || '{}');
-        } catch (e) {
-            dockerConfig = {};
-        }
-
-        containers.forEach(c => {
-            const div = document.createElement('div');
-            div.className = 'docker-item';
-            div.style.display = 'flex';
-            div.style.justifyContent = 'space-between';
-            div.style.alignItems = 'center';
-
-            const infoSpan = document.createElement('span');
-            infoSpan.textContent = `${c.name} (${c.id}) :: ${c.status}`;
-            div.appendChild(infoSpan);
-
-            // Default Toggle (Star)
-            const isDefault = dockerConfig.defaultContainerId === c.id;
-            const star = document.createElement('span');
-            star.textContent = isDefault ? '★' : '☆';
-            star.className = 'docker-default-star'; // Add class for potential styling
-            star.style.marginLeft = '8px';
-            star.style.cursor = 'pointer';
-            star.style.fontSize = '1.2em';
-            star.style.color = isDefault ? '#f0a35c' : '#6a7280'; // accent-orange vs muted
-            star.title = isDefault ? 'Unset Default' : 'Set as Default (Auto-Connect)';
-
-            star.onclick = (e) => {
-                e.stopPropagation();
-                // Toggle default
-                if (isDefault) {
-                    delete dockerConfig.defaultContainerId;
-                } else {
-                    dockerConfig.defaultContainerId = c.id;
-                    dockerConfig.defaultContainerName = c.name; // Store name for UI status
-                }
-                localStorage.setItem('ahmadIDE:dockerConfig', JSON.stringify(dockerConfig));
-                // Re-render to update stars
-                renderDocker(containers, routineState, editor, opts);
-            };
-
-            div.appendChild(star);
-
-            div.onclick = async () => {
-                appendOutput(`🐳 Using container ${c.name} (${c.id})`);
-                // Save this container ID for later use
-                try {
-                    localStorage.setItem('ahmadIDE:lastContainerId', c.id);
-                } catch (e) {
-                    // ignore
-                }
-
-                // Use latest config (reload to be safe, or use modified object)
-                let currentConfig = {};
-                try {
-                    currentConfig = JSON.parse(localStorage.getItem('ahmadIDE:dockerConfig') || '{}');
-                } catch (e) { }
-
-                await window.ahmadIDE.setConnection('docker', { docker: { containerId: c.id, ...currentConfig } });
-                const modeLabel = currentConfig.ydbPath ? 'Docker (configured)' : 'Docker (universal)';
-                setConnStatus(`Docker: ${c.name} (${modeLabel})`, 'success');
-                await loadRoutineList(
-                    routineState,
-                    editor,
-                    document.getElementById('routineSearch')?.value || '',
-                    null
-                );
-                if (onSelect) onSelect();
-                if (collapseEl) collapseEl.classList.add('collapsed');
-                if (window.MIDE?.scheduleEditorLayout) window.MIDE.scheduleEditorLayout('docker-select');
-            };
-            host.appendChild(div);
-        });
-        // Listing containers does not mean we are connected to one.
+        return dockerUi.renderDocker(containers, routineState, editor, opts);
     }
 
     function setConnStatus(text, severity) {
-        const pill = document.getElementById('connStatus');
-        if (!pill) return;
-        pill.textContent = text;
-        if (severity === 'subtle') {
-            pill.style.background = '';
-            pill.style.color = '';
-            return;
-        }
-        pill.style.background = severity === 'error'
-            ? 'var(--accent-orange)'
-            : 'var(--accent-soft)';
-        pill.style.color = severity === 'error'
-            ? 'var(--text-bright)'
-            : 'var(--accent-blue)';
+        return dockerUi.setConnStatus(text, severity);
     }
 
     function initExtensionsView() {
@@ -4577,6 +2838,16 @@
     function registerMumpsHover() {
         return debugManager.registerMumpsHover();
     }
+
+    // Expose the internal menu action runner so toolbar/drawers can dispatch actions
+    // without relying on legacy global free-variables.
+    try {
+        window.AhmadIDEModules = window.AhmadIDEModules || {};
+        window.AhmadIDEModules.app = window.AhmadIDEModules.app || {};
+        if (typeof window.AhmadIDEModules.app.runMenuAction !== 'function') {
+            window.AhmadIDEModules.app.runMenuAction = (action, ctx) => runMenuAction(action, ctx);
+        }
+    } catch (_) { }
 
     // Dispose all tab models on unload to release memory and markers
     window.addEventListener('beforeunload', () => {

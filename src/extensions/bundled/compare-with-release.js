@@ -13,7 +13,7 @@
 (() => {
     const EXTENSION_ID = 'compare-with-release';
     const EXTENSION_NAME = 'Compare with Release';
-    const EXTENSION_VERSION = '1.0.0';
+    const EXTENSION_VERSION = '2.0.0';
     const utils = window.AhmadIDEModules?.extensions?.compareWithReleaseUtils || {};
 
     const runtime = {

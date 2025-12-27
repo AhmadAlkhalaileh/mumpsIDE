@@ -89,7 +89,9 @@
         }
 
         async function loadRoutineList(state, editor, search = '') {
+            console.log('[RENDERER] loadRoutineList called');
             const res = await window.ahmadIDE.listRoutines('');
+            console.log('[RENDERER] listRoutines result:', res);
             if (res.ok) {
                 state._cacheFull = res.routines;
                 setRoutinesCache(res.routines || getRoutinesCache());
@@ -97,6 +99,7 @@
                     renderProjectTree(state._cacheFull || state._lastRoutines || [], state, editor);
                 }, 0);
             } else {
+                console.log('[RENDERER] listRoutines failed:', res.error);
                 setTimeout(() => renderProjectTree([], state, editor), 0);
             }
             state._lastRoutines = res.ok ? res.routines : [];
@@ -287,7 +290,10 @@
                 }
 
                 logger.info('FILE_CREATE', { routine: routineName });
-                const code = `MAIN ; ${routineName} routine\n    WRITE "Hello from ${routineName}!", !\n    QUIT\n`;
+                // Use configurable template from snippets service, fallback to default
+                const snippetsService = window.mumpsSnippets;
+                const code = snippetsService?.getRoutineTemplate?.(routineName)
+                    || `${routineName}\t; ${routineName} routine\n\tQUIT\n`;
 
                 // Create a new tab for the routine
                 createTab(routineName, code, state);

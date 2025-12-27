@@ -444,10 +444,14 @@
             newBtn.on('click', () => {
                 showCustomPrompt('New Routine', 'Routine name (e.g., NEWRTN)', (name) => {
                     if (name) {
-                        createTab(name.toUpperCase(), `${name.toUpperCase()}\t; New routine\n\tQUIT\n`);
+                        const routineName = name.toUpperCase();
+                        const snippetsService = window.mumpsSnippets;
+                        const code = snippetsService?.getRoutineTemplate?.(routineName)
+                            || `${routineName}\t; New routine\n\tQUIT\n`;
+                        createTab(routineName, code);
                         const terminalState = getGlobalTerminalState();
                         if (terminalState) {
-                            appendOutput(`✓ Created new routine: ${name.toUpperCase()}`, terminalState);
+                            appendOutput(`✓ Created new routine: ${routineName}`, terminalState);
                         }
                     }
                 });

@@ -1,0 +1,315 @@
+/**
+ * MUMPS GOTO Map Visualization - Styling
+ * Visually stunning flow map with curved arcs and heat maps
+ */
+
+/* Panel container */
+.mumps-goto-map-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 700px;
+    height: 85vh;
+    max-height: 900px;
+    background: #282a36;
+    border: 2px solid #6272a4;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    display: none;
+    flex-direction: column;
+    z-index: 10000;
+    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden;
+}
+
+.mumps-goto-map-panel.visible {
+    display: flex;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -48%);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%);
+    }
+}
+
+/* Header */
+.goto-map-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: linear-gradient(135deg, #44475a 0%, #363948 100%);
+    border-bottom: 1px solid #6272a4;
+    flex-shrink: 0;
+}
+
+.goto-map-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+    font-size: 15px;
+    color: #f8f8f2;
+    flex: 1;
+}
+
+.goto-map-icon {
+    font-size: 20px;
+}
+
+.goto-map-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: #f8f8f2;
+}
+
+.goto-map-stats .stat {
+    padding: 3px 8px;
+    background: rgba(98, 114, 164, 0.3);
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.goto-map-stats .stat.forward {
+    background: rgba(80, 250, 123, 0.2);
+    color: #50fa7b;
+}
+
+.goto-map-stats .stat.backward {
+    background: rgba(255, 184, 108, 0.2);
+    color: #ffb86c;
+}
+
+.goto-map-stats .stat.spaghetti {
+    background: rgba(189, 147, 249, 0.2);
+    color: #bd93f9;
+}
+
+.goto-map-close {
+    background: none;
+    border: none;
+    color: #f8f8f2;
+    font-size: 28px;
+    font-weight: 300;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.goto-map-close:hover {
+    background: rgba(255, 85, 85, 0.2);
+    color: #ff5555;
+}
+
+/* Body - SVG container */
+.goto-map-body {
+    flex: 1;
+    padding: 20px;
+    overflow: auto;
+    background: #1e1f29;
+}
+
+.goto-map-svg {
+    width: 100%;
+    height: 100%;
+    min-height: 500px;
+}
+
+/* Timeline axis */
+.timeline-axis {
+    stroke: #6272a4;
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+/* Label dots and text */
+.label-dot {
+    fill: #bd93f9;
+    stroke: #6272a4;
+    stroke-width: 2;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.label-dot:hover {
+    fill: #ff79c6;
+    stroke: #ff79c6;
+    r: 7;
+    filter: url(#glow);
+}
+
+.label-text {
+    fill: #f8f8f2;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+    transition: fill 0.2s;
+}
+
+.label-text:hover {
+    fill: #ff79c6;
+    font-weight: 600;
+}
+
+/* GOTO dots */
+.goto-dot {
+    stroke-width: 1.5;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.goto-dot.forward {
+    fill: #50fa7b;
+    stroke: #50fa7b;
+}
+
+.goto-dot.backward {
+    fill: #ffb86c;
+    stroke: #ffb86c;
+}
+
+.goto-dot:hover {
+    r: 5;
+    filter: url(#glow);
+}
+
+/* GOTO arcs - curved paths */
+.goto-arc {
+    fill: none;
+    stroke-width: 2;
+    opacity: 0.7;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.goto-arc.forward {
+    stroke: #50fa7b;
+}
+
+.goto-arc.backward {
+    stroke: #ffb86c;
+}
+
+.goto-arc:hover,
+.goto-arc.highlighted {
+    stroke-width: 3;
+    opacity: 1;
+    filter: url(#glow);
+}
+
+/* Heat map bars */
+.heat-bar {
+    pointer-events: all;
+    transition: opacity 0.2s;
+}
+
+.heat-bar:hover {
+    opacity: 0.9 !important;
+    stroke: #f8f8f2;
+    stroke-width: 1;
+}
+
+/* Legend */
+.goto-map-legend {
+    display: flex;
+    gap: 20px;
+    padding: 12px 18px;
+    background: #363948;
+    border-top: 1px solid #6272a4;
+    font-size: 12px;
+    color: #f8f8f2;
+    flex-shrink: 0;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.legend-line {
+    width: 24px;
+    height: 2px;
+    display: inline-block;
+}
+
+.legend-line.forward {
+    background: #50fa7b;
+}
+
+.legend-line.backward {
+    background: #ffb86c;
+}
+
+.legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.legend-dot.label {
+    background: #bd93f9;
+    border: 2px solid #6272a4;
+}
+
+.legend-dot.goto {
+    background: #50fa7b;
+}
+
+/* Scrollbar styling */
+.goto-map-body::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.goto-map-body::-webkit-scrollbar-track {
+    background: #1e1f29;
+}
+
+.goto-map-body::-webkit-scrollbar-thumb {
+    background: #6272a4;
+    border-radius: 4px;
+}
+
+.goto-map-body::-webkit-scrollbar-thumb:hover {
+    background: #bd93f9;
+}
+
+/* Tooltips (native SVG titles) */
+title {
+    font-family: 'Segoe UI', sans-serif;
+}
+
+/* Responsive adjustments */
+@media (max-width: 800px) {
+    .mumps-goto-map-panel {
+        width: 90vw;
+        height: 90vh;
+    }
+
+    .goto-map-stats {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .goto-map-legend {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+}

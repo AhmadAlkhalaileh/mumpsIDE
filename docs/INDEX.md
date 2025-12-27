@@ -269,7 +269,7 @@ See `package.json` for details.
 
 | Version | Date | Documentation Changes |
 |---------|------|----------------------|
-| 1.0.0 | 2024-12-12 | Initial complete documentation |
+| 2.0.0 | 2024-12-12 | Initial complete documentation |
 
 ---
 
@@ -294,4 +294,4 @@ See `package.json` for details.
 ---
 
 **Last Updated:** December 12, 2024
-**Documentation Version:** 1.0.0
+**Documentation Version:** 2.0.0

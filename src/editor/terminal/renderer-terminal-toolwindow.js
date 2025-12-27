@@ -216,7 +216,12 @@
             try { pane.term.resize(dims.cols, dims.rows); } catch (_) { }
             pane.lastSize = dims;
             if (resizeSession && pane.sessionId) {
-                resizePtySession(pane.sessionId, dims.cols, dims.rows);
+                // Debounce backend resize to prevent lag during dragging
+                if (pane._resizeTimer) clearTimeout(pane._resizeTimer);
+                pane._resizeTimer = setTimeout(() => {
+                    pane._resizeTimer = null;
+                    resizePtySession(pane.sessionId, dims.cols, dims.rows);
+                }, 300);
             }
         };
 

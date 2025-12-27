@@ -35,6 +35,8 @@
     <link rel="stylesheet" href="./styles/splash.css?v=20251213">
     <link rel="stylesheet" href="./styles/patch-tracking.css">
     <link rel="stylesheet" href="./styles/git-blame.css">
+    <link rel="stylesheet" href="./styles/goto-map.css">
+    <link rel="stylesheet" href="./styles/mumps-features.css">
 
     <link rel="stylesheet" href="./node_modules/xterm/css/xterm.css">
 </head>
@@ -47,7 +49,7 @@
             </div>
             <h1 class="splash-title">Mumps Studio</h1>
             <p class="splash-subtitle">Developed by Ahmad Alkhalaileh</p>
-            <p class="splash-version">Version 1.1</p>
+            <p class="splash-version">Version 2.0</p>
             <div class="splash-loader">
                 <div class="loader-bar"></div>
             </div>
@@ -102,8 +104,6 @@
                     <button class="btn ghost icon-btn toolbar-btn vcs-toggle" id="vcsWidgetBtn" title="Git"
                         aria-label="Git">
                         <span data-ui-icon="git" data-ui-icon-size="16" aria-hidden="true"></span>
-                        <span class="vcs-widget-label" id="vcsWidgetLabel">Git</span>
-                        <span data-ui-icon="chevron-down" data-ui-icon-size="12" aria-hidden="true"></span>
                     </button>
                 </div>
             </div>
@@ -128,8 +128,9 @@
                 <button class="tool-window-stripe-btn" data-panel="commitPanel" data-position="left"
                     title="Commit (Alt+0)">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M10.5 7.5A2.5 2.5 0 0 1 8 10a2.5 2.5 0 0 1-2.5-2.5A2.5 2.5 0 0 1 8 5a2.5 2.5 0 0 1 2.5 2.5z"/>
-                        <path d="M0 7.5h3.5a4.5 4.5 0 0 0 9 0H16v1h-3.5a4.5 4.5 0 0 1-9 0H0v-1z"/>
+                        <path
+                            d="M10.5 7.5A2.5 2.5 0 0 1 8 10a2.5 2.5 0 0 1-2.5-2.5A2.5 2.5 0 0 1 8 5a2.5 2.5 0 0 1 2.5 2.5z" />
+                        <path d="M0 7.5h3.5a4.5 4.5 0 0 0 9 0H16v1h-3.5a4.5 4.5 0 0 1-9 0H0v-1z" />
                     </svg>
                     <span class="stripe-text">Commit</span>
                 </button>
@@ -242,11 +243,12 @@
                     </svg>
                     <span class="stripe-text">Problems</span>
                 </button>
-                <button class="tool-window-stripe-btn horizontal hidden" data-panel="comparePanel" data-position="bottom"
-                    title="Compare (Alt+7)">
+                <button class="tool-window-stripe-btn horizontal hidden" data-panel="comparePanel"
+                    data-position="bottom" title="Compare (Alt+7)">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M2 2h5v12H2zM9 2h5v12H9z" fill="none" stroke="currentColor" stroke-width="1.5"/>
-                        <path d="M4.5 6L6 7.5 4.5 9M11.5 6L10 7.5 11.5 9" stroke="currentColor" stroke-width="1.2" fill="none"/>
+                        <path d="M2 2h5v12H2zM9 2h5v12H9z" fill="none" stroke="currentColor" stroke-width="1.5" />
+                        <path d="M4.5 6L6 7.5 4.5 9M11.5 6L10 7.5 11.5 9" stroke="currentColor" stroke-width="1.2"
+                            fill="none" />
                     </svg>
                     <span class="stripe-text">Compare</span>
                 </button>
@@ -288,8 +290,9 @@
                 <button class="tool-window-stripe-btn horizontal" data-panel="patchTrackingPanel" data-position="bottom"
                     title="Patch Tracking">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor">
-                        <path d="M9 2H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7" stroke-width="1.4"/>
-                        <path d="M11 2l3 3M13 3l-7 7-3 1 1-3 7-7z" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M9 2H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7" stroke-width="1.4" />
+                        <path d="M11 2l3 3M13 3l-7 7-3 1 1-3 7-7z" stroke-width="1.4" stroke-linecap="round"
+                            stroke-linejoin="round" />
                     </svg>
                     <span class="stripe-text">Patches</span>
                 </button>
@@ -390,11 +393,13 @@
     <script src="./libs/jquery.min.js"></script>
     <script src="./assets/mumps/mumps-validator.js"></script>
     <script src="./assets/mumps/mumps-linter.js"></script>
+    <script src="./assets/mumps/mumps-linter-enhanced.js"></script>
     <script src="./assets/mumps/mumps-lexer.js"></script>
     <script src="./utils/debug-log.js"></script>
     <script src="./utils/logger.js"></script>
     <script src="./src/services/settingsService.js"></script>
     <script src="./src/services/debugTimelineService.js"></script>
+    <script src="./src/ui/layout-resizer.js"></script>
     <script src="./src/services/debugTimelineDiffService.js"></script>
     <script src="./src/services/fontService.js"></script>
     <script src="./src/services/extensionsService.js"></script>
@@ -424,12 +429,12 @@
     <script src="./src/features/projects/openProjectDialog.js"></script>
     <script src="./src/features/search/findReplaceDialog.js"></script>
     <script src="./src/features/search/searchEverywhereDialog.js"></script>
-	    <script src="./src/features/extensions/extensionsToolWindow.js"></script>
-	    <script src="./src/extensions/bundled/git.js"></script>
-	    <script src="./src/extensions/bundled/mumps-tools.js"></script>
-	    <script src="./src/extensions/compare-with-release/compareWithReleaseUtils.js"></script>
-	    <script src="./src/extensions/bundled/compare-with-release.js"></script>
-	    <script src="./src/features/connections/releaseConnection.js"></script>
+    <script src="./src/features/extensions/extensionsToolWindow.js"></script>
+    <script src="./src/extensions/bundled/git.js"></script>
+    <script src="./src/extensions/bundled/mumps-tools.js"></script>
+    <script src="./src/extensions/compare-with-release/compareWithReleaseUtils.js"></script>
+    <script src="./src/extensions/bundled/compare-with-release.js"></script>
+    <script src="./src/features/connections/releaseConnection.js"></script>
     <script src="./src/editor/patchTracking/renderer-patch-tracking.js"></script>
     <script src="./src/editor/mumps/mumps-local-tags.js"></script>
     <script src="./src/editor/tabs/renderer-tabs.js"></script>
@@ -455,34 +460,67 @@
     <script src="./src/features/globalImpact/renderer-global-impact.js"></script>
     <script src="./src/editor/connections/renderer-connections.js"></script>
     <script src="./src/editor/project/renderer-project-create.js"></script>
-    <script src="./src/editor/project/renderer-project-context-menu.js"></script>
-    <script src="./src/editor/project/renderer-project-tree.js"></script>
+    <script src="./src/editor/project/renderer-project-context-menu.js?v=final_fix"></script>
+    <script src="./src/editor/project/renderer-project-tree.js?v=fix_multi_1"></script>
     <script src="./src/editor/routines/renderer-routines.js"></script>
     <script src="./src/editor/ui/renderer-editor-context-menu.js"></script>
     <script src="./src/editor/ui/renderer-settings-panel.js"></script>
     <script src="./src/editor/ui/renderer-ctrl-hover.js"></script>
     <script src="./src/editor/mumps/mumps-rename-preview-dialog.js"></script>
     <script src="./src/editor/mumps/mumps-rename-provider.js"></script>
+    <script src="./src/editor/mumps/mumps-symbol-indexer.js"></script>
+    <script src="./src/editor/mumps/mumps-smart-rename.js"></script>
+    <script src="./src/editor/mumps/mumps-smart-rename-dialog.js"></script>
+    <script src="./src/editor/mumps/mumps-rename-transaction.js"></script>
+    <script src="./src/editor/mumps/mumps-smart-rename-fallback.js"></script>
+    <script src="./src/editor/mumps/mumps-smart-rename-provider.js"></script>
+    <script src="./src/editor/mumps/mumps-quick-fix-provider.js"></script>
+    <script src="./src/editor/mumps/mumps-goto-map-panel.js?v=fix_2"></script>
+    <script src="./src/editor/mumps/mumps-linter-integration.js"></script>
+    <script src="./src/editor/mumps/mumps-fileman-api.js"></script>
+    <script src="./src/editor/mumps/mumps-snippets-service.js"></script>
+    <script src="./src/editor/mumps/mumps-new-autocomplete.js"></script>
+    <script src="./src/editor/mumps/mumps-tag-header-generator.js"></script>
+    <script src="./src/editor/mumps/mumps-routine-compare.js?v=final_fix"></script>
     <script src="./src/editor/mumps/renderer-mumps-monaco.js"></script>
     <script src="./src/ui/virtual-list.js"></script>
     <script src="./src/features/git/perf-ui.js"></script>
+    <script src="./src/renderer/diff/diffTabUi.js"></script>
     <script src="./src/app/monaco-layout-scheduler.js"></script>
     <script src="./src/app/feature-registry.js"></script>
     <script src="./src/app/lazy-panels.templates.js"></script>
     <script src="./src/app/lazy-panels.bootstrap.js"></script>
     <script src="./src/features/services/panel-bindings.js"></script>
     <script src="./src/app/perf-mode.js"></script>
-    <script src="./src/app/registries/menuRegistry.js?v=fix1"></script>
+    <script src="./src/app/registries/menuRegistry.js?v=1703706000"></script>
     <script src="./src/ui/icons/iconRegistry.js"></script>
     <script src="./src/ui/menu/menuUtils.js"></script>
     <script src="./src/ui/menu/submenuIntent.js"></script>
     <script src="./src/ui/menu/menuController.js"></script>
     <script src="./src/ui/menu/menuBar.js"></script>
-    <script src="./src/features/menus/menuActions.js"></script>
+    <script src="./src/features/menus/menuActions.js?v=1703706000"></script>
     <script src="./src/features/menus/vcsWidgetPopover.js"></script>
     <script src="./src/features/menus/phase3a-menus.js"></script>
     <script src="./src/app/wireDialogs.js"></script>
-    <script src="./renderer.js"></script>
+    <script src="./src/renderer/themes/themePresets.js"></script>
+    <script src="./src/renderer/toolWindows/toolWindowManager.js"></script>
+    <script src="./src/renderer/search/searchBindings.js"></script>
+    <script src="./src/renderer/shortcuts/globalShortcuts.js"></script>
+    <script src="./src/renderer/shortcuts/shortcutPrefs.js"></script>
+    <script src="./src/renderer/shortcuts/editorKeybindings.js"></script>
+    <script src="./src/renderer/menu/menuBarWiring.js"></script>
+    <script src="./src/renderer/run/runDebugButtons.js"></script>
+    <script src="./src/renderer/docker/dockerUi.js"></script>
+    <script src="./src/renderer/startup/postMonacoWiring.js"></script>
+    <script src="./src/renderer/status/statusBarWiring.js"></script>
+    <script src="./src/renderer/editor/editorToolbarWiring.js"></script>
+    <script src="./src/renderer/editor/declarationNavigation.js"></script>
+    <script src="./src/renderer/editor/editorMonacoActions.js"></script>
+    <script src="./src/renderer/git/gitQuickActions.js"></script>
+    <script src="./src/renderer/git/diffActions.js"></script>
+    <script src="./src/renderer/project/projectTreeWiring.js"></script>
+    <script src="./src/renderer/tabs/saveAllOpenTabs.js"></script>
+    <script src="./renderer.js?v=final_fix"></script>
 
     <script>
         (function () {

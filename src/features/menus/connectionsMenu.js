@@ -129,7 +129,7 @@
             const host = String(profile?.host || '').trim();
             const port = Number(profile?.port || 22) || 22;
             const username = String(profile?.user || profile?.username || '').trim();
-            const envKey = String(profile?.envKey || 'cc').trim() || 'cc';
+            const envKey = String(profile?.envKey || '').trim();
             if (!host || !username) {
                 notify('info', 'SSH', 'Host and user are required.');
                 return;
@@ -142,12 +142,20 @@
                 return;
             }
             try {
-                const res = await window.ahmadIDE.sshConnect({ host, port, username, password, envKey });
+                const payload = { host, port, username, password };
+                if (envKey) payload.envKey = envKey;
+                const res = await window.ahmadIDE.sshConnect(payload);
                 if (!res?.ok) throw new Error(res?.error || 'SSH connect failed');
                 if (res.sessionId) localStorage.setItem('ahmadIDE:sshSessionId', String(res.sessionId));
-                localStorage.setItem('ahmadIDE:ssh', JSON.stringify({ envKey, host, port, username }));
-                await window.ahmadIDE.setConnection('ssh', { ssh: { host, port, username, password, envKey } });
+                localStorage.setItem('ahmadIDE:ssh', JSON.stringify({ ...(envKey ? { envKey } : {}), host, port, username }));
+                const setConnResult = await window.ahmadIDE.setConnection('ssh', { ssh: { host, port, username, password, ...(envKey ? { envKey } : {}) } });
                 setStatus(`SSH: ${profile.name || host}`, 'success');
+
+                // Auto-fetch routines to project if project is open
+                if (typeof window.autoFetchRoutinesAfterConnection === 'function') {
+                    await window.autoFetchRoutinesAfterConnection({ discovered: setConnResult?.discovered });
+                }
+
                 await refreshRoutines();
             } catch (e) {
                 notify('error', 'SSH', String(e?.message || e || 'SSH connect failed'));
@@ -176,10 +184,16 @@
                 }
 
                 const config = loadDockerConfig();
-                await window.ahmadIDE.setConnection('docker', { docker: { containerId, ...config } });
+                const setConnResult = await window.ahmadIDE.setConnection('docker', { docker: { containerId, ...config } });
                 localStorage.setItem('ahmadIDE:lastContainerId', containerId);
                 const label = container?.name || containerId;
                 setStatus(`Docker: ${label}`, 'success');
+
+                // Auto-fetch routines to project if project is open
+                if (typeof window.autoFetchRoutinesAfterConnection === 'function') {
+                    await window.autoFetchRoutinesAfterConnection({ discovered: setConnResult?.discovered });
+                }
+
                 await refreshRoutines();
             } catch (e) {
                 notify('error', 'Docker', String(e?.message || e || 'Docker connect failed'));

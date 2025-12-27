@@ -2,7 +2,7 @@
 
 Professional IDE for MUMPS/M programming language with Docker and SSH support.
 
-Version: **1.1**
+Version: **2.0**
 
 ---
 
@@ -168,7 +168,7 @@ mumps-studio/
 
 ---
 
-## Fixes in v1.3
+## Fixes in v2.0
 
 **Terminal:**
 - ✓ Fixed xterm/Monaco AMD loader conflict
@@ -194,6 +194,15 @@ Built with:
 - **xterm.js** - Terminal emulator
 - **ssh2** - SSH client library
 - **YottaDB** - MUMPS database (via Docker/SSH)
+
+## FileMan API Snippets (Developer)
+
+Built-in VA FileMan API snippets + hover docs live in `src/editor/mumps/mumps-fileman-api.js`.
+
+To add another FileMan API:
+- Add a new entry to `APIS` (keyed by `TAG^ROUTINE` or `^DIC`) with `signature`, `description`, `params`, and `url`.
+- Add 1–2 snippet templates in `buildDefaultSnippets()` using tabstops/placeholders and include trigger prefixes for the full API name and a friendly `fileman ...` alias.
+- Run `npm test` to validate behavior.
 
 ---
 

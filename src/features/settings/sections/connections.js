@@ -130,7 +130,7 @@
                 const idx = parseInt(val, 10); activeIndex = Number.isFinite(idx) ? idx : -1; fillSshForm(sshProfiles[activeIndex] || {});
             }
         });
-        const envKeyInput = createInput({ value: '', placeholder: 'cc' });
+        const envKeyInput = createInput({ value: '', placeholder: 'auto' });
         const hostInput = createInput({ value: '', placeholder: '192.168.1.100' });
         const portInput = createInput({ value: '22', type: 'number', placeholder: '22' });
         const userInput = createInput({ value: '', placeholder: 'root' });
@@ -222,7 +222,7 @@
         const dockerHint = document.createElement('div'); dockerHint.className = 'ui-settings-group__hint'; dockerHint.textContent = 'Defaults used when connecting to Docker containers.';
         dockerGroup.appendChild(dockerTitle); dockerGroup.appendChild(dockerHint);
         const dockerConfig = loadDockerConfig();
-        const dockerEnvKeyInput = createInput({ value: String(dockerConfig?.envKey || 'cc'), placeholder: 'cc' });
+        const dockerEnvKeyInput = createInput({ value: String(dockerConfig?.envKey || ''), placeholder: 'auto' });
         const dockerYdbPathInput = createInput({ value: String(dockerConfig?.ydbPath || ''), placeholder: '/data/yottadb' });
         const dockerGldPathInput = createInput({ value: String(dockerConfig?.gldPath || ''), placeholder: '/data' });
         const dockerRoutinesPathInput = createInput({ value: String(dockerConfig?.routinesPath || ''), placeholder: '/data/routines' });
@@ -295,7 +295,11 @@
         const connectDocker = async () => {
             const containerId = dockerSelect.value;
             if (!containerId) { notify('info', 'Docker', 'Select a container before connecting.'); return; }
-            const config = { envKey: dockerEnvKeyInput.value.trim() || 'cc', ydbPath: dockerYdbPathInput.value.trim() || '', gldPath: dockerGldPathInput.value.trim() || '', routinesPath: dockerRoutinesPathInput.value.trim() || '' };
+            const envKey = dockerEnvKeyInput.value.trim();
+            const ydbPath = dockerYdbPathInput.value.trim();
+            const gldPath = dockerGldPathInput.value.trim();
+            const routinesPath = dockerRoutinesPathInput.value.trim();
+            const payloadConfig = { envKey, ydbPath, gldPath, routinesPath };
             const btnLabel = dockerConnectBtn.querySelector('.ui-btn__label');
             const originalLabel = btnLabel?.textContent || 'Connect Docker';
             dockerConnectBtn.disabled = true;
@@ -316,8 +320,15 @@
                     throw new Error('Selected container is not running. Refresh the list and try again.');
                 }
 
-                await window.ahmadIDE.setConnection('docker', { docker: { containerId, ...config } });
-                localStorage.setItem('ahmadIDE:lastContainerId', String(containerId)); saveDockerConfig(config);
+                await window.ahmadIDE.setConnection('docker', { docker: { containerId, ...payloadConfig } });
+                localStorage.setItem('ahmadIDE:lastContainerId', String(containerId));
+
+                const savedConfig = {};
+                if (envKey) savedConfig.envKey = envKey;
+                if (ydbPath) savedConfig.ydbPath = ydbPath;
+                if (gldPath) savedConfig.gldPath = gldPath;
+                if (routinesPath) savedConfig.routinesPath = routinesPath;
+                saveDockerConfig(savedConfig);
                 const name = dockerContainers.find((c) => (c.id || c.containerId) === containerId)?.name || containerId;
                 setStatus(`Docker: ${name}`, 'success'); await refreshRoutines();
             } catch (err) { notify('error', 'Docker', String(err?.message || err || 'Docker connect failed')); } finally {
@@ -338,17 +349,22 @@
         const dockerSaveBtn = createButton({
             label: 'Save Docker Defaults', variant: 'ghost',
             onClick: () => {
-                onClick: () => {
-                    const next = {
-                        envKey: dockerEnvKeyInput.value.trim() || 'cc',
-                        ydbPath: dockerYdbPathInput.value.trim() || '',
-                        gldPath: dockerGldPathInput.value.trim() || '',
-                        routinesPath: dockerRoutinesPathInput.value.trim() || '',
-                        defaultContainerId: defaultContainerSelect.value || null,
-                        defaultContainerName: defaultContainerSelect.options[defaultContainerSelect.selectedIndex]?.textContent || ''
-                    };
-                    saveDockerConfig(next); notify('success', 'Docker Defaults', 'Defaults saved.');
-                }
+                const envKey = dockerEnvKeyInput.value.trim();
+                const ydbPath = dockerYdbPathInput.value.trim();
+                const gldPath = dockerGldPathInput.value.trim();
+                const routinesPath = dockerRoutinesPathInput.value.trim();
+
+                const next = {
+                    defaultContainerId: defaultContainerSelect.value || null,
+                    defaultContainerName: defaultContainerSelect.options[defaultContainerSelect.selectedIndex]?.textContent || ''
+                };
+                if (envKey) next.envKey = envKey;
+                if (ydbPath) next.ydbPath = ydbPath;
+                if (gldPath) next.gldPath = gldPath;
+                if (routinesPath) next.routinesPath = routinesPath;
+
+                saveDockerConfig(next);
+                notify('success', 'Docker Defaults', 'Defaults saved.');
             }
         });
         dockerActionsRow.appendChild(dockerRefreshBtn); dockerActionsRow.appendChild(dockerConnectBtn); dockerActionsRow.appendChild(dockerDisconnectBtn); dockerActionsRow.appendChild(dockerSaveBtn);

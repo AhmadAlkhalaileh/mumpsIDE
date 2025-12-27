@@ -3,6 +3,10 @@ const { log: dbgLog } = require('../../../utils/debug-log');
 const { connectionConfig } = require('../config/connectionConfig');
 const { hasActiveSshSession } = require('../state/sessions');
 const { wrapDockerCmd } = require('../util/process');
+const {
+  discoverVistaProfilePaths,
+  applyVistaProfilePathsToConfig
+} = require('../vista/vistaProfilePaths');
 
 // Discover gld path from the container/host
 async function discoverGldPath() {
@@ -14,8 +18,18 @@ async function discoverGldPath() {
     return cfg.gldPath;
   }
 
-  // Try to discover from common locations
-  const discoveryCmd = "test -f /var/worldvista/prod/hakeem/globals/mumps.gld && echo '/var/worldvista/prod/hakeem/globals/mumps.gld' || (find /var/worldvista -name 'mumps.gld' 2>/dev/null | head -1)";
+  // Prefer vista-profile when available (more accurate than envKey defaults)
+  try {
+    const discovered = await discoverVistaProfilePaths({ timeoutMs: 4000 });
+    if (discovered?.ok && discovered.gldPath) {
+      applyVistaProfilePathsToConfig(cfg, discovered, { override: true });
+      return cfg.gldPath;
+    }
+  } catch (_) { }
+
+  // Fallback: search for a global directory file anywhere under /var/worldvista.
+  // (Avoid env-specific hardcoding like /var/worldvista/prod/<env>/globals/mumps.gld.)
+  const discoveryCmd = "find /var/worldvista -name 'mumps.gld' -type f 2>/dev/null | head -1";
 
   return new Promise((resolve) => {
     if (useDocker) {
@@ -24,7 +38,7 @@ async function discoverGldPath() {
       exec(fullCmd, { timeout: 10000 }, (err, stdout) => {
         const gldPath = (stdout || '').trim();
         dbgLog('[DEBUG] discoverGldPath result:', gldPath || '(empty)');
-        resolve(gldPath || '/var/worldvista/prod/hakeem/globals/mumps.gld'); // Fallback
+        resolve(gldPath || '');
       });
     } else {
       const sshPass = cfg.password ? `sshpass -p '${cfg.password}'` : '';
@@ -32,7 +46,7 @@ async function discoverGldPath() {
       exec(fullCmd, { timeout: 10000 }, (err, stdout) => {
         const gldPath = (stdout || '').trim();
         dbgLog('[DEBUG] discoverGldPath result:', gldPath || '(empty)');
-        resolve(gldPath || '/var/worldvista/prod/hakeem/globals/mumps.gld'); // Fallback
+        resolve(gldPath || '');
       });
     }
   });

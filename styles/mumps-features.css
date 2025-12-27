@@ -1,0 +1,714 @@
+/**
+ * MUMPS Features - Snippets, Compare, Tags
+ */
+
+/* ================================================
+   COMPARE ROUTINE DIALOG
+   ================================================ */
+
+.mumps-compare-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mumps-compare-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+}
+
+.mumps-compare-content {
+    position: relative;
+    background: #282a36;
+    border: 2px solid #6272a4;
+    border-radius: 8px;
+    width: 500px;
+    max-width: 90vw;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+}
+
+.mumps-compare-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid #44475a;
+}
+
+.mumps-compare-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #f8f8f2;
+}
+
+.mumps-compare-header .close-btn {
+    background: none;
+    border: none;
+    color: #f8f8f2;
+    font-size: 28px;
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.mumps-compare-header .close-btn:hover {
+    background: rgba(255, 85, 85, 0.2);
+    color: #ff5555;
+}
+
+.mumps-compare-body {
+    padding: 20px;
+}
+
+.compare-info {
+    margin-bottom: 20px;
+}
+
+.compare-info label {
+    display: block;
+    font-size: 12px;
+    color: #6272a4;
+    margin-bottom: 6px;
+}
+
+.compare-info strong {
+    font-size: 14px;
+    color: #bd93f9;
+}
+
+.compare-input label {
+    display: block;
+    font-size: 13px;
+    color: #f8f8f2;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.compare-input input {
+    width: 100%;
+    padding: 10px 12px;
+    background: #363948;
+    border: 1px solid #44475a;
+    border-radius: 4px;
+    color: #f8f8f2;
+    font-size: 14px;
+    font-family: 'Fira Code', monospace;
+}
+
+.compare-input input:focus {
+    outline: none;
+    border-color: #bd93f9;
+    box-shadow: 0 0 0 2px rgba(189, 147, 249, 0.2);
+}
+
+.mumps-compare-footer {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    padding: 16px 20px;
+    border-top: 1px solid #44475a;
+}
+
+/* ================================================
+   DIFF PANEL - Premium JetBrains-Inspired Design
+   ================================================ */
+
+.mumps-diff-panel {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #1a1b26 0%, #0d0e14 100%);
+    z-index: 9000;
+    display: none;
+    flex-direction: column;
+    animation: diffPanelFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes diffPanelFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.mumps-diff-panel.visible {
+    display: flex;
+}
+
+.diff-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    background: linear-gradient(180deg, rgba(65, 75, 105, 0.95) 0%, rgba(45, 52, 75, 0.9) 100%);
+    border-bottom: 1px solid rgba(88, 101, 140, 0.5);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+        0 4px 24px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.diff-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #e8eaed;
+    letter-spacing: 0.02em;
+}
+
+.diff-panel-title .left-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, rgba(255, 100, 100, 0.2) 0%, rgba(255, 60, 60, 0.1) 100%);
+    border: 1px solid rgba(255, 100, 100, 0.4);
+    border-radius: 20px;
+    color: #ff7b7b;
+    font-weight: 500;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.diff-panel-title .left-label:hover {
+    background: linear-gradient(135deg, rgba(255, 100, 100, 0.3) 0%, rgba(255, 60, 60, 0.2) 100%);
+    transform: translateY(-1px);
+}
+
+.diff-panel-title .left-label::before {
+    content: '◀';
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+.diff-panel-title .right-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: linear-gradient(135deg, rgba(80, 220, 140, 0.2) 0%, rgba(50, 200, 120, 0.1) 100%);
+    border: 1px solid rgba(80, 220, 140, 0.4);
+    border-radius: 20px;
+    color: #5cf09e;
+    font-weight: 500;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.diff-panel-title .right-label:hover {
+    background: linear-gradient(135deg, rgba(80, 220, 140, 0.3) 0%, rgba(50, 200, 120, 0.2) 100%);
+    transform: translateY(-1px);
+}
+
+.diff-panel-title .right-label::after {
+    content: '▶';
+    font-size: 10px;
+    opacity: 0.7;
+}
+
+.diff-panel-title .diff-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, rgba(100, 120, 200, 0.3) 0%, rgba(80, 100, 180, 0.2) 100%);
+    border: 1px solid rgba(100, 120, 200, 0.4);
+    border-radius: 50%;
+    color: #8b9dff;
+    font-size: 14px;
+    font-weight: bold;
+    box-shadow:
+        0 4px 12px rgba(100, 120, 200, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    animation: diffIconPulse 2s ease-in-out infinite;
+}
+
+@keyframes diffIconPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.diff-panel-controls {
+    display: flex;
+    gap: 8px;
+}
+
+.diff-panel-controls .btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #a0a8b8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.diff-panel-controls .btn:hover {
+    background: rgba(100, 120, 200, 0.3);
+    border-color: rgba(100, 120, 200, 0.5);
+    color: #ffffff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(100, 120, 200, 0.3);
+}
+
+.diff-panel-controls .btn:active {
+    transform: translateY(0);
+}
+
+#diffCloseBtn:hover {
+    background: rgba(255, 100, 100, 0.3);
+    border-color: rgba(255, 100, 100, 0.5);
+    color: #ff7b7b;
+}
+
+.diff-panel-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    background: #0f1014;
+}
+
+.diff-editor-container {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.diff-editor-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(100, 120, 200, 0.4), transparent);
+    z-index: 1;
+}
+
+.diff-changes-panel {
+    width: 280px;
+    background: linear-gradient(180deg, #1a1b26 0%, #141520 100%);
+    border-left: 1px solid rgba(88, 101, 140, 0.3);
+    display: flex;
+    flex-direction: column;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+}
+
+.changes-header {
+    padding: 16px 20px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #6b7394;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    border-bottom: 1px solid rgba(88, 101, 140, 0.2);
+    background: rgba(255, 255, 255, 0.02);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.changes-header::before {
+    content: '';
+    width: 4px;
+    height: 16px;
+    background: linear-gradient(180deg, #8b9dff 0%, #6478c8 100%);
+    border-radius: 2px;
+}
+
+.changes-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.changes-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.changes-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.changes-list::-webkit-scrollbar-thumb {
+    background: rgba(100, 120, 160, 0.3);
+    border-radius: 3px;
+}
+
+.changes-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 120, 160, 0.5);
+}
+
+.change-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-bottom: 4px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid transparent;
+}
+
+.change-item:hover {
+    background: rgba(100, 120, 200, 0.15);
+    border-color: rgba(100, 120, 200, 0.3);
+    transform: translateX(4px);
+}
+
+.change-item:active {
+    transform: translateX(2px);
+}
+
+.change-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.change-icon.added {
+    background: linear-gradient(135deg, rgba(80, 220, 140, 0.3) 0%, rgba(50, 180, 100, 0.2) 100%);
+    border: 1px solid rgba(80, 220, 140, 0.4);
+    color: #5cf09e;
+}
+
+.change-icon.deleted {
+    background: linear-gradient(135deg, rgba(255, 100, 100, 0.3) 0%, rgba(220, 60, 60, 0.2) 100%);
+    border: 1px solid rgba(255, 100, 100, 0.4);
+    color: #ff7b7b;
+}
+
+.change-icon.modified {
+    background: linear-gradient(135deg, rgba(255, 200, 80, 0.3) 0%, rgba(220, 170, 50, 0.2) 100%);
+    border: 1px solid rgba(255, 200, 80, 0.4);
+    color: #ffcc50;
+}
+
+.change-desc {
+    flex: 1;
+    color: #d0d4e0;
+    font-weight: 500;
+    line-height: 1.4;
+}
+
+.change-line {
+    color: #6b7394;
+    font-size: 11px;
+    font-weight: 400;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.no-changes {
+    text-align: center;
+    padding: 60px 24px;
+    color: #6b7394;
+    font-size: 13px;
+}
+
+.no-changes::before {
+    content: '✓';
+    display: block;
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 16px;
+    background: linear-gradient(135deg, rgba(80, 220, 140, 0.2) 0%, rgba(50, 180, 100, 0.1) 100%);
+    border: 1px solid rgba(80, 220, 140, 0.3);
+    border-radius: 50%;
+    line-height: 48px;
+    font-size: 20px;
+    color: #5cf09e;
+}
+
+/* ================================================
+   COMPARE DIALOG - Premium Styling
+   ================================================ */
+
+.mumps-compare-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: dialogBackdropFadeIn 0.2s ease;
+}
+
+@keyframes dialogBackdropFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.mumps-compare-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.mumps-compare-content {
+    position: relative;
+    width: 420px;
+    max-width: 90vw;
+    background: linear-gradient(180deg, #2a2d3a 0%, #1e2028 100%);
+    border-radius: 16px;
+    box-shadow:
+        0 24px 80px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(255, 255, 255, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    animation: dialogSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+@keyframes dialogSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.96);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.mumps-compare-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mumps-compare-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #e8eaed;
+    letter-spacing: -0.01em;
+}
+
+.mumps-compare-header .close-btn {
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    color: #9ca0ab;
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mumps-compare-header .close-btn:hover {
+    background: rgba(255, 100, 100, 0.2);
+    color: #ff7b7b;
+}
+
+.mumps-compare-body {
+    padding: 24px;
+}
+
+.compare-info {
+    margin-bottom: 20px;
+}
+
+.compare-info label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7394;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.compare-info strong {
+    display: block;
+    font-size: 16px;
+    font-weight: 600;
+    color: #ff7b7b;
+    padding: 12px 16px;
+    background: rgba(255, 100, 100, 0.1);
+    border: 1px solid rgba(255, 100, 100, 0.2);
+    border-radius: 8px;
+}
+
+.compare-input-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: #6b7394;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.compare-input-group input {
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(100, 120, 160, 0.3);
+    border-radius: 8px;
+    color: #e8eaed;
+    font-size: 14px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    transition: all 0.2s ease;
+}
+
+.compare-input-group input:focus {
+    outline: none;
+    border-color: rgba(100, 140, 255, 0.6);
+    box-shadow: 0 0 0 3px rgba(100, 140, 255, 0.15);
+}
+
+.compare-input-group input::placeholder {
+    color: #5a5e6b;
+}
+
+.compare-suggestions {
+    margin-top: 8px;
+    max-height: 150px;
+    overflow-y: auto;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.compare-suggestion-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    font-size: 13px;
+    color: #c8cad0;
+}
+
+.compare-suggestion-item:hover {
+    background: rgba(100, 120, 200, 0.2);
+    color: #ffffff;
+}
+
+.mumps-compare-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 20px 24px;
+    background: rgba(0, 0, 0, 0.15);
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.mumps-compare-footer .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.mumps-compare-footer .cancel-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #9ca0ab;
+}
+
+.mumps-compare-footer .cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.25);
+    color: #e8eaed;
+}
+
+.mumps-compare-footer .compare-btn {
+    background: linear-gradient(135deg, #5a7fea 0%, #4060d0 100%);
+    border: none;
+    color: #ffffff;
+    box-shadow: 0 4px 12px rgba(90, 127, 234, 0.3);
+}
+
+.mumps-compare-footer .compare-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #6a8ffa 0%, #5070e0 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(90, 127, 234, 0.4);
+}
+
+.mumps-compare-footer .compare-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ================================================
+   RESPONSIVE
+   ================================================ */
+
+@media (max-width: 800px) {
+    .mumps-compare-content {
+        width: 95vw;
+    }
+
+    .diff-changes-panel {
+        width: 220px;
+    }
+
+    .diff-panel-title .left-label,
+    .diff-panel-title .right-label {
+        padding: 4px 10px;
+        font-size: 12px;
+    }
+}

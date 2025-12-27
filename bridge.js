@@ -6,17 +6,6 @@ const { logger } = require('./utils/logger');
 const { log: dbgLog } = require('./utils/debug-log');
 const net = require('net');
 const { EventEmitter } = require('events');
-const {
-  DEFAULT_ENV_KEY,
-  DOCKER_DEFAULT_ENV_KEY,
-  shellQuote,
-  deriveEnvKeyFromUsername,
-  buildEnvPaths,
-  buildSshPaths,
-  buildDockerPaths,
-  normalizeRoutineName
-} = require('./src/bridge/config/paths');
-
 // In snap environment, ensure PATH includes snap + system binaries (git/docker live under $SNAP/usr/bin).
 if (process.env.SNAP) {
   const snap = String(process.env.SNAP || '').trim();

@@ -7,6 +7,9 @@ const crypto = require('crypto');
 const { exec } = require('child_process');
 const util = require('util');
 const execAsync = util.promisify(exec);
+const { extractVistaPathsFromProfileText, applyVistaProfilePathsToConfig } = require('../../bridge/vista/vistaProfilePaths');
+const { connectionConfig } = require('../../bridge/config/connectionConfig');
+const { hasActiveSshSession } = require('../../bridge/state/sessions');
 
 class DockerScanner {
     constructor() {
@@ -74,8 +77,8 @@ class DockerScanner {
     async scanEnvironment(connectionId, config = {}) {
 
         const {
-            localrPath = '/var/worldvista/prod/hakeem/localr',
-            routinesPath = '/var/worldvista/prod/hakeem/routines',
+            localrPath = null,
+            routinesPath = null,
             envName = 'docker',
             routineNames = null // NEW: Optional list of specific routines to scan
         } = config;
@@ -84,51 +87,90 @@ class DockerScanner {
         console.log('[Docker Scanner] Paths:', { localrPath, routinesPath });
 
         try {
-            // Auto-discover paths if defaults don't exist
-            let actualLocalrPath = localrPath;
-            let actualRoutinesPath = routinesPath;
+            // Auto-discover paths when not provided or when invalid/empty.
+            let actualLocalrPath = String(localrPath || '').trim();
+            let actualRoutinesPath = String(routinesPath || '').trim();
+            let discoveryResult = null;
 
-            const testLocalr = await this.execCommand(connectionId, `test -d "${localrPath}" && echo "exists" || echo "missing"`, 5000);
-            const testRoutines = await this.execCommand(connectionId, `test -d "${routinesPath}" && echo "exists" || echo "missing"`, 5000);
+            let needsDiscovery = !actualLocalrPath || !actualRoutinesPath;
 
-            // Check if directories exist
-            const localrExists = testLocalr.stdout.trim() === 'exists';
-            const routinesExists = testRoutines.stdout.trim() === 'exists';
-            console.log('[Docker Scanner] Directory existence check:', { localrExists, routinesExists });
+            if (!needsDiscovery) {
+                const testLocalr = await this.execCommand(connectionId, `test -d "${actualLocalrPath}" && echo "exists" || echo "missing"`, 5000);
+                const testRoutines = await this.execCommand(connectionId, `test -d "${actualRoutinesPath}" && echo "exists" || echo "missing"`, 5000);
 
-            // If missing, definitely need discovery
-            let needsDiscovery = !localrExists || !routinesExists;
+                const localrExists = testLocalr.stdout.trim() === 'exists';
+                const routinesExists = testRoutines.stdout.trim() === 'exists';
+                console.log('[Docker Scanner] Directory existence check:', { localrExists, routinesExists });
 
-            // If directories exist, check if they're empty
-            if (localrExists && routinesExists) {
-                console.log('[Docker Scanner] Directories exist, checking if empty...');
-                const countCmd = `ls "${localrPath}"/*.m 2>/dev/null | wc -l`;
-                console.log('[Docker Scanner] Running empty check:', countCmd);
-                const countResult = await this.execCommand(connectionId, countCmd, 5000);
-                const fileCount = parseInt(countResult.stdout.trim()) || 0;
-                console.log('[Docker Scanner] File count in localr:', fileCount);
+                needsDiscovery = !localrExists || !routinesExists;
 
-                if (fileCount === 0) {
-                    console.warn('[Docker Scanner] Default paths are empty, will attempt auto-discovery...');
-                    needsDiscovery = true;
+                if (localrExists && routinesExists) {
+                    console.log('[Docker Scanner] Directories exist, checking if empty...');
+                    const countCmd = `ls "${actualLocalrPath}"/*.m 2>/dev/null | wc -l`;
+                    const countResult = await this.execCommand(connectionId, countCmd, 5000);
+                    const fileCount = parseInt(countResult.stdout.trim()) || 0;
+                    console.log('[Docker Scanner] File count in localr:', fileCount);
+                    if (fileCount === 0) needsDiscovery = true;
                 }
             }
 
             console.log('[Docker Scanner] needsDiscovery:', needsDiscovery);
 
             if (needsDiscovery) {
-                console.warn('[Docker Scanner] Running auto-discovery...');
-                const discovered = await this.discoverPaths(connectionId);
+                console.warn('[Docker Scanner] Auto-discovering Vista paths...');
 
-                if (discovered) {
-                    actualLocalrPath = discovered.localrPath || localrPath;
-                    actualRoutinesPath = discovered.routinesPath || routinesPath;
-                    console.log('[Docker Scanner] ✓ Using discovered paths:', { actualLocalrPath, actualRoutinesPath });
-                } else {
-                    console.error('[Docker Scanner] ✗ Could not find Vista routine directories!');
+                const fromProfile = await this.discoverPathsFromVistaProfile(connectionId);
+                if (fromProfile?.localrPath) {
+                    actualLocalrPath = fromProfile.localrPath;
+                    discoveryResult = fromProfile;
                 }
+                if (fromProfile?.routinesPath) actualRoutinesPath = fromProfile.routinesPath;
+
+                if (!actualLocalrPath || !actualRoutinesPath) {
+                    const discovered = await this.discoverPaths(connectionId);
+                    if (discovered?.localrPath) actualLocalrPath = discovered.localrPath;
+                    if (discovered?.routinesPath) actualRoutinesPath = discovered.routinesPath;
+                    // Merge discovery results, preferring fromProfile if available
+                    if (discovered) {
+                        discoveryResult = {
+                            ...discovered,
+                            ...(fromProfile || {}),
+                            localrPath: actualLocalrPath,
+                            routinesPath: actualRoutinesPath
+                        };
+                    }
+                }
+
+                console.log('[Docker Scanner] Using paths:', { actualLocalrPath, actualRoutinesPath });
             } else {
-                console.log('[Docker Scanner] Using default paths (directories not empty)');
+                // Even if paths were provided, try to get metadata from vista-profile
+                console.log('[Docker Scanner] Paths provided, enriching with metadata...');
+                const fromProfile = await this.discoverPathsFromVistaProfile(connectionId);
+                if (fromProfile) {
+                    discoveryResult = {
+                        ...fromProfile,
+                        localrPath: actualLocalrPath,
+                        routinesPath: actualRoutinesPath
+                    };
+                }
+            }
+
+            // UPDATE: Propagate discovered paths to connectionConfig so other code can use them
+            if (actualLocalrPath || actualRoutinesPath) {
+                const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
+                const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
+
+                const pathsToApply = {
+                    ok: true,
+                    localrPath: actualLocalrPath,
+                    routinesPath: actualRoutinesPath,
+                    basePath: discoveryResult?.basePath || null,
+                    gldPath: discoveryResult?.gldPath || null,
+                    envKey: discoveryResult?.envKey || null
+                };
+
+                applyVistaProfilePathsToConfig(cfg, pathsToApply, { override: true });
+                console.log('[Docker Scanner] Updated connectionConfig with paths:', pathsToApply);
             }
 
             let localrFiles, routinesFiles;
@@ -148,13 +190,16 @@ class DockerScanner {
 
             console.log(`[Docker Scanner] Found ${localrFiles.length} routines in localr, ${routinesFiles.length} in routines`);
 
-            // Build result
+            // Build result with full path metadata
             const result = {
                 environment: envName,
                 scannedAt: new Date().toISOString(),
                 paths: {
                     localr: actualLocalrPath,
-                    routines: actualRoutinesPath
+                    routines: actualRoutinesPath,
+                    basePath: discoveryResult?.basePath || null,
+                    gldPath: discoveryResult?.gldPath || null,
+                    envKey: discoveryResult?.envKey || null
                 },
                 localr: localrFiles,
                 routines: routinesFiles,
@@ -502,7 +547,7 @@ class DockerScanner {
             foundPaths.forEach(path => {
                 const parts = path.split('/');
                 const dirName = parts[parts.length - 1]; // localr or routines
-                const basePath = parts.slice(0, -1).join('/'); // /var/worldvista/prod/hakeem
+                const basePath = parts.slice(0, -1).join('/'); // /var/worldvista/prod/<env>
 
                 if (!pathGroups[basePath]) {
                     pathGroups[basePath] = {};
@@ -540,6 +585,34 @@ class DockerScanner {
 
         } catch (error) {
             console.error('[Docker Scanner] Path discovery error:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Auto-discover Vista paths using /var/worldvista/prod/common/vista-profile
+     * @returns {Promise<Object|null>} Discovered paths or null
+     */
+    async discoverPathsFromVistaProfile(connectionId) {
+        try {
+            const cmd = `sh -c 'cat /var/worldvista/prod/common/vista-profile 2>/dev/null || true'`;
+            const res = await this.execCommand(connectionId, cmd, 5000);
+            const text = String(res?.stdout || '').trim();
+            if (!text) return null;
+
+            const parsed = extractVistaPathsFromProfileText(text);
+            const localr = parsed?.localrPath || null;
+            const routines = parsed?.routinesPath || null;
+            if (!localr && !routines) return null;
+
+            return {
+                basePath: parsed?.basePath || null,
+                localrPath: localr,
+                routinesPath: routines,
+                envKey: parsed?.envKey || null
+            };
+        } catch (error) {
+            console.warn('[Docker Scanner] vista-profile discovery error:', error?.message || error);
             return null;
         }
     }

@@ -7,6 +7,21 @@
     background: var(--panel-2) !important;
 }
 
+.panel#problemsPanel {
+    padding: 8px;
+}
+
+.panel#problemsPanel .pane-header {
+    flex-shrink: 0;
+    margin-bottom: 0;
+}
+
+.panel#problemsPanel #problemsListStandalone {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+}
+
 /* SUSPECTED UNUSED STYLE – verify in DOM/templates before deleting. Legacy toolwindow rail/content/buttons replaced by tool-window-bar. */
 .toolwindows-rail,
 .toolwindows-content,

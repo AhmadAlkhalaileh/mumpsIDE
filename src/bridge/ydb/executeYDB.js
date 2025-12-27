@@ -5,10 +5,32 @@ const { wrapDockerCmd } = require('../util/process');
 const { discoverGldPath } = require('./discoverGldPath');
 const { cleanOutput } = require('../util/ydb');
 const { getRoutineDirs } = require('../routines/fetchRoutineDirectoriesToLocal');
+const { discoverVistaProfilePaths, applyVistaProfilePathsToConfig } = require('../vista/vistaProfilePaths');
+
+async function ensureVistaProfilePathsDiscovered() {
+  const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
+  const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
+
+  const needsAny = !String(cfg?.gldPath || '').trim()
+    || (!String(cfg?.routinesPath || '').trim() && !String(cfg?.rpcRoutinesPath || '').trim());
+  if (!needsAny) return;
+
+  if (useDocker) {
+    if (!cfg?.containerId) return;
+  } else {
+    if (!cfg?.host || !cfg?.username) return;
+  }
+
+  try {
+    const discovered = await discoverVistaProfilePaths({ timeoutMs: 4000 });
+    applyVistaProfilePathsToConfig(cfg, discovered, { override: true });
+  } catch (_) { }
+}
 
 // Execute code directly in MUMPS without wrapping in a routine (for debugging)
 async function executeYDBDirect(command) {
   const cmdFile = '/tmp/ahmad_debug_cmd.txt';
+  await ensureVistaProfilePathsDiscovered();
 
   // Commands are executed line-by-line in direct mode
   // No routine wrapper, so variables persist in the same session
@@ -132,6 +154,7 @@ async function executeYDBDirect(command) {
 }
 
 async function executeYDB(command) {
+  await ensureVistaProfilePathsDiscovered();
   const routineName = `TMP${Date.now().toString(16)}`;
   const routineDirs = getRoutineDirs();
   const routinesPath = routineDirs[0];
@@ -246,8 +269,9 @@ async function executeYDB(command) {
       ? `${routinesPath}(${routinesPath}) ${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}`
       : `${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}`;
 
-    // Use a default globals dir if not configured
+    // Prefer configured gldPath; otherwise attempt discovery (vista-profile / find).
     const gldPath = cfg.gldPath || await discoverGldPath();
+    const gldExport = gldPath ? `export gtmgbldir=${gldPath} && ` : '';
 
     const writeCmd = wrapDockerCmd(
       `docker exec ${cfg.containerId} bash -lc "echo ${codeB64} | base64 -d > ${routineFile}"`
@@ -256,7 +280,7 @@ async function executeYDB(command) {
       `docker exec ${cfg.containerId} bash -lc "echo ${runCmdB64} | base64 -d > ${cmdFile}"`
     );
     const runCmd = wrapDockerCmd(
-      `docker exec ${cfg.containerId} bash -lc "export gtm_dist=${cfg.ydbPath} && export gtmgbldir=${gldPath} && export gtmroutines='${gtmroutines}' && export gtm_etrap='' && export gtm_ztrap='' && ${cfg.ydbPath}/mumps -direct < ${cmdFile} 2>&1; rm -f ${routineFile} ${cmdFile}"`
+      `docker exec ${cfg.containerId} bash -lc "export gtm_dist=${cfg.ydbPath} && ${gldExport}export gtmroutines='${gtmroutines}' && export gtm_etrap='' && export gtm_ztrap='' && ${cfg.ydbPath}/mumps -direct < ${cmdFile} 2>&1; rm -f ${routineFile} ${cmdFile}"`
     );
 
     return new Promise((resolve) => {
@@ -274,12 +298,13 @@ async function executeYDB(command) {
       ? `${routinesPath}(${routinesPath}) ${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}`
       : `${cfg.ydbPath}/libgtmutil.so ${cfg.ydbPath}`;
 
-    // Use a default globals dir if not configured
+    // Prefer configured gldPath; otherwise attempt discovery (vista-profile / find).
     const gldPath = cfg.gldPath || await discoverGldPath();
+    const gldExport = gldPath ? `export gtmgbldir=${gldPath} && ` : '';
 
     const writeCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "echo ${codeB64} | base64 -d > ${routineFile}"`;
     const writeRun = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "echo ${runCmdB64} | base64 -d > ${cmdFile}"`;
-    const runCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "export gtm_dist=${cfg.ydbPath} && export gtmgbldir=${gldPath} && export gtmroutines='${gtmroutines}' && export gtm_etrap='' && export gtm_ztrap='' && ${cfg.ydbPath}/mumps -direct < ${cmdFile} 2>&1; rm -f ${routineFile} ${cmdFile}"`;
+    const runCmd = `${sshPass} ssh -o StrictHostKeyChecking=no -p ${cfg.port} ${cfg.username}@${cfg.host} "export gtm_dist=${cfg.ydbPath} && ${gldExport}export gtmroutines='${gtmroutines}' && export gtm_etrap='' && export gtm_ztrap='' && ${cfg.ydbPath}/mumps -direct < ${cmdFile} 2>&1; rm -f ${routineFile} ${cmdFile}"`;
 
     return new Promise((resolve) => {
       exec(`${writeCmd} && ${writeRun} && ${runCmd}`, { timeout: 30000, maxBuffer: 10 * 1024 * 1024 }, (err, stdout, stderr) => {
@@ -294,4 +319,3 @@ module.exports = {
   executeYDBDirect,
   executeYDB
 };
-

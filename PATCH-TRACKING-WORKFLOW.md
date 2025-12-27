@@ -171,9 +171,8 @@ docker exec 8c21cf79fb67 find /var/worldvista -name "routines" -type d
 When everything works correctly:
 
 ```
-[Patch Tracker] Scanning 4 routines from patch UJO*3.0*28: LRAPD1, LRSPRPTA, LRAPCUM, LRAPBR1
 [Docker Scanner] Scanning 4 specific routines from patch
-[Docker Scanner] Executing: docker exec 8c21cf79fb67 sh -c 'cd /var/worldvista/prod/hakeem/localr && md5sum LRAPD1.m LRSPRPTA.m LRAPCUM.m LRAPBR1.m 2>/dev/null || true'
+[Docker Scanner] Executing: docker exec 8c21cf79fb67 sh -c 'cd /var/worldvista/prod/h/localr && md5sum LRAPD1.m LRSPRPTA.m LRAPCUM.m LRAPBR1.m 2>/dev/null || true'
 [Docker Scanner] Found 4 in localr, 4 in routines
 [Change Detector] Modified: 4 routines
 [GitLab] Downloading 4 changed routines from Docker...

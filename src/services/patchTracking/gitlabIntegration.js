@@ -182,19 +182,57 @@ class GitLabIntegration {
             throw new Error('Repository path not initialized');
         }
 
-        console.log('[GitLab] Downloading changed routines from Docker...');
+        console.log('[GitLab] ========================================');
+        console.log('[GitLab] Starting routine download from Docker');
+        console.log('[GitLab] ========================================');
 
         const fs = require('fs');
         const path = require('path');
         const { exec } = require('child_process');
         const util = require('util');
         const execAsync = util.promisify(exec);
+        const { connectionConfig } = require('../../bridge/config/connectionConfig');
+        const { hasActiveSshSession } = require('../../bridge/state/sessions');
+        const { getRoutineDirs } = require('../../bridge/routines/fetchRoutineDirectoriesToLocal');
 
-        // Create localr directory in repo if it doesn't exist
+        // Get current paths from connectionConfig (updated by scan)
+        const useDocker = connectionConfig.type !== 'ssh' || !hasActiveSshSession();
+        const cfg = useDocker ? connectionConfig.docker : connectionConfig.ssh;
+
+        console.log('[GitLab] Connection config:', {
+            type: connectionConfig.type,
+            routinesPath: cfg?.routinesPath,
+            rpcRoutinesPath: cfg?.rpcRoutinesPath,
+            basePath: cfg?.basePath
+        });
+
+        // Get all routine directories (localr, routines, etc.)
+        const routineDirs = getRoutineDirs();
+        console.log('[GitLab] Available routine directories:', routineDirs);
+
+        // Find localr path (primary directory for changes)
+        const localrPath = routineDirs.find(d => /\/localr\/?$/.test(d)) ||
+                          cfg.routinesPath ||
+                          routineDirs[0] ||
+                          null;
+
+        console.log('[GitLab] Using localr path:', localrPath);
+
+        if (!localrPath) {
+            throw new Error('Cannot determine localr path - no paths configured. Run scan first to discover paths from vista-profile.');
+        }
+
+        // Create localr and routines directories in repo
         const localrDir = path.join(this.repoPath, 'localr');
+        const routinesDir = path.join(this.repoPath, 'routines');
+
         if (!fs.existsSync(localrDir)) {
             fs.mkdirSync(localrDir, { recursive: true });
             console.log('[GitLab] Created localr directory:', localrDir);
+        }
+        if (!fs.existsSync(routinesDir)) {
+            fs.mkdirSync(routinesDir, { recursive: true });
+            console.log('[GitLab] Created routines directory:', routinesDir);
         }
 
         // Download each modified/added file from Docker
@@ -203,24 +241,61 @@ class GitLabIntegration {
             ...(changeResult.changes.addedToLocalr || [])
         ];
 
-        console.log(`[GitLab] Downloading ${filesToDownload.length} files...`);
+        console.log(`[GitLab] Files to download: ${filesToDownload.length}`);
+        console.log('[GitLab] Files:', filesToDownload.map(f => f.routine).join(', '));
+
+        let successCount = 0;
+        let failCount = 0;
 
         for (const change of filesToDownload) {
             try {
                 const localPath = path.join(localrDir, `${change.routine}.m`);
-                const dockerPath = change.localrPath;
+
+                // Determine Docker path with multiple fallback strategies
+                let dockerPath = change.localrPath; // From scan result
+
+                if (!dockerPath || !dockerPath.startsWith('/')) {
+                    // Fallback 1: Use localrPath from config
+                    dockerPath = `${localrPath}/${change.routine}.m`;
+                    console.log(`[GitLab] Using config path for ${change.routine}: ${dockerPath}`);
+                }
+
+                // Verify path looks valid
+                if (!dockerPath || !dockerPath.startsWith('/')) {
+                    console.error(`[GitLab] Invalid Docker path for ${change.routine}: ${dockerPath}`);
+                    failCount++;
+                    continue;
+                }
 
                 // Use docker cp to copy file from container
-                const cpCmd = `docker cp ${connectionId}:${dockerPath} ${localPath}`;
-                console.log('[GitLab] Copying:', change.routine);
-                await execAsync(cpCmd);
+                const cpCmd = `docker cp ${connectionId}:${dockerPath} "${localPath}"`;
+                console.log(`[GitLab] Executing: ${cpCmd}`);
+
+                const result = await execAsync(cpCmd);
+
+                if (fs.existsSync(localPath)) {
+                    const stats = fs.statSync(localPath);
+                    console.log(`[GitLab] ✓ Downloaded ${change.routine} (${stats.size} bytes)`);
+                    successCount++;
+                } else {
+                    console.error(`[GitLab] ✗ File not created: ${change.routine}`);
+                    failCount++;
+                }
 
             } catch (error) {
-                console.warn(`[GitLab] Failed to download ${change.routine}:`, error.message);
+                console.error(`[GitLab] ✗ Failed to download ${change.routine}:`, error.message);
+                console.error(`[GitLab]   Error details:`, error.stderr || error.stdout);
+                failCount++;
             }
         }
 
-        console.log('[GitLab] Download complete');
+        console.log('[GitLab] ========================================');
+        console.log(`[GitLab] Download complete: ${successCount} success, ${failCount} failed`);
+        console.log('[GitLab] ========================================');
+
+        if (failCount > 0 && successCount === 0) {
+            throw new Error(`Failed to download any routines. Check that:\n1. Paths are correct (localr: ${localrPath})\n2. Files exist in Docker container\n3. Docker container is running`);
+        }
     }
 
     /**

@@ -64,6 +64,7 @@ function createWindow() {
         show: false,  // Restore v1.3 behavior
         autoHideMenuBar: true,
         backgroundColor: '#1b120e',
+        icon: path.join(__dirname, 'icon.png'),
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
@@ -71,6 +72,24 @@ function createWindow() {
             sandbox: false  // Disable Electron sandbox in snap (snap provides confinement)
         }
     });
+
+    // Open external links in the user's default browser (avoid in-app navigation/popups).
+    try {
+        const { shell } = require('electron');
+        const isHttpUrl = (url) => /^https?:\/\//i.test(String(url || ''));
+        win.webContents.setWindowOpenHandler(({ url }) => {
+            if (isHttpUrl(url)) {
+                shell.openExternal(url).catch(() => { });
+            }
+            return { action: 'deny' };
+        });
+        win.webContents.on('will-navigate', (event, url) => {
+            if (isHttpUrl(url)) {
+                event.preventDefault();
+                shell.openExternal(url).catch(() => { });
+            }
+        });
+    } catch (_) { }
 
     const indexHtmlPath = path.join(__dirname, 'index.html');
     win.loadFile(indexHtmlPath).catch((err) => {
@@ -90,7 +109,7 @@ function createWindow() {
   <pre>${safeMessage}</pre>
 </body>`;
 
-        win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`).catch(() => {});
+        win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`).catch(() => { });
         win.show();
     });
     win.once('ready-to-show', () => {
@@ -389,11 +408,11 @@ app.whenReady().then(() => {
                     permissionError: true,
                     error: 'Docker permission denied',
                     message: 'Docker permission denied. Quick fix:\n\n' +
-                            '1. Add yourself to docker group:\n' +
-                            '   sudo usermod -aG docker $USER\n' +
-                            '   newgrp docker\n\n' +
-                            '2. Restart Mumps Studio\n\n' +
-                            'See DOCKER-SETUP.md for detailed instructions.',
+                        '1. Add yourself to docker group:\n' +
+                        '   sudo usermod -aG docker $USER\n' +
+                        '   newgrp docker\n\n' +
+                        '2. Restart Mumps Studio\n\n' +
+                        'See DOCKER-SETUP.md for detailed instructions.',
                     details: res.stderr || res.error
                 };
             }
@@ -402,11 +421,11 @@ app.whenReady().then(() => {
                     ok: false,
                     error: 'Docker not installed',
                     message: 'DEBUG INFO:\n' +
-                            'Command: ' + dockerCmd + '\n' +
-                            'Error: ' + res.error + '\n' +
-                            'Stderr: ' + res.stderr + '\n' +
-                            'Stdout: ' + res.stdout + '\n\n' +
-                            'PATH: ' + process.env.PATH,
+                        'Command: ' + dockerCmd + '\n' +
+                        'Error: ' + res.error + '\n' +
+                        'Stderr: ' + res.stderr + '\n' +
+                        'Stdout: ' + res.stdout + '\n\n' +
+                        'PATH: ' + process.env.PATH,
                     details: res.stderr || res.error
                 };
             }
@@ -450,12 +469,12 @@ app.whenReady().then(() => {
                     permissionError: true,
                     error: 'SSH permission denied',
                     message: 'SSH access requires permissions. Please run:\n\n' +
-                            '1. Connect snap interface:\n' +
-                            '   sudo snap connect mumps-studio:ssh-keys\n\n' +
-                            '2. Check SSH key permissions:\n' +
-                            '   chmod 600 ~/.ssh/id_rsa\n' +
-                            '   chmod 644 ~/.ssh/id_rsa.pub\n\n' +
-                            '3. Restart the IDE',
+                        '1. Connect snap interface:\n' +
+                        '   sudo snap connect mumps-studio:ssh-keys\n\n' +
+                        '2. Check SSH key permissions:\n' +
+                        '   chmod 600 ~/.ssh/id_rsa\n' +
+                        '   chmod 644 ~/.ssh/id_rsa.pub\n\n' +
+                        '3. Restart the IDE',
                     details: res.error
                 };
             }
@@ -479,7 +498,10 @@ app.whenReady().then(() => {
 
     // Routines
     ipcHandle('routines:list', async (_event, payload) => {
-        return bridge.listRoutines(payload?.search || '');
+        console.log('>>> [IPC] routines:list called with payload:', payload);
+        const result = await bridge.listRoutines(payload?.search || '');
+        console.log('>>> [IPC] routines:list result:', { ok: result?.ok, count: result?.routines?.length, error: result?.error });
+        return result;
     });
 
     ipcHandle('routines:search', async (_event, payload) => {
@@ -560,11 +582,17 @@ app.whenReady().then(() => {
                 await patchTrackerService.init();
             }
 
+            const activeConn = (() => {
+                try { return bridge.getConnection?.(); } catch (_) { return null; }
+            })();
+            const fallbackLocalr = activeConn?.paths?.localrPath || '';
+            const fallbackRoutines = activeConn?.paths?.routinesPath || '';
+
             const result = await patchTrackerService.scanEnvironment({
                 connectionId,
                 envName: envName || 'docker',
-                localrPath: localrPath || '/var/worldvista/prod/hakeem/localr',
-                routinesPath: routinesPath || '/var/worldvista/prod/hakeem/routines',
+                localrPath: localrPath || fallbackLocalr || null,
+                routinesPath: routinesPath || fallbackRoutines || null,
                 patchId: patchId // Pass through the patchId
             });
 

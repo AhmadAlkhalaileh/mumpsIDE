@@ -36,7 +36,7 @@
         let projectTreeRenderPending = null;
         let projectTreeRenderArgs = null;
         let projectTreeRenderToken = 0;
-        let lastSelectedTreeItem = null;
+        const selectedPaths = new Set();
 
         function renderProjectTreeLoading(message = 'Loading routines…') {
             const host = document.getElementById('projectTree');
@@ -55,6 +55,7 @@
                 renderProjectTreeImmediate(args.routines, args.routineStateRef, args.editorRef, args.token);
             });
         }
+
 
         function renderProjectTreeImmediate(routines = [], routineStateRef = null, editorRef = null, token = projectTreeRenderToken) {
             if (token !== projectTreeRenderToken) return;
@@ -156,22 +157,41 @@
                             icon: treeIcons.mumps,
                             depth: depth + 1,
                             isActive: isCurrentRoutine,
-                            onClick: async () => {
-                                if (lastSelectedTreeItem) {
-                                    lastSelectedTreeItem.removeClass('selected active');
+                            onClick: async (e) => {
+                                const isMulti = e.ctrlKey || e.metaKey;
+                                if (isMulti) {
+                                    if (selectedPaths.has(routinePath)) {
+                                        selectedPaths.delete(routinePath);
+                                        fileItem.removeClass('selected active');
+                                    } else {
+                                        selectedPaths.add(routinePath);
+                                        fileItem.addClass('selected active');
+                                    }
+                                } else {
+                                    $('#projectTree .tree-item.selected').removeClass('selected active');
+                                    selectedPaths.clear();
+                                    selectedPaths.add(routinePath);
+                                    fileItem.addClass('selected active');
+                                    await loadRoutineByName(routinePath, routineStateRef, editorRef || getActiveEditor(), routinesSource);
                                 }
-                                fileItem.addClass('selected active');
-                                lastSelectedTreeItem = fileItem;
-                                await loadRoutineByName(routinePath, routineStateRef, editorRef || getActiveEditor(), routinesSource);
                             },
-                            onContext: (e) => showProjectContextMenu(e.clientX, e.clientY, {
-                                type: 'file',
-                                path: routinePath,
-                                name: displayName,
-                                folderName: folderName,
-                                routineStateRef,
-                                editorRef
-                            })
+                            onContext: (e) => {
+                                if (!selectedPaths.has(routinePath)) {
+                                    $('#projectTree .tree-item.selected').removeClass('selected active');
+                                    selectedPaths.clear();
+                                    selectedPaths.add(routinePath);
+                                    fileItem.addClass('selected active');
+                                }
+                                showProjectContextMenu(e.clientX, e.clientY, {
+                                    type: 'file',
+                                    path: routinePath,
+                                    name: displayName,
+                                    folderName: folderName,
+                                    selectedPaths: Array.from(selectedPaths),
+                                    routineStateRef,
+                                    editorRef
+                                });
+                            }
                         });
                         childrenContainer.append(fileItem);
                         added += 1;
@@ -275,22 +295,41 @@
                                     icon: treeIcons.mumps,
                                     depth: depth + 1,
                                     isActive: isCurrentRoutine,
-                                    onClick: async () => {
-                                        if (lastSelectedTreeItem) {
-                                            lastSelectedTreeItem.removeClass('selected active');
+                                    onClick: async (e) => {
+                                        const isMulti = e.ctrlKey || e.metaKey;
+                                        if (isMulti) {
+                                            if (selectedPaths.has(routinePath)) {
+                                                selectedPaths.delete(routinePath);
+                                                fileItem.removeClass('selected active');
+                                            } else {
+                                                selectedPaths.add(routinePath);
+                                                fileItem.addClass('selected active');
+                                            }
+                                        } else {
+                                            $('#projectTree .tree-item.selected').removeClass('selected active');
+                                            selectedPaths.clear();
+                                            selectedPaths.add(routinePath);
+                                            fileItem.addClass('selected active');
+                                            await loadRoutineByName(routinePath, routineStateRef, editorRef || getActiveEditor(), routinesSource);
                                         }
-                                        fileItem.addClass('selected active');
-                                        lastSelectedTreeItem = fileItem;
-                                        await loadRoutineByName(routinePath, routineStateRef, editorRef || getActiveEditor(), routinesSource);
                                     },
-                                    onContext: (e) => showProjectContextMenu(e.clientX, e.clientY, {
-                                        type: 'file',
-                                        path: routinePath,
-                                        name: displayName,
-                                        folderName: folderName,
-                                        routineStateRef,
-                                        editorRef
-                                    })
+                                    onContext: (e) => {
+                                        if (!selectedPaths.has(routinePath)) {
+                                            $('#projectTree .tree-item.selected').removeClass('selected active');
+                                            selectedPaths.clear();
+                                            selectedPaths.add(routinePath);
+                                            fileItem.addClass('selected active');
+                                        }
+                                        showProjectContextMenu(e.clientX, e.clientY, {
+                                            type: 'file',
+                                            path: routinePath,
+                                            name: displayName,
+                                            folderName: folderName,
+                                            selectedPaths: Array.from(selectedPaths),
+                                            routineStateRef,
+                                            editorRef
+                                        });
+                                    }
                                 });
                                 children.append(fileItem);
                             });

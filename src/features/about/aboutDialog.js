@@ -87,9 +87,9 @@
                     margin-top: var(--ui-space-6);
                 }
                 </style>
-                <div class="about-dialog-content__logo">M</div>
+                <div class="about-dialog-content__logo">MS</div>
                 <div class="about-dialog-content__title">Mumps Studio</div>
-                <div class="about-dialog-content__version">Version 1.1</div>
+                <div class="about-dialog-content__version">Version 2.0</div>
 
                 <div class="about-dialog-content__section">
                     <div class="about-dialog-content__section-title">Author</div>
@@ -98,7 +98,7 @@
 
                 <div class="about-dialog-content__section">
                     <div class="about-dialog-content__section-title">Build</div>
-                    <div class="about-dialog-content__section-value">Build #MS-1.1.${new Date().toISOString().slice(0, 10).replace(/-/g, '')}</div>
+                    <div class="about-dialog-content__section-value">Build #MS-2.0.${new Date().toISOString().slice(0, 10).replace(/-/g, '')}</div>
                     <div class="about-dialog-content__section-value" style="margin-top:4px;font-size:12px;color:rgba(255,255,255,0.5)">
                         ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
                     </div>
@@ -127,12 +127,12 @@
                 loadEnv().then((env) => {
                     const versions = env?.versions || {};
                     const info = `
-Mumps Studio v1.1
-Author: Ahmad Alkhalaileh
-Build: MS-1.1.${new Date().toISOString().slice(0, 10).replace(/-/g, '')}
-Node.js: ${versions.node || 'Unknown'}
-Electron: ${versions.electron || 'Unknown'}
-Chrome: ${versions.chrome || 'Unknown'}
+	Mumps Studio v2.0
+	Author: Ahmad Alkhalaileh
+	Build: MS-2.0.${new Date().toISOString().slice(0, 10).replace(/-/g, '')}
+	Node.js: ${versions.node || 'Unknown'}
+	Electron: ${versions.electron || 'Unknown'}
+	Chrome: ${versions.chrome || 'Unknown'}
                     `.trim();
                     navigator.clipboard?.writeText(info).catch(() => { });
                     const btn = container.querySelector('#aboutCopyBtn');
